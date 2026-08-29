@@ -4,6 +4,14 @@
  * Public self-serve signup: email/password with required verification,
  * Google OAuth, Resend transactional email, disposable-domain blocking,
  * invite-only signup allowlist, and umbrella org provisioning on signup.
+ *
+ * Self-host toggles (fork-local, not upstream):
+ *   - DISABLE_BILLING=true            -> drop the Stripe plugin, no paywall
+ *   - RESEND_API_KEY unset            -> skip all transactional email; signup
+ *                                       needs no verification, invites create a
+ *                                       row whose /accept-invitation/<id> link
+ *                                       is shared out of band
+ *   - GOOGLE_CLIENT_ID/SECRET unset   -> omit the Google social provider
  */
 
 import type { CreateAuthOptions } from "@workspace/lib/auth/server";
@@ -52,25 +60,35 @@ function getSignupAllowlist(): string[] {
 
 export function getCloudAuthOptions(): CreateAuthOptions {
 	const appUrl = process.env.APP_URL!;
+	const emailEnabled = !!process.env.RESEND_API_KEY;
+	const billingDisabled = process.env.DISABLE_BILLING === "true";
+	const hasGoogleOAuth = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+
 	return {
-		requireEmailVerification: true,
-		emailVerification: {
-			sendOnSignUp: true,
-			sendOnSignIn: true,
-			autoSignInAfterVerification: true,
-			sendVerificationEmail: async ({ user, url }) => {
-				await sendEmail(user.email, verificationEmail({ url }));
+		// Without a transactional-email provider there is no way to deliver a
+		// verification link, so verification is only required when email works.
+		requireEmailVerification: emailEnabled,
+		...(emailEnabled && {
+			emailVerification: {
+				sendOnSignUp: true,
+				sendOnSignIn: true,
+				autoSignInAfterVerification: true,
+				sendVerificationEmail: async ({ user, url }) => {
+					await sendEmail(user.email, verificationEmail({ url }));
+				},
 			},
-		},
-		sendResetPassword: async ({ user, url }) => {
-			await sendEmail(user.email, passwordResetEmail({ url }));
-		},
-		socialProviders: {
-			google: {
-				clientId: process.env.GOOGLE_CLIENT_ID!,
-				clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+			sendResetPassword: async ({ user, url }) => {
+				await sendEmail(user.email, passwordResetEmail({ url }));
 			},
-		},
+		}),
+		...(hasGoogleOAuth && {
+			socialProviders: {
+				google: {
+					clientId: process.env.GOOGLE_CLIENT_ID!,
+					clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+				},
+			},
+		}),
 		databaseHooks: {
 			user: {
 				create: {
@@ -98,18 +116,20 @@ export function getCloudAuthOptions(): CreateAuthOptions {
 				},
 			},
 		},
-		extraPlugins: [createStripeBillingPlugin()],
-		organizationOptions: {
-			sendInvitationEmail: async (data) => {
-				await sendEmail(
-					data.email,
-					invitationEmail({
-						inviterName: data.inviter.user.name,
-						orgName: data.organization.name,
-						url: `${appUrl}/accept-invitation/${data.id}`,
-					}),
-				);
-			},
-		},
+		...(!billingDisabled && { extraPlugins: [createStripeBillingPlugin()] }),
+		organizationOptions: emailEnabled
+			? {
+					sendInvitationEmail: async (data) => {
+						await sendEmail(
+							data.email,
+							invitationEmail({
+								inviterName: data.inviter.user.name,
+								orgName: data.organization.name,
+								url: `${appUrl}/accept-invitation/${data.id}`,
+							}),
+						);
+					},
+				}
+			: {},
 	};
 }

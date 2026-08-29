@@ -117,7 +117,7 @@ export async function getOrgBillingStates(
 ): Promise<Map<string, OrgBillingState>> {
 	const mode = options?.mode ?? getDeploymentModeFromEnv(process.env);
 	const result = new Map<string, OrgBillingState>();
-	if (mode !== "cloud") {
+	if (mode !== "cloud" || process.env.DISABLE_BILLING === "true") {
 		for (const orgId of orgIds) result.set(orgId, UNLIMITED_STATE);
 		return result;
 	}

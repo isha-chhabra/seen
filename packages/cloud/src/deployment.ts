@@ -26,7 +26,7 @@ export function createCloudDeployment(env: Record<string, string | undefined> = 
 			canCreateBrands: true,
 			platformPicksEditable: true,
 			selfServeSignup: true,
-			billing: true,
+			billing: process.env.DISABLE_BILLING !== "true",
 			reportGeneration: false,
 			teamInvites: true,
 		},

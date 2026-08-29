@@ -1,4 +1,4 @@
-# Elmo 
+# Elmo
 # Supports: web app (Nitro server) and worker
 
 # Base stage with Node.js
@@ -31,29 +31,36 @@ RUN pnpm install --frozen-lockfile
 FROM base AS builder
 WORKDIR /app
 
-# Copy dependencies
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
-COPY --from=deps /app/apps/worker/node_modules ./apps/worker/node_modules
-COPY --from=deps /app/packages/ui/node_modules ./packages/ui/node_modules
-COPY --from=deps /app/packages/config/node_modules ./packages/config/node_modules
-COPY --from=deps /app/packages/lib/node_modules ./packages/lib/node_modules
-COPY --from=deps /app/packages/local/node_modules ./packages/local/node_modules
-COPY --from=deps /app/packages/whitelabel/node_modules ./packages/whitelabel/node_modules
-COPY --from=deps /app/packages/cloud/node_modules ./packages/cloud/node_modules
-COPY --from=deps /app/packages/deployment/node_modules ./packages/deployment/node_modules
-COPY --from=deps /app/packages/og/node_modules ./packages/og/node_modules
+# Warm pnpm store + the fully-installed node_modules tree from the deps stage.
+# This stage then never needs the network (the droplet's link to npmjs.org is flaky).
+COPY --from=deps /root/.local/share/pnpm /root/.local/share/pnpm
+COPY --from=deps /root/.cache/node /root/.cache/node
+COPY --from=deps /app /app
 
-# Copy source code
+# Copy source code. node_modules/.next/etc are excluded by .dockerignore,
+# so the installed dependency tree copied above survives this.
 COPY . .
+
+# Keep pnpm from doing any network work in this offline stage:
+#  - verifyDepsBeforeRun:false  -> no implicit `pnpm install` before run/deploy
+#  - minimumReleaseAge:0        -> no supply-chain re-scan (deps stage already validated it)
+RUN sed -i 's/^minimumReleaseAge:.*/minimumReleaseAge: 0/' pnpm-workspace.yaml \
+ && printf '\nverifyDepsBeforeRun: false\n' >> pnpm-workspace.yaml
 
 # Build arguments for VITE_ env vars (baked into client bundle)
 ARG DEPLOYMENT_MODE=local
 ARG VITE_DEPLOYMENT_MODE=${DEPLOYMENT_MODE}
 ENV VITE_DEPLOYMENT_MODE=${VITE_DEPLOYMENT_MODE}
 
-# Build the web application (increase heap for large bundles)
-RUN pnpm --filter @workspace/web build
+ENV NODE_OPTIONS=--max-old-space-size=2048
+ENV npm_config_prefer_offline=true
+ENV npm_config_offline=true
+ENV npm_config_fetch_retries=6
+ENV npm_config_fetch_timeout=600000
+
+# Build the web application. Invoke vite directly rather than `pnpm --filter ... build`,
+# because `pnpm run` triggers a deps-status precheck that reinstalls from the network.
+RUN cd apps/web && node_modules/.bin/vite build && node ../../scripts/check-server-bundle.mjs .
 
 # Create pruned standalone deployments (only each package's own deps)
 # --legacy: allows deploy without inject-workspace-packages (which breaks Alpine Docker builds)

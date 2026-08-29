@@ -36,6 +36,11 @@ services:
     environment:
       DATABASE_URL: postgres://elmo:${POSTGRES_PASSWORD}@postgres:5432/elmo
       DEPLOYMENT_MODE: cloud
+      # Fork-local: run cloud mode without Stripe (no paywall, unlimited entitlements)
+      DISABLE_BILLING: "true"
+      # Invite-only self-serve signup. Comma-separated exact addresses and/or
+      # "@domain" entries. Empty = nobody can register. "*" = fully public (don't).
+      CLOUD_SIGNUP_ALLOWLIST: ${CLOUD_SIGNUP_ALLOWLIST:-}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       APP_NAME: ${APP_NAME}
       APP_ICON: ${APP_ICON}
@@ -57,6 +62,7 @@ services:
     environment:
       DATABASE_URL: postgres://elmo:${POSTGRES_PASSWORD}@postgres:5432/elmo
       DEPLOYMENT_MODE: cloud
+      DISABLE_BILLING: "true"
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       APP_NAME: ${APP_NAME}
       APP_URL: ${APP_URL}
