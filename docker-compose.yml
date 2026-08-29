@@ -1,0 +1,72 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: elmo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: elmo
+    volumes:
+      - elmo_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U elmo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: migrate
+    environment:
+      DATABASE_URL: postgres://elmo:${POSTGRES_PASSWORD}@postgres:5432/elmo
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: web
+    restart: unless-stopped
+    ports:
+      - "1515:3000"
+    environment:
+      DATABASE_URL: postgres://elmo:${POSTGRES_PASSWORD}@postgres:5432/elmo
+      DEPLOYMENT_MODE: cloud
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      APP_NAME: ${APP_NAME}
+      APP_ICON: ${APP_ICON}
+      APP_URL: ${APP_URL}
+      BRIGHTDATA_API_TOKEN: ${BRIGHTDATA_API_TOKEN}
+      SCRAPE_TARGETS: ${SCRAPE_TARGETS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://elmo:${POSTGRES_PASSWORD}@postgres:5432/elmo
+      DEPLOYMENT_MODE: cloud
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      APP_NAME: ${APP_NAME}
+      APP_URL: ${APP_URL}
+      BRIGHTDATA_API_TOKEN: ${BRIGHTDATA_API_TOKEN}
+      SCRAPE_TARGETS: ${SCRAPE_TARGETS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  elmo_postgres_data:
