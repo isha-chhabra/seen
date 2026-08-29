@@ -14,11 +14,12 @@ services:
       timeout: 5s
       retries: 10
 
+  # Images are built in CI (.github/workflows/build-images.yml) and pushed to GHCR.
+  # This box only pulls + runs them. To update: push to main, wait for the
+  # build-images workflow, then `docker compose pull && docker compose up -d`.
+
   migrate:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      target: migrate
+    image: ghcr.io/isha-chhabra/seen-migrate:main
     environment:
       DATABASE_URL: postgres://elmo:${POSTGRES_PASSWORD}@postgres:5432/elmo
     depends_on:
@@ -26,10 +27,7 @@ services:
         condition: service_healthy
 
   web:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      target: web
+    image: ghcr.io/isha-chhabra/seen-web:main
     restart: unless-stopped
     ports:
       - "1515:3000"
@@ -54,10 +52,7 @@ services:
         condition: service_completed_successfully
 
   worker:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      target: worker
+    image: ghcr.io/isha-chhabra/seen-worker:main
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://elmo:${POSTGRES_PASSWORD}@postgres:5432/elmo
