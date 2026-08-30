@@ -9,8 +9,8 @@
  * NOTE: Whitelabel mode does NOT use these defaults - all values must be
  * provided via environment variables.
  */
-export const DEFAULT_APP_NAME = "Elmo";
-export const DEFAULT_APP_ICON = "/icons/elmo-icon.svg";
+export const DEFAULT_APP_NAME = "Seen";
+export const DEFAULT_APP_ICON = "/icons/seen-icon.svg";
 export const DEFAULT_APP_URL = "http://localhost:3000/";
 
 /**
@@ -26,9 +26,9 @@ export const CRISP_WEBSITE_ID = "2f79a110-4e29-41a8-b45d-4993df6ff487";
 /**
  * Elmo brand constants — used for icon generation, manifest, and the brand kit.
  */
-export const ELMO_BRAND_COLOR = "#2563eb"; // blue-600
+export const ELMO_BRAND_COLOR = "#ec4899"; // pink-500
 export const ELMO_BRAND_FONT = "Titan One";
-export const ELMO_THEME_COLOR = "#2563eb";
+export const ELMO_THEME_COLOR = "#ec4899";
 export const ELMO_BACKGROUND_COLOR = "#ffffff";
 
 /**
