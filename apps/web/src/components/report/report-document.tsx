@@ -1,31 +1,24 @@
 /**
- * Offscreen two-page report, snapshotted to a PDF by downloadReportPdf().
- * US Letter at 96dpi (816 x 1056 px). Our own visual language: pink "seen"
- * wordmark, pink accents, clean analytics-report layout.
+ * Client-facing AI-visibility report — four pages, affiliate-marketing framing,
+ * plain language. Rendered visibly for ~1s while downloadReportPdf() snapshots
+ * each [data-report-page] to a PDF. US Letter at 96dpi (816 x 1056 px).
  */
 import type { ReportNarrative } from "@workspace/lib/report/narrative";
 import { forwardRef } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 
 interface ReportDigestView {
-	headlineMetrics: {
-		visibilityPct: number | null;
-		shareOfVoicePct: number | null;
-		totalRuns: number;
-		trackedPrompts: number;
-		visibilityDeltaPts?: number | null;
-		shareOfVoiceDeltaPts?: number | null;
-	};
 	charts: {
-		dailyVisibility: { date: string; visibility: number }[];
-		engineMentionRate: { engine: string; pct: number }[];
-		citationCategoryMix: Record<string, number>;
+		dailyRecommendationRate: { date: string; rate: number }[];
+		byAssistant: { assistant: string; rate: number }[];
+		sourceMix: Record<string, number>;
 	};
 }
 
 const PINK = "#ec4899";
 const INK = "#0f172a";
 const MUTE = "#64748b";
+const LINE = "#e2e8f0";
 
 export interface ReportDocProps {
 	brandName: string;
@@ -35,228 +28,237 @@ export interface ReportDocProps {
 	narrative: ReportNarrative;
 }
 
-const pageStyle: React.CSSProperties = {
+const page: React.CSSProperties = {
 	width: 816,
 	minHeight: 1056,
 	background: "#fff",
 	color: INK,
-	padding: "56px 60px",
+	padding: "52px 60px 64px",
 	fontFamily: "'Geist', ui-sans-serif, system-ui, sans-serif",
+	fontSize: 12,
+	lineHeight: 1.55,
 	boxSizing: "border-box",
+	position: "relative",
 };
+const h2: React.CSSProperties = { fontSize: 16, fontWeight: 700, margin: "0 0 10px" };
+const label: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: MUTE, textTransform: "uppercase" };
+const note: React.CSSProperties = { color: MUTE };
 
-function Wordmark() {
-	return <span style={{ fontFamily: "'Titan One', system-ui", fontSize: 26, color: PINK, lineHeight: 1 }}>seen</span>;
-}
-
-function Header({ brandName, periodLabel, compareLabel, page }: ReportDocProps & { page: 1 | 2 }) {
+function Head({ brandName, periodLabel, compareLabel, n }: ReportDocProps & { n: number }) {
+	const titles = ["Where you stand", "Which questions you win and lose", "Which sites the AI trusts", "What to do next"];
 	return (
-		<div
-			style={{
-				display: "flex",
-				justifyContent: "space-between",
-				alignItems: "flex-start",
-				borderBottom: `2px solid ${PINK}`,
-				paddingBottom: 14,
-				marginBottom: 26,
-			}}
-		>
+		<div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: `2px solid ${PINK}`, paddingBottom: 12, marginBottom: 24 }}>
 			<div>
-				<Wordmark />
-				<div style={{ fontSize: 20, fontWeight: 700, marginTop: 8 }}>{brandName} — AI Visibility Report</div>
-				<div style={{ fontSize: 12, color: MUTE, marginTop: 3 }}>
+				<span style={{ fontFamily: "'Titan One', system-ui", fontSize: 24, color: PINK, lineHeight: 1 }}>seen</span>
+				<div style={{ fontSize: 19, fontWeight: 700, marginTop: 8 }}>{brandName} — AI Visibility Report</div>
+				<div style={{ fontSize: 11, color: MUTE, marginTop: 3 }}>
 					{periodLabel}
-					{compareLabel ? `  ·  vs  ${compareLabel}` : ""}
+					{compareLabel ? `  ·  compared with  ${compareLabel}` : ""}
 				</div>
 			</div>
-			<div style={{ fontSize: 11, color: MUTE, textAlign: "right" }}>
-				{page === 1 ? "Summary & Analysis" : "Opportunities"}
+			<div style={{ fontSize: 10.5, color: MUTE, textAlign: "right" }}>
+				{titles[n - 1]}
 				<br />
-				Page {page} of 2
+				Page {n} of 4
 			</div>
 		</div>
 	);
 }
 
-function Stat({ label, value, delta }: { label: string; value: string; delta?: number | null }) {
+function Foot({ periodLabel }: { periodLabel: string }) {
 	return (
-		<div style={{ flex: 1, border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 14px" }}>
-			<div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 0.6, color: MUTE }}>{label}</div>
-			<div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{value}</div>
-			{delta != null && (
-				<div style={{ fontSize: 11, marginTop: 2, color: delta >= 0 ? "#059669" : "#dc2626" }}>
-					{delta >= 0 ? "+" : ""}
-					{delta} pts vs prior
-				</div>
-			)}
+		<div style={{ position: "absolute", left: 60, right: 60, bottom: 34, borderTop: `1px solid ${LINE}`, paddingTop: 8, fontSize: 9, color: MUTE, display: "flex", justifyContent: "space-between" }}>
+			<span>Seen — AI Visibility Report</span>
+			<span>{periodLabel}</span>
 		</div>
 	);
 }
 
-function PerfTable({ title, rows }: { title: string; rows: ReportNarrative["page1"]["topPerformers"] }) {
+function Callout({ children }: { children: React.ReactNode }) {
 	return (
-		<div style={{ flex: 1 }}>
-			<div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>{title}</div>
-			{rows.map((r, i) => (
-				<div
-					key={i}
-					style={{ display: "flex", gap: 8, padding: "5px 0", borderTop: i ? "1px solid #f1f5f9" : "none", fontSize: 11 }}
-				>
-					<div style={{ flex: 1 }}>
-						<div style={{ fontWeight: 600 }}>{r.label}</div>
-						<div style={{ color: MUTE }}>{r.note}</div>
+		<div style={{ background: "#fdf2f8", border: `1px solid #fbcfe8`, borderRadius: 10, padding: "14px 16px", fontSize: 12, lineHeight: 1.6 }}>
+			{children}
+		</div>
+	);
+}
+
+// ── Page 1 ────────────────────────────────────────────────────────────
+function Page1(p: ReportDocProps) {
+	const o = p.narrative.overview;
+	const trend = p.digest.charts.dailyRecommendationRate.map((d) => ({ d: d.date.slice(5), rate: d.rate }));
+	return (
+		<div style={page}>
+			<Head {...p} n={1} />
+			<div style={{ marginBottom: 18 }}>
+				<div style={label}>What this report measures</div>
+				<div style={{ marginTop: 6 }}>{o.whatThisIs}</div>
+			</div>
+			<Callout>
+				<strong>Bottom line. </strong>
+				{o.headline}
+			</Callout>
+			<div style={{ display: "flex", gap: 12, margin: "22px 0 24px" }}>
+				{o.keyNumbers.map((k, i) => (
+					<div key={i} style={{ flex: 1, border: `1px solid ${LINE}`, borderRadius: 10, padding: "14px 16px" }}>
+						<div style={label}>{k.label}</div>
+						<div style={{ fontSize: 26, fontWeight: 700, margin: "6px 0 4px", color: PINK }}>{k.value}</div>
+						<div style={{ ...note, fontSize: 11 }}>{k.whatItMeans}</div>
 					</div>
-					<div style={{ whiteSpace: "nowrap", fontWeight: 700, color: PINK }}>{r.value}</div>
+				))}
+			</div>
+			<div style={label}>How often AI recommended {p.brandName}, day by day</div>
+			<LineChart width={690} height={190} data={trend} margin={{ top: 10, right: 12, bottom: 0, left: -18 }}>
+				<CartesianGrid stroke="#f1f5f9" vertical={false} />
+				<XAxis dataKey="d" tick={{ fontSize: 9, fill: MUTE }} interval="preserveStartEnd" />
+				<YAxis tick={{ fontSize: 9, fill: MUTE }} domain={[0, 100]} unit="%" />
+				<Line type="monotone" dataKey="rate" stroke={PINK} strokeWidth={2.5} dot={false} isAnimationActive={false} />
+			</LineChart>
+			<div style={{ ...note, fontSize: 10.5, marginTop: 6 }}>
+				Each point is the share of that day's AI answers to your tracked buying questions that named {p.brandName}.
+			</div>
+			<Foot periodLabel={p.periodLabel} />
+		</div>
+	);
+}
+
+// ── Page 2 ────────────────────────────────────────────────────────────
+function QList({ items, kind }: { items: { question: string; detail: string; recommendedInstead?: string }[]; kind: "win" | "lose" }) {
+	return (
+		<div>
+			{items.map((it, i) => (
+				<div key={i} style={{ padding: "9px 0", borderTop: i ? `1px solid #f1f5f9` : "none" }}>
+					<div style={{ fontWeight: 600, fontSize: 12 }}>
+						<span style={{ color: kind === "win" ? "#059669" : "#dc2626", marginRight: 6 }}>{kind === "win" ? "▲" : "▼"}</span>
+						“{it.question}”
+					</div>
+					<div style={{ ...note, fontSize: 11, marginTop: 2 }}>{it.detail}</div>
+					{it.recommendedInstead && (
+						<div style={{ fontSize: 11, marginTop: 2 }}>
+							<span style={note}>AI recommends instead: </span>
+							<strong>{it.recommendedInstead}</strong>
+						</div>
+					)}
 				</div>
 			))}
 		</div>
 	);
 }
-
-function PageOne(props: ReportDocProps) {
-	const { digest, narrative } = props;
-	const h = digest.headlineMetrics;
-	const trend = digest.charts.dailyVisibility.map((d) => ({ date: d.date.slice(5), visibility: d.visibility }));
-	const engines = digest.charts.engineMentionRate.map((e) => ({ engine: e.engine, pct: e.pct }));
-
+function Page2(p: ReportDocProps) {
+	const b = p.narrative.buyingQuestions;
+	const bars = p.digest.charts.byAssistant.map((e) => ({ a: e.assistant, rate: e.rate }));
 	return (
-		<div style={pageStyle}>
-			<Header {...props} page={1} />
-
-			<div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.4, marginBottom: 18 }}>{narrative.page1.headline}</div>
-
-			<div style={{ display: "flex", gap: 10, marginBottom: 22 }}>
-				<Stat label="Visibility" value={h.visibilityPct != null ? `${h.visibilityPct}%` : "—"} delta={h.visibilityDeltaPts} />
-				<Stat
-					label="Share of Voice"
-					value={h.shareOfVoicePct != null ? `${h.shareOfVoicePct}%` : "—"}
-					delta={h.shareOfVoiceDeltaPts}
-				/>
-				<Stat label="Answers sampled" value={String(h.totalRuns)} />
-				<Stat label="Prompts tracked" value={String(h.trackedPrompts)} />
-			</div>
-
-			<ul style={{ margin: "0 0 22px", paddingLeft: 18, fontSize: 12, lineHeight: 1.55 }}>
-				{narrative.page1.summary.map((s, i) => (
-					<li key={i} style={{ marginBottom: 4 }}>
-						{s}
-					</li>
-				))}
-			</ul>
-
-			<div style={{ display: "flex", gap: 24, marginBottom: 22 }}>
-				<div style={{ flex: 1 }}>
-					<div style={{ fontSize: 11, fontWeight: 700, color: MUTE, marginBottom: 6 }}>DAILY VISIBILITY</div>
-					<LineChart width={318} height={150} data={trend} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
-						<CartesianGrid stroke="#f1f5f9" vertical={false} />
-						<XAxis dataKey="date" tick={{ fontSize: 9, fill: MUTE }} interval="preserveStartEnd" />
-						<YAxis tick={{ fontSize: 9, fill: MUTE }} domain={[0, 100]} />
-						<Line type="monotone" dataKey="visibility" stroke={PINK} strokeWidth={2} dot={false} isAnimationActive={false} />
-					</LineChart>
-				</div>
-				<div style={{ flex: 1 }}>
-					<div style={{ fontSize: 11, fontWeight: 700, color: MUTE, marginBottom: 6 }}>MENTION RATE BY ENGINE</div>
-					<BarChart width={318} height={150} data={engines} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
-						<CartesianGrid stroke="#f1f5f9" vertical={false} />
-						<XAxis dataKey="engine" tick={{ fontSize: 8, fill: MUTE }} />
-						<YAxis tick={{ fontSize: 9, fill: MUTE }} domain={[0, 100]} />
-						<Bar dataKey="pct" fill={PINK} radius={[3, 3, 0, 0]} isAnimationActive={false} />
-					</BarChart>
-				</div>
-			</div>
-
+		<div style={page}>
+			<Head {...p} n={2} />
+			<div style={{ marginBottom: 14 }}>{b.intro}</div>
 			<div style={{ display: "flex", gap: 28 }}>
-				<PerfTable title="Top performers" rows={narrative.page1.topPerformers} />
-				<PerfTable title="Needs attention" rows={narrative.page1.bottomPerformers} />
+				<div style={{ flex: 1 }}>
+					<div style={h2}>AI recommends you here</div>
+					<QList items={b.winning} kind="win" />
+				</div>
+				<div style={{ flex: 1 }}>
+					<div style={h2}>AI leaves you out here</div>
+					<QList items={b.losing.map((l) => ({ question: l.question, detail: l.detail, recommendedInstead: l.recommendedInstead }))} kind="lose" />
+				</div>
 			</div>
+			<div style={{ marginTop: 24 }}>
+				<div style={h2}>By AI assistant</div>
+				<div style={{ marginBottom: 8 }}>{b.engineNote}</div>
+				<BarChart width={690} height={170} data={bars} margin={{ top: 8, right: 12, bottom: 0, left: -18 }}>
+					<CartesianGrid stroke="#f1f5f9" vertical={false} />
+					<XAxis dataKey="a" tick={{ fontSize: 9, fill: MUTE }} />
+					<YAxis tick={{ fontSize: 9, fill: MUTE }} domain={[0, 100]} unit="%" />
+					<Bar dataKey="rate" fill={PINK} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+				</BarChart>
+			</div>
+			<Foot periodLabel={p.periodLabel} />
 		</div>
 	);
 }
 
-const PRIORITY_COLOR: Record<string, string> = { high: "#dc2626", medium: "#d97706", low: "#0891b2" };
-
-function PageTwo(props: ReportDocProps) {
-	const { narrative, digest } = props;
-	const cats = Object.entries(digest.charts.citationCategoryMix).sort((a, b) => b[1] - a[1]);
-	const catTotal = cats.reduce((s, [, n]) => s + n, 0) || 1;
-
+// ── Page 3 ────────────────────────────────────────────────────────────
+function Page3(p: ReportDocProps) {
+	const s = p.narrative.sources;
+	const mix = Object.entries(p.digest.charts.sourceMix).sort((a, b) => b[1] - a[1]);
+	const total = mix.reduce((t, [, n]) => t + n, 0) || 1;
 	return (
-		<div style={pageStyle}>
-			<Header {...props} page={2} />
+		<div style={page}>
+			<Head {...p} n={3} />
+			<div style={{ marginBottom: 14 }}>{s.intro}</div>
+			<Callout>
+				<strong>The affiliate angle. </strong>
+				{s.affiliateInsight}
+			</Callout>
+			<div style={{ display: "flex", gap: 28, marginTop: 22 }}>
+				<div style={{ flex: "0 0 250px" }}>
+					<div style={label}>Where AI's sources come from</div>
+					<div style={{ marginTop: 10 }}>
+						{mix.map(([k, n]) => (
+							<div key={k} style={{ marginBottom: 8 }}>
+								<div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5 }}>
+									<span>{k}</span>
+									<span style={note}>{Math.round((n / total) * 100)}%</span>
+								</div>
+								<div style={{ height: 6, background: "#f1f5f9", borderRadius: 3, marginTop: 2 }}>
+									<div style={{ width: `${(n / total) * 100}%`, height: "100%", background: PINK, borderRadius: 3 }} />
+								</div>
+							</div>
+						))}
+					</div>
+				</div>
+				<div style={{ flex: 1 }}>
+					<div style={label}>The sites AI relied on most</div>
+					<div style={{ marginTop: 8 }}>
+						{s.keySources.map((k, i) => (
+							<div key={i} style={{ padding: "7px 0", borderTop: i ? `1px solid #f1f5f9` : "none" }}>
+								<div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5 }}>
+									<strong>{k.site}</strong>
+									<span style={{ ...note, fontSize: 10 }}>{k.type}</span>
+								</div>
+								<div style={{ ...note, fontSize: 10.5, marginTop: 1 }}>{k.note}</div>
+							</div>
+						))}
+					</div>
+				</div>
+			</div>
+			<div style={{ marginTop: 22 }}>
+				<div style={h2}>Where competitors are cited but you aren't</div>
+				<div>{s.competitorSourceGap}</div>
+			</div>
+			<Foot periodLabel={p.periodLabel} />
+		</div>
+	);
+}
 
-			<div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Where to focus next</div>
+// ── Page 4 ────────────────────────────────────────────────────────────
+const PRI: Record<string, string> = { high: "#dc2626", medium: "#d97706", low: "#0891b2" };
+function Page4(p: ReportDocProps) {
+	return (
+		<div style={page}>
+			<Head {...p} n={4} />
+			<div style={h2}>Your action plan</div>
 			<div style={{ marginBottom: 26 }}>
-				{narrative.page2.opportunities.map((o, i) => (
-					<div
-						key={i}
-						style={{ display: "flex", gap: 10, padding: "10px 0", borderTop: i ? "1px solid #f1f5f9" : "none" }}
-					>
-						<div
-							style={{
-								fontSize: 9,
-								fontWeight: 700,
-								textTransform: "uppercase",
-								color: "#fff",
-								background: PRIORITY_COLOR[o.priority] ?? MUTE,
-								borderRadius: 5,
-								padding: "3px 6px",
-								height: "fit-content",
-								whiteSpace: "nowrap",
-							}}
-						>
-							{o.priority}
-						</div>
+				{p.narrative.actionPlan.map((a, i) => (
+					<div key={i} style={{ display: "flex", gap: 10, padding: "10px 0", borderTop: i ? `1px solid #f1f5f9` : "none" }}>
+						<span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", color: "#fff", background: PRI[a.priority] ?? MUTE, borderRadius: 5, padding: "3px 6px", height: "fit-content", whiteSpace: "nowrap" }}>
+							{a.priority}
+						</span>
 						<div>
-							<div style={{ fontSize: 12.5, fontWeight: 600 }}>{o.title}</div>
-							<div style={{ fontSize: 11.5, color: MUTE, lineHeight: 1.5, marginTop: 2 }}>{o.why}</div>
+							<div style={{ fontSize: 12.5, fontWeight: 600 }}>{a.action}</div>
+							<div style={{ ...note, fontSize: 11, marginTop: 2 }}>{a.rationale}</div>
 						</div>
 					</div>
 				))}
 			</div>
-
-			<div style={{ display: "flex", gap: 28 }}>
-				<div style={{ flex: 1 }}>
-					<div style={{ fontSize: 11, fontWeight: 700, color: MUTE, marginBottom: 8 }}>CITATION SOURCE MIX</div>
-					{cats.map(([cat, n]) => (
-						<div key={cat} style={{ marginBottom: 6 }}>
-							<div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, marginBottom: 2 }}>
-								<span style={{ textTransform: "capitalize" }}>{cat}</span>
-								<span style={{ color: MUTE }}>{Math.round((n / catTotal) * 100)}%</span>
-							</div>
-							<div style={{ height: 6, background: "#f1f5f9", borderRadius: 3 }}>
-								<div style={{ width: `${(n / catTotal) * 100}%`, height: "100%", background: PINK, borderRadius: 3 }} />
-							</div>
-						</div>
-					))}
-				</div>
-				<div style={{ flex: 1 }}>
-					<div style={{ fontSize: 11, fontWeight: 700, color: MUTE, marginBottom: 8 }}>HOW TO READ THIS REPORT</div>
-					{narrative.page2.metricGuide.map((m, i) => (
-						<div key={i} style={{ fontSize: 11, lineHeight: 1.5, marginBottom: 8 }}>
-							<span style={{ fontWeight: 700 }}>{m.term}. </span>
-							<span style={{ color: MUTE }}>{m.plainExplanation}</span>
-						</div>
-					))}
-				</div>
+			<div style={h2}>How to read this report</div>
+			<div>
+				{p.narrative.glossary.map((g, i) => (
+					<div key={i} style={{ fontSize: 11.5, marginBottom: 7 }}>
+						<strong>{g.term}. </strong>
+						<span style={note}>{g.definition}</span>
+					</div>
+				))}
 			</div>
-
-			<div
-				style={{
-					position: "absolute",
-					bottom: 40,
-					left: 60,
-					right: 60,
-					fontSize: 9,
-					color: MUTE,
-					borderTop: "1px solid #e2e8f0",
-					paddingTop: 8,
-					display: "flex",
-					justifyContent: "space-between",
-				}}
-			>
-				<span>Generated by Seen</span>
-				<span>{props.periodLabel}</span>
-			</div>
+			<Foot periodLabel={p.periodLabel} />
 		</div>
 	);
 }
@@ -278,13 +280,12 @@ export const ReportDocument = forwardRef<HTMLDivElement, ReportDocProps>(functio
 				padding: "24px 0",
 			}}
 		>
-			<div style={{ fontSize: 13, fontWeight: 600, color: "#ec4899" }}>Preparing your PDF…</div>
-			<div data-report-page="1" style={{ position: "relative", boxShadow: "0 4px 24px rgba(0,0,0,0.1)" }}>
-				<PageOne {...props} />
-			</div>
-			<div data-report-page="2" style={{ position: "relative", boxShadow: "0 4px 24px rgba(0,0,0,0.1)" }}>
-				<PageTwo {...props} />
-			</div>
+			<div style={{ fontSize: 13, fontWeight: 600, color: PINK }}>Preparing your PDF…</div>
+			{[Page1, Page2, Page3, Page4].map((P, i) => (
+				<div key={i} data-report-page={i + 1} style={{ position: "relative", boxShadow: "0 4px 24px rgba(0,0,0,0.1)" }}>
+					<P {...props} />
+				</div>
+			))}
 		</div>
 	);
 });

@@ -1,13 +1,14 @@
 /**
- * Brand analytics reports — periodic, LLM-narrated, two-page PDF over the
- * brand's own tracked runs / mentions / citations data.
+ * Brand analytics reports — periodic, LLM-narrated, client-facing PDF over the
+ * brand's own tracked runs / mentions / citations data, framed for affiliate
+ * marketing.
  *
  * Rate limit: one report per brand per rolling 7 days (brands.lastReportGeneratedAt),
  * keyed to generation time, not the analyzed range. Any member generating starts
  * the brand's clock. Thin/empty ranges are blocked.
  *
  * Generation is synchronous (no reverse proxy in front of this deployment): the
- * digest is plain SQL, the single gpt-5-mini completion is ~10-25s.
+ * digest is plain SQL, the single gpt-5-mini completion is ~15-30s.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { db } from "@workspace/lib/db/db";
@@ -22,23 +23,46 @@ import { getCitationDomainStats } from "@/lib/postgres-read";
 import { resolveTimezone } from "@/lib/timezone-utils";
 
 const COOLDOWN_DAYS = 7;
-const MIN_RUNS = 20; // below this a period has nothing worth reporting on
+const MIN_RUNS = 20;
 
-// ── period aggregation (plain SQL, self-contained) ──────────────────────
+const ENGINE_LABEL: Record<string, string> = {
+	chatgpt: "ChatGPT",
+	gemini: "Gemini",
+	perplexity: "Perplexity",
+	"google-ai-mode": "Google AI Mode",
+	"google-ai-overview": "Google AI Overview",
+	"claude": "Claude",
+	"copilot": "Microsoft Copilot",
+};
+const CATEGORY_LABEL: Record<string, string> = {
+	affiliate: "Affiliate / roundup",
+	editorial: "Editorial",
+	reviews: "Reviews",
+	ecommerce: "Retailer",
+	social: "Community",
+	reference: "Reference",
+	institutional: "Institutional",
+	developer: "Developer",
+	pr: "PR / news",
+	brand: "The brand's own site",
+	competitor: "A competitor's site",
+	other: "Other",
+};
 
 interface PeriodStats {
 	from: string;
 	to: string;
 	totalRuns: number;
 	totalPrompts: number;
-	visibility: number | null; // % of answers that mention the brand
-	nonBrandedVisibility: number | null;
-	sovPct: number | null; // brand mentions / (brand + competitor mentions)
+	visibility: number | null;
+	sovPct: number | null;
 	perPrompt: { promptId: string; runs: number; mentionRate: number }[];
+	perPromptTopCompetitor: Map<string, string>;
+	competitorOnlyPromptIds: string[];
 	perEngine: { engine: string; runs: number; mentionRate: number }[];
 	competitors: { name: string; mentions: number }[];
-	dailyVisibility: { date: string; visibility: number; runs: number }[];
-	topDomains: { domain: string; count: number; category: string }[];
+	dailyVisibility: { date: string; visibility: number }[];
+	sources: { domain: string; count: number; category: string; exampleTitle: string | null }[];
 }
 
 async function periodStats(
@@ -74,10 +98,11 @@ async function periodStats(
 	const perPrompt = (
 		await db.execute(sql`
 			SELECT prompt_id::text AS prompt_id, count(*)::int AS runs,
-				round(avg(CASE WHEN brand_mentioned THEN 1 ELSE 0 END)::numeric, 4)::float AS mention_rate
+				round(avg(CASE WHEN brand_mentioned THEN 1 ELSE 0 END)::numeric, 4)::float AS mention_rate,
+				count(*) FILTER (WHERE NOT brand_mentioned AND cardinality(competitors_mentioned) > 0)::int AS comp_only
 			FROM prompt_runs WHERE ${inRange} GROUP BY prompt_id
 		`)
-	).rows as { prompt_id: string; runs: number; mention_rate: number }[];
+	).rows as { prompt_id: string; runs: number; mention_rate: number; comp_only: number }[];
 
 	const perEngine = (
 		await db.execute(sql`
@@ -87,29 +112,43 @@ async function periodStats(
 		`)
 	).rows as { engine: string; runs: number; mention_rate: number }[];
 
-	const competitors = (
+	const competitorRows = (
 		await db.execute(sql`
-			SELECT c AS name, count(*)::int AS mentions
+			SELECT pr.prompt_id::text AS prompt_id, c AS name, count(*)::int AS mentions
 			FROM prompt_runs pr, unnest(pr.competitors_mentioned) AS c
-			WHERE ${sql`pr.brand_id = ${brandId} AND pr.created_at >= ${rangeStart} AND pr.created_at < ${rangeEnd}`}
-			GROUP BY c ORDER BY mentions DESC LIMIT 8
+			WHERE pr.brand_id = ${brandId} AND pr.created_at >= ${rangeStart} AND pr.created_at < ${rangeEnd}
+			GROUP BY pr.prompt_id, c
 		`)
-	).rows as { name: string; mentions: number }[];
+	).rows as { prompt_id: string; name: string; mentions: number }[];
+
+	const perPromptTopCompetitor = new Map<string, string>();
+	const competitorTotals = new Map<string, number>();
+	for (const r of competitorRows) {
+		competitorTotals.set(r.name, (competitorTotals.get(r.name) ?? 0) + r.mentions);
+		const cur = perPromptTopCompetitor.get(r.prompt_id);
+		if (!cur || r.mentions > (competitorRows.find((x) => x.prompt_id === r.prompt_id && x.name === cur)?.mentions ?? 0)) {
+			perPromptTopCompetitor.set(r.prompt_id, r.name);
+		}
+	}
+	const competitors = [...competitorTotals.entries()]
+		.map(([name, mentions]) => ({ name, mentions }))
+		.sort((a, b) => b.mentions - a.mentions)
+		.slice(0, 8);
 
 	const dailyVisibility = (
 		await db.execute(sql`
 			SELECT (created_at AT TIME ZONE ${timezone})::date::text AS date,
-				round(count(*) FILTER (WHERE brand_mentioned) * 100.0 / NULLIF(count(*), 0), 0)::int AS visibility,
-				count(*)::int AS runs
+				round(count(*) FILTER (WHERE brand_mentioned) * 100.0 / NULLIF(count(*), 0), 0)::int AS visibility
 			FROM prompt_runs WHERE ${inRange} GROUP BY 1 ORDER BY 1
 		`)
-	).rows as { date: string; visibility: number; runs: number }[];
+	).rows as { date: string; visibility: number }[];
 
 	const domainRows = await getCitationDomainStats(brandId, from, to, timezone);
-	const topDomains = domainRows.slice(0, 14).map((d) => ({
+	const sources = domainRows.slice(0, 16).map((d) => ({
 		domain: d.domain,
 		count: d.count,
 		category: categorizeDomain(extractDomain(d.domain), brandDomains, competitorDomains),
+		exampleTitle: (d as { example_title?: string | null }).example_title ?? null,
 	}));
 
 	const sovDenom = totals.brand_mentions + totals.competitor_mentions;
@@ -119,21 +158,15 @@ async function periodStats(
 		totalRuns: totals.total_runs ?? 0,
 		totalPrompts: totals.total_prompts ?? 0,
 		visibility: totals.visibility,
-		nonBrandedVisibility: totals.visibility,
 		sovPct: sovDenom > 0 ? Math.round((totals.brand_mentions * 100) / sovDenom) : null,
-		perPrompt,
+		perPrompt: perPrompt.map(({ prompt_id, runs, mention_rate }) => ({ promptId: prompt_id, runs, mentionRate: mention_rate })),
+		perPromptTopCompetitor,
+		competitorOnlyPromptIds: perPrompt.filter((p) => p.runs >= 3 && p.comp_only / p.runs >= 0.5).map((p) => p.prompt_id),
 		perEngine,
 		competitors,
 		dailyVisibility,
-		topDomains,
+		sources,
 	};
-}
-
-// ── digest assembly ────────────────────────────────────────────────────
-
-function rank<T>(rows: T[], key: (r: T) => number, n: number) {
-	const sorted = [...rows].sort((a, b) => key(b) - key(a));
-	return { top: sorted.slice(0, n), bottom: sorted.slice(-n).reverse() };
 }
 
 function buildDigest(args: {
@@ -142,74 +175,101 @@ function buildDigest(args: {
 	main: PeriodStats;
 	compare?: PeriodStats;
 }) {
-	const { promptText, main, compare } = args;
-	const namePrompt = (p: { promptId: string; runs: number; mentionRate: number }) => ({
-		prompt: promptText.get(p.promptId) ?? "(deleted prompt)",
-		runs: p.runs,
-		mentionRatePct: Math.round(p.mentionRate * 100),
-	});
-	const promptsRanked = rank(main.perPrompt.filter((p) => p.runs >= 3), (p) => p.mentionRate, 5);
-	const enginesRanked = rank(main.perEngine.filter((e) => e.runs >= 3), (e) => e.mentionRate, 5);
+	const { brandName, promptText, main, compare } = args;
+	const q = (id: string) => promptText.get(id) ?? "(a tracked question)";
+	const pct = (r: number) => Math.round(r * 100);
 
-	const delta = (now: number | null, then: number | null) =>
-		now == null || then == null ? null : now - then;
+	const scored = main.perPrompt.filter((p) => p.runs >= 3).sort((a, b) => b.mentionRate - a.mentionRate);
+	const winning = scored
+		.filter((p) => p.mentionRate >= 0.5)
+		.slice(0, 6)
+		.map((p) => ({ question: q(p.promptId), recommendedRate: `${pct(p.mentionRate)}%`, runs: p.runs }));
+	const losing = scored
+		.filter((p) => p.mentionRate < 0.5)
+		.slice(-6)
+		.reverse()
+		.map((p) => ({
+			question: q(p.promptId),
+			recommendedRate: `${pct(p.mentionRate)}%`,
+			runs: p.runs,
+			aiRecommendsInstead: main.perPromptTopCompetitor.get(p.promptId) ?? null,
+		}));
+
+	const engines = main.perEngine
+		.filter((e) => e.runs >= 3)
+		.map((e) => ({ assistant: ENGINE_LABEL[e.engine] ?? e.engine, recommendedRate: `${pct(e.mentionRate)}%`, answersChecked: e.runs }))
+		.sort((a, b) => Number.parseInt(b.recommendedRate) - Number.parseInt(a.recommendedRate));
+
+	const sourceTotal = main.sources.reduce((s, d) => s + d.count, 0) || 1;
+	const affiliateCount = main.sources.filter((d) => d.category === "affiliate").reduce((s, d) => s + d.count, 0);
+	const bucket = main.sources.reduce<Record<string, number>>((acc, d) => {
+		acc[CATEGORY_LABEL[d.category] ?? d.category] = (acc[CATEGORY_LABEL[d.category] ?? d.category] ?? 0) + d.count;
+		return acc;
+	}, {});
+
+	const competitorOnly = main.competitorOnlyPromptIds
+		.slice(0, 6)
+		.map((id) => ({ question: q(id), aiRecommends: main.perPromptTopCompetitor.get(id) ?? "competitors" }));
+
+	const delta = (a: number | null, b: number | null) => (a == null || b == null ? null : a - b);
 
 	return {
-		brand: args.brandName,
-		comparisonMode: Boolean(compare),
+		brand: brandName,
 		period: { from: main.from, to: main.to },
+		comparisonMode: Boolean(compare),
 		comparePeriod: compare ? { from: compare.from, to: compare.to } : null,
-		headlineMetrics: {
-			visibilityPct: main.visibility,
-			shareOfVoicePct: main.sovPct,
-			totalRuns: main.totalRuns,
-			trackedPrompts: main.totalPrompts,
+		headline: {
+			aiRecommendationRatePct: main.visibility,
+			shareOfCategoryPct: main.sovPct,
+			aiAnswersChecked: main.totalRuns,
+			buyingQuestionsTracked: main.totalPrompts,
 			...(compare
 				? {
-						visibilityDeltaPts: delta(main.visibility, compare.visibility),
-						shareOfVoiceDeltaPts: delta(main.sovPct, compare.sovPct),
-						runsDelta: main.totalRuns - compare.totalRuns,
+						recommendationRateChangePts: delta(main.visibility, compare.visibility),
+						shareOfCategoryChangePts: delta(main.sovPct, compare.sovPct),
 					}
 				: {}),
 		},
-		prompts: {
-			topByMentionRate: promptsRanked.top.map(namePrompt),
-			bottomByMentionRate: promptsRanked.bottom.map(namePrompt),
+		buyingQuestions: {
+			aiRecommendsBrand: winning,
+			aiLeavesBrandOut: losing,
+			questionsWhereOnlyCompetitorsAppear: competitorOnly,
 		},
-		engines: {
-			best: enginesRanked.top.map((e) => ({ engine: e.engine, runs: e.runs, mentionRatePct: Math.round(e.mentionRate * 100) })),
-			worst: enginesRanked.bottom.map((e) => ({ engine: e.engine, runs: e.runs, mentionRatePct: Math.round(e.mentionRate * 100) })),
-		},
-		competitors: main.competitors,
-		citations: {
-			topSources: main.topDomains,
-			categoryMix: Object.entries(
-				main.topDomains.reduce<Record<string, number>>((acc, d) => {
-					acc[d.category] = (acc[d.category] ?? 0) + d.count;
-					return acc;
-				}, {}),
-			)
-				.map(([category, count]) => ({ category, count }))
-				.sort((a, b) => b.count - a.count),
+		aiAssistants: engines,
+		competitorsAiRecommends: main.competitors.map((c) => ({ name: c.name, timesRecommended: c.mentions })),
+		sourcesAiReliesOn: {
+			total: sourceTotal,
+			affiliateSharePct: Math.round((affiliateCount / sourceTotal) * 100),
+			byType: Object.entries(bucket)
+				.map(([type, count]) => ({ type, sharePct: Math.round((count / sourceTotal) * 100) }))
+				.sort((a, b) => b.sharePct - a.sharePct),
+			topSites: main.sources.slice(0, 10).map((d) => ({
+				site: d.domain,
+				type: CATEGORY_LABEL[d.category] ?? d.category,
+				timesUsed: d.count,
+				examplePage: d.exampleTitle,
+			})),
 		},
 		...(compare
 			? {
 					previousPeriod: {
-						visibilityPct: compare.visibility,
-						shareOfVoicePct: compare.sovPct,
-						totalRuns: compare.totalRuns,
-						topPrompts: rank(compare.perPrompt.filter((p) => p.runs >= 3), (p) => p.mentionRate, 3).top.map(namePrompt),
-						engines: compare.perEngine.map((e) => ({ engine: e.engine, mentionRatePct: Math.round(e.mentionRate * 100) })),
-						competitors: compare.competitors,
+						aiRecommendationRatePct: compare.visibility,
+						shareOfCategoryPct: compare.sovPct,
+						topQuestions: compare.perPrompt
+							.filter((p) => p.runs >= 3)
+							.sort((a, b) => b.mentionRate - a.mentionRate)
+							.slice(0, 4)
+							.map((p) => ({ question: q(p.promptId), recommendedRate: `${pct(p.mentionRate)}%` })),
+						competitors: compare.competitors.map((c) => ({ name: c.name, timesRecommended: c.mentions })),
 					},
 				}
 			: {}),
 		charts: {
-			dailyVisibility: main.dailyVisibility,
-			compareDailyVisibility: compare?.dailyVisibility ?? null,
-			engineMentionRate: main.perEngine.map((e) => ({ engine: e.engine, pct: Math.round(e.mentionRate * 100), runs: e.runs })),
-			citationCategoryMix: main.topDomains.reduce<Record<string, number>>((acc, d) => {
-				acc[d.category] = (acc[d.category] ?? 0) + d.count;
+			dailyRecommendationRate: main.dailyVisibility.map((d) => ({ date: d.date, rate: d.visibility })),
+			byAssistant: engines.map((e) => ({ assistant: e.assistant, rate: Number.parseInt(e.recommendedRate) })),
+			sourceMix: main.sources.reduce<Record<string, number>>((acc, d) => {
+				const k = CATEGORY_LABEL[d.category] ?? d.category;
+				acc[k] = (acc[k] ?? 0) + d.count;
 				return acc;
 			}, {}),
 		},
@@ -217,8 +277,6 @@ function buildDigest(args: {
 }
 
 export type ReportDigest = ReturnType<typeof buildDigest>;
-
-// ── shared loader ──────────────────────────────────────────────────────
 
 async function loadBrandContext(brandId: string) {
 	const [brand] = await db.select().from(brands).where(eq(brands.id, brandId)).limit(1);
@@ -238,8 +296,6 @@ function fmtDate(iso: string) {
 	return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-// ── server fns ─────────────────────────────────────────────────────────
-
 export const getReportAvailabilityFn = createServerFn({ method: "POST" })
 	.validator(z.object({ brandId: z.string().min(1) }))
 	.handler(async ({ data }) => {
@@ -253,11 +309,9 @@ export const getReportAvailabilityFn = createServerFn({ method: "POST" })
 		const last = row?.last ? new Date(row.last) : null;
 		const nextAvailableAt = last ? new Date(last.getTime() + COOLDOWN_DAYS * 86400_000) : null;
 		const canGenerate = !nextAvailableAt || nextAvailableAt.getTime() <= Date.now();
-
-		const [earliest] = await db.execute(sql`
-			SELECT min(created_at) AS first FROM prompt_runs WHERE brand_id = ${data.brandId}
-		`).then((r) => r.rows as { first: string | null }[]);
-
+		const [earliest] = await db
+			.execute(sql`SELECT min(created_at) AS first FROM prompt_runs WHERE brand_id = ${data.brandId}`)
+			.then((r) => r.rows as { first: string | null }[]);
 		return {
 			canGenerate,
 			nextAvailableAt: nextAvailableAt ? nextAvailableAt.toISOString() : null,
@@ -281,7 +335,6 @@ export const generateBrandReportFn = createServerFn({ method: "POST" })
 		await requireBrandAccess(session.user.id, data.brandId);
 		const timezone = resolveTimezone();
 
-		// cooldown (server is source of truth)
 		const [brandRow] = await db
 			.select({ last: brands.lastReportGeneratedAt })
 			.from(brands)
@@ -294,21 +347,20 @@ export const generateBrandReportFn = createServerFn({ method: "POST" })
 
 		const compareOn = Boolean(data.compareStart && data.compareEnd);
 		const { brand, promptText, brandDomains } = await loadBrandContext(data.brandId);
-		const noCompDomains = new Set<string>();
+		const noComp = new Set<string>();
 
-		const main = await periodStats(data.brandId, data.periodStart, data.periodEnd, timezone, brandDomains, noCompDomains);
+		const main = await periodStats(data.brandId, data.periodStart, data.periodEnd, timezone, brandDomains, noComp);
 		if (main.totalRuns < MIN_RUNS) {
 			throw new Error(
-				`Not enough data in ${fmtDate(data.periodStart)}–${fmtDate(data.periodEnd)} (${main.totalRuns} runs). Pick a wider range or a period with tracking data.`,
+				`Not enough data in ${fmtDate(data.periodStart)}–${fmtDate(data.periodEnd)} (${main.totalRuns} AI answers). Pick a wider range or a period with tracking data.`,
 			);
 		}
 		const compare = compareOn
-			? await periodStats(data.brandId, data.compareStart!, data.compareEnd!, timezone, brandDomains, noCompDomains)
+			? await periodStats(data.brandId, data.compareStart!, data.compareEnd!, timezone, brandDomains, noComp)
 			: undefined;
 
 		const digest = buildDigest({ brandName: brand.name, promptText, main, compare });
 
-		// lock the cooldown at initiation
 		await db.update(brands).set({ lastReportGeneratedAt: new Date() }).where(eq(brands.id, data.brandId));
 
 		const [report] = await db
@@ -343,7 +395,6 @@ export const generateBrandReportFn = createServerFn({ method: "POST" })
 				narrative,
 			};
 		} catch (err) {
-			// refund the weekly allowance on failure
 			await db.update(brands).set({ lastReportGeneratedAt: last ?? null }).where(eq(brands.id, data.brandId));
 			await db
 				.update(brandReports)
@@ -352,7 +403,6 @@ export const generateBrandReportFn = createServerFn({ method: "POST" })
 			throw new Error("The report's written analysis could not be generated. Your weekly allowance was not used — try again.");
 		}
 	});
-
 
 export const getLatestBrandReportFn = createServerFn({ method: "POST" })
 	.validator(z.object({ brandId: z.string().min(1) }))
@@ -371,9 +421,9 @@ export const getLatestBrandReportFn = createServerFn({ method: "POST" })
 		return {
 			name: row.name,
 			brandName: brand?.name ?? "Brand",
-			periodLabel: `${fmtDate(row.periodStart)} \u2013 ${fmtDate(row.periodEnd)}`,
+			periodLabel: `${fmtDate(row.periodStart)} – ${fmtDate(row.periodEnd)}`,
 			compareLabel:
-				row.compareStart && row.compareEnd ? `${fmtDate(row.compareStart)} \u2013 ${fmtDate(row.compareEnd)}` : null,
+				row.compareStart && row.compareEnd ? `${fmtDate(row.compareStart)} – ${fmtDate(row.compareEnd)}` : null,
 			createdAt: row.createdAt,
 			digest: p.digest,
 			narrative: p.narrative,
