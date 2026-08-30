@@ -38,6 +38,7 @@ export const brands = pgTable(
 		onboarded: boolean("onboarded").default(false).notNull(),
 		delayOverrideHours: integer("delay_override_hours"),
 		enabledModels: text("enabled_models").array(),
+		lastReportGeneratedAt: timestamp("last_report_generated_at", { withTimezone: true }),
 		// Hard tenancy scope. Every brand belongs to exactly one better-auth
 		// organization; org membership (the `member` table) is the access-control
 		// mechanism. Brand and organization ids are independent, so billing and
@@ -212,6 +213,36 @@ export const brandOpportunities = pgTable(
 
 export type BrandOpportunity = typeof brandOpportunities.$inferSelect;
 export type NewBrandOpportunity = typeof brandOpportunities.$inferInsert;
+
+// ── Brand analytics reports (periodic, LLM-narrated, two-page PDF) ────────────
+
+export const brandReportStatusEnum = pgEnum("brand_report_status", ["processing", "done", "failed"]);
+
+export const brandReports = pgTable(
+	"brand_reports",
+	{
+		id: uuid("id").defaultRandom().primaryKey().notNull(),
+		brandId: text("brand_id")
+			.references(() => brands.id, { onDelete: "cascade" })
+			.notNull(),
+		name: text("name").notNull(),
+		periodStart: text("period_start").notNull(),
+		periodEnd: text("period_end").notNull(),
+		compareStart: text("compare_start"),
+		compareEnd: text("compare_end"),
+		status: brandReportStatusEnum().notNull().default("processing"),
+		payload: json("payload"),
+		error: text("error"),
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+		completedAt: timestamp("completed_at", { withTimezone: true }),
+	},
+	(table) => ({
+		brandCreatedIdx: index("brand_reports_brand_id_created_at_idx").on(table.brandId, table.createdAt),
+	}),
+).enableRLS();
+
+export type BrandReport = typeof brandReports.$inferSelect;
+export type NewBrandReport = typeof brandReports.$inferInsert;
 
 export type Brand = typeof brands.$inferSelect;
 export type NewBrand = typeof brands.$inferInsert;
