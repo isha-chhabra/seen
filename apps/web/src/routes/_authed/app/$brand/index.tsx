@@ -23,6 +23,7 @@ import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip";
 import { type ReactNode, useEffect } from "react";
 import PromptWizard from "@/components/prompt-wizard";
+import { RunNowButton } from "@/components/run-now-button";
 import { TrendChart, type TrendPoint } from "@/components/trend-chart";
 import { useBrand } from "@/hooks/use-brands";
 import { useDashboardSummary } from "@/hooks/use-dashboard-summary";
@@ -456,6 +457,13 @@ function DashboardPage() {
 	return (
 		<div className="flex flex-1 flex-col">
 			<div className="m-auto flex w-full max-w-[1600px] flex-col gap-3 p-4">
+				<div className="flex flex-wrap items-center justify-between gap-3 pb-1">
+					<div>
+						<h1 className="text-2xl font-bold tracking-tight">Overview</h1>
+						<p className="text-sm text-muted-foreground">Prompts run automatically once a day. Trigger a full cycle now:</p>
+					</div>
+					<RunNowButton brandId={brandId} />
+				</div>
 				<TrendSection
 					icon={IconEye}
 					title="AI Visibility"
