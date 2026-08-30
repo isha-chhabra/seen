@@ -55,7 +55,12 @@ function useCitationSections(citationData: CitationData) {
 			: 0;
 
 	const chartSourceCategories = useMemo(
-		() => CITATION_CATEGORIES.filter((c: CitationCategory) => (citationData.categoryCounts[c] ?? 0) > 0),
+		() =>
+			CITATION_CATEGORIES.filter(
+				// Affiliate always shows (0% is a real signal: no commission-driven citations);
+				// every other category only appears once it has citations.
+				(c: CitationCategory) => c === "affiliate" || (citationData.categoryCounts[c] ?? 0) > 0,
+			),
 		[citationData.categoryCounts],
 	);
 	const chartPageTypes = useMemo(() => {
