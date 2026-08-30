@@ -3,7 +3,14 @@
 // this from a client module would bloat the browser bundle — keep it confined to
 // server functions. Client code imports types/config from `./domain-categories`.
 
-import { type CitationCategory, FORUM_DOMAINS, inferPageType, isForumDomain } from "./domain-categories";
+import {
+	type CitationCategory,
+	FORUM_DOMAINS,
+	inferPageType,
+	isAffiliateRedirectHost,
+	isAffiliateUrl,
+	isForumDomain,
+} from "./domain-categories";
 import { EDITORIAL_DOMAINS } from "./editorial-domains";
 
 const SOCIAL_MEDIA_DOMAINS = new Set([
@@ -552,6 +559,8 @@ export function categorizeDomain(
 	for (const cd of competitorDomains) {
 		if (domain === cd || domain.endsWith(`.${cd}`)) return "competitor";
 	}
+	// Affiliate-network redirect hosts (Skimlinks, CJ, Rakuten, AWIN, Impact, …).
+	if (isAffiliateRedirectHost(domain)) return "affiliate";
 	// Forums (incl. community.X / forums.X subdomains) win over the generic lists
 	// below so a forum on an ecommerce/editorial site isn't miscounted as a store.
 	if (isForumDomain(domain)) return "social";
@@ -601,6 +610,9 @@ export function classifyUrl(
 	competitorDomains: Set<string>,
 ): CitationCategory {
 	const cat = categorizeDomain(domain, brandDomains, competitorDomains);
+	// An affiliate tracking link counts as an "affiliate" citation whatever its
+	// destination (retailer, editorial, blog) — but keep brand/competitor attribution.
+	if (cat !== "brand" && cat !== "competitor" && isAffiliateUrl(url)) return "affiliate";
 	if (cat !== "other") return cat;
 	const pt = inferPageType(url, title);
 	if (pt === "forum") return "social"; // a forum page on an unlisted domain is still community / UGC

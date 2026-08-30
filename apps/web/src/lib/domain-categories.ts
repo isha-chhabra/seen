@@ -9,6 +9,7 @@ export type CitationCategory =
 	| "editorial"
 	| "reviews"
 	| "ecommerce"
+	| "affiliate"
 	| "social"
 	| "developer"
 	| "pr"
@@ -27,6 +28,7 @@ export const CITATION_CATEGORIES: CitationCategory[] = [
 	"editorial",
 	"reviews",
 	"ecommerce",
+	"affiliate",
 	"social",
 	"developer",
 	"pr",
@@ -146,6 +148,72 @@ export function normalizeUrl(url: string): string {
 	} catch {
 		return url;
 	}
+}
+
+// ============================================================================
+// Affiliate-link detection — orthogonal to source category (a property of the
+// link, not the site). High-precision: affiliate-network redirect hosts, plus a
+// small set of unambiguous affiliate tracking params.
+// ============================================================================
+
+/** Affiliate-network redirect / tracking hosts. A citation on one of these is an affiliate link whatever its final destination. */
+export const AFFILIATE_REDIRECT_DOMAINS = new Set([
+	"skimresources.com", "skimlinks.com", "redirectingat.com",
+	"viglink.com",
+	"prf.hn", "partnerize.com",
+	"shareasale.com", "shrsl.com",
+	"anrdoezrs.net", "dpbolvw.net", "tkqlhce.com", "jdoqocy.com", "kqzyfj.com", "emjcd.com", "ftjcfx.com", "afcyhf.com",
+	"linksynergy.com",
+	"awin1.com", "zenaps.com",
+	"avantlink.com",
+	"gopjn.com", "pjatr.com", "pjtra.com", "pntra.com", "pntrac.com", "pntrs.com",
+	"impact.com", "impactradius-event.com",
+	"webgains.com",
+	"amzn.to",
+]);
+
+/** Unambiguous affiliate tracking query-param keys (network-specific; deliberately excludes generic ones like bare "ref"). */
+export const AFFILIATE_PARAM_KEYS = new Set([
+	"aff", "affid", "aff_id", "affiliate", "a_aid",
+	"awc", "ranmid", "ransiteid", "raneaid",
+	"irclickid", "irgwc",
+	"clickid", "subid", "sub_id",
+]);
+
+function affiliateHostMatch(host: string): boolean {
+	let h = host.replace(/^www\./, "").toLowerCase();
+	while (h) {
+		if (AFFILIATE_REDIRECT_DOMAINS.has(h)) return true;
+		const dot = h.indexOf(".");
+		if (dot === -1) return false;
+		h = h.slice(dot + 1);
+	}
+	return false;
+}
+
+/** True when a bare host/domain is an affiliate-network redirect host. */
+export function isAffiliateRedirectHost(hostOrDomain: string): boolean {
+	return affiliateHostMatch(extractDomain(hostOrDomain));
+}
+
+/** True when a full citation URL is an affiliate link — redirect-network host, an affiliate tracking param, Amazon `?tag=`, or `utm_medium=affiliate`. */
+export function isAffiliateUrl(url: string): boolean {
+	let u: URL;
+	try {
+		u = new URL(url);
+	} catch {
+		return false;
+	}
+	if (affiliateHostMatch(u.hostname)) return true;
+	const host = u.hostname.replace(/^www\./, "").toLowerCase();
+	const isAmazon = /(^|\.)amazon\.[a-z.]+$/.test(host);
+	for (const [rawKey, value] of u.searchParams.entries()) {
+		const key = rawKey.toLowerCase();
+		if (key === "utm_medium" && /^(affiliate|affiliates|aff)$/i.test(value)) return true;
+		if (key === "tag" && isAmazon && value.trim().length > 0) return true;
+		if (AFFILIATE_PARAM_KEYS.has(key) && value.trim().length > 0) return true;
+	}
+	return false;
 }
 
 // ============================================================================
@@ -531,6 +599,12 @@ export const CATEGORY_CONFIG: Record<
 		chartColor: "#36b39a",
 		badgeClass: "bg-teal-500/90 text-white",
 		chartDotClass: "bg-teal-500",
+	},
+	affiliate: {
+		label: "Affiliate",
+		chartColor: "#ca8a04",
+		badgeClass: "bg-yellow-600/90 text-white",
+		chartDotClass: "bg-yellow-600",
 	},
 	social: {
 		label: "Social",
