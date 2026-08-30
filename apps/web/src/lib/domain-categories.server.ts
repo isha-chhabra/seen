@@ -518,6 +518,71 @@ export function isReviewDomain(domain: string): boolean {
 	return inDomainSet(domain, REVIEW_DOMAINS);
 }
 
+/**
+ * Affiliate-monetized publishers: sites whose "best X" / roundup / product
+ * content is driven by affiliate commissions. A deliberate monetization lens —
+ * it pulls commerce-content publishers OUT of "editorial"/"reviews" into
+ * "affiliate" so you can see how much AI visibility rides on commission-driven
+ * roundups vs. genuine editorial. Domain-level and fuzzy by design (a publisher
+ * runs both kinds of content); scoped to the big networks where affiliate is the
+ * documented revenue model for product content.
+ */
+const AFFILIATE_PUBLISHER_DOMAINS = new Set([
+	// Dedicated review / recommendation sites (affiliate-first)
+	"wirecutter.com", "thewirecutter.com", "rtings.com", "bestreviews.com",
+	"reviewed.com", "bestproducts.com", "spy.com", "gearpatrol.com",
+	"outdoorgearlab.com", "switchbacktravel.com", "cleverhiker.com",
+	"gearjunkie.com", "dontwasteyourmoney.com", "your-best-digs.com",
+	"housefresh.com", "moderncastle.com", "safewise.com",
+	// Tech publishers (heavy affiliate on buying guides)
+	"cnet.com", "pcmag.com", "tomsguide.com", "tomshardware.com", "techradar.com",
+	"digitaltrends.com", "engadget.com", "gizmodo.com", "trustedreviews.com",
+	"t3.com", "whathifi.com", "expertreviews.co.uk", "techadvisor.com",
+	"androidauthority.com", "androidcentral.com", "androidpolice.com", "imore.com",
+	"macworld.com", "pcworld.com", "techhive.com", "pcgamer.com", "gamesradar.com",
+	"polygon.com", "theverge.com", "zdnet.com", "slashgear.com", "howtogeek.com",
+	"makeuseof.com", "lifehacker.com",
+	// Dotdash Meredith network (affiliate-monetized)
+	"thespruce.com", "thespruceeats.com", "thesprucepets.com", "byrdie.com",
+	"mydomaine.com", "investopedia.com", "thebalancemoney.com", "thebalance.com",
+	"lifewire.com", "verywellhealth.com", "verywellfamily.com", "verywellmind.com",
+	"verywellfit.com", "health.com", "shape.com", "realsimple.com",
+	"foodandwine.com", "travelandleisure.com", "southernliving.com",
+	"marthastewart.com", "bhg.com", "eatingwell.com", "allrecipes.com",
+	"myrecipes.com", "simplyrecipes.com", "seriouseats.com", "people.com",
+	"instyle.com", "brides.com", "parents.com", "familyhandyman.com", "liquor.com",
+	"treehugger.com", "food52.com", "thekitchn.com", "apartmenttherapy.com",
+	"tasteofhome.com",
+	// Hearst (commerce / roundup affiliate)
+	"goodhousekeeping.com", "housebeautiful.com", "elledecor.com", "veranda.com",
+	"countryliving.com", "thepioneerwoman.com", "delish.com", "womansday.com",
+	"menshealth.com", "womenshealthmag.com", "prevention.com", "runnersworld.com",
+	"bicycling.com", "cosmopolitan.com", "elle.com", "harpersbazaar.com",
+	"marieclaire.com", "esquire.com", "townandcountrymag.com", "caranddriver.com",
+	"roadandtrack.com", "popularmechanics.com",
+	// Condé Nast (commerce teams)
+	"wired.com", "gq.com", "vogue.com", "architecturaldigest.com", "bonappetit.com",
+	"epicurious.com", "self.com", "allure.com", "glamour.com", "teenvogue.com",
+	"cntraveler.com",
+	// Future plc (heavy affiliate)
+	"livescience.com", "space.com", "womanandhome.com", "realhomes.com",
+	"cyclingnews.com", "guitarworld.com", "musicradar.com", "digitalcameraworld.com",
+	// Other publishers with large affiliate commerce operations
+	"buzzfeed.com", "businessinsider.com", "forbes.com", "today.com", "huffpost.com",
+	"rollingstone.com", "parade.com", "nypost.com", "popsci.com", "mashable.com",
+	"foodnetwork.com",
+	// Niche content-affiliate blogs seen in this account's citations
+	"smokedbbqsource.com", "carnivorestyle.com", "grassfedsource.com",
+	"amazingribs.com", "theonlinegrill.com", "ownthegrill.com", "foodfirefriends.com",
+	"angrybbq.com", "wagyuhandbook.com", "pickyeaterblog.com", "mommyhood101.com",
+	"milk-drunk.com", "formulaatlas.com",
+]);
+
+/** True when a bare host/domain is a known affiliate-monetized publisher. */
+export function isAffiliatePublisherDomain(domain: string): boolean {
+	return inDomainSet(domain, AFFILIATE_PUBLISHER_DOMAINS);
+}
+
 export function isEcommerceDomain(domain: string): boolean {
 	return inDomainSet(domain, ECOMMERCE_DOMAINS);
 }
@@ -561,6 +626,7 @@ export function categorizeDomain(
 	}
 	// Affiliate-network redirect hosts (Skimlinks, CJ, Rakuten, AWIN, Impact, …).
 	if (isAffiliateRedirectHost(domain)) return "affiliate";
+	if (isAffiliatePublisherDomain(domain)) return "affiliate";
 	// Forums (incl. community.X / forums.X subdomains) win over the generic lists
 	// below so a forum on an ecommerce/editorial site isn't miscounted as a store.
 	if (isForumDomain(domain)) return "social";
