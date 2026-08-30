@@ -352,3 +352,30 @@ export const generateBrandReportFn = createServerFn({ method: "POST" })
 			throw new Error("The report's written analysis could not be generated. Your weekly allowance was not used — try again.");
 		}
 	});
+
+
+export const getLatestBrandReportFn = createServerFn({ method: "POST" })
+	.validator(z.object({ brandId: z.string().min(1) }))
+	.handler(async ({ data }) => {
+		const session = await requireAuthSession();
+		await requireBrandAccess(session.user.id, data.brandId);
+		const [row] = await db
+			.select()
+			.from(brandReports)
+			.where(and(eq(brandReports.brandId, data.brandId), eq(brandReports.status, "done")))
+			.orderBy(desc(brandReports.createdAt))
+			.limit(1);
+		if (!row || !row.payload) return null;
+		const p = row.payload as { digest: unknown; narrative: unknown };
+		const [brand] = await db.select({ name: brands.name }).from(brands).where(eq(brands.id, data.brandId)).limit(1);
+		return {
+			name: row.name,
+			brandName: brand?.name ?? "Brand",
+			periodLabel: `${fmtDate(row.periodStart)} \u2013 ${fmtDate(row.periodEnd)}`,
+			compareLabel:
+				row.compareStart && row.compareEnd ? `${fmtDate(row.compareStart)} \u2013 ${fmtDate(row.compareEnd)}` : null,
+			createdAt: row.createdAt,
+			digest: p.digest,
+			narrative: p.narrative,
+		};
+	});

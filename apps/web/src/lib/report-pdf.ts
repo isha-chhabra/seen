@@ -82,6 +82,8 @@ function buildImagePdf(pages: ImgPage[]): Blob {
 
 /** Snapshot each element, assemble a PDF, trigger a download named `<fileName>.pdf`. */
 export async function downloadReportPdf(pageEls: HTMLElement[], fileName: string): Promise<void> {
+	// let charts / fonts settle before snapshotting
+	await new Promise((r) => setTimeout(r, 350));
 	const imgPages: ImgPage[] = [];
 	for (const el of pageEls) {
 		const canvas = await html2canvas(el, {
@@ -89,9 +91,16 @@ export async function downloadReportPdf(pageEls: HTMLElement[], fileName: string
 			backgroundColor: "#ffffff",
 			logging: false,
 			useCORS: true,
+			imageTimeout: 0,
 		});
-		const jpeg = dataUrlToBytes(canvas.toDataURL("image/jpeg", 0.92));
-		imgPages.push({ jpeg, wPx: canvas.width, hPx: canvas.height });
+		if (!canvas.width || !canvas.height) throw new Error("report page rendered empty");
+		let dataUrl: string;
+		try {
+			dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+		} catch {
+			throw new Error("could not read the rendered page (canvas tainted)");
+		}
+		imgPages.push({ jpeg: dataUrlToBytes(dataUrl), wPx: canvas.width, hPx: canvas.height });
 	}
 	const blob = buildImagePdf(imgPages);
 	const url = URL.createObjectURL(blob);

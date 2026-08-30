@@ -5,7 +5,7 @@
  */
 import type { ReportNarrative } from "@workspace/lib/report/narrative";
 import { forwardRef } from "react";
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 
 interface ReportDigestView {
 	headlineMetrics: {
@@ -147,31 +147,21 @@ function PageOne(props: ReportDocProps) {
 			<div style={{ display: "flex", gap: 24, marginBottom: 22 }}>
 				<div style={{ flex: 1 }}>
 					<div style={{ fontSize: 11, fontWeight: 700, color: MUTE, marginBottom: 6 }}>DAILY VISIBILITY</div>
-					<div style={{ width: "100%", height: 150 }}>
-						<ResponsiveContainer width="100%" height="100%">
-							<LineChart data={trend} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
-								<CartesianGrid stroke="#f1f5f9" vertical={false} />
-								<XAxis dataKey="date" tick={{ fontSize: 9, fill: MUTE }} interval="preserveStartEnd" />
-								<YAxis tick={{ fontSize: 9, fill: MUTE }} domain={[0, 100]} />
-								<Tooltip />
-								<Line type="monotone" dataKey="visibility" stroke={PINK} strokeWidth={2} dot={false} isAnimationActive={false} />
-							</LineChart>
-						</ResponsiveContainer>
-					</div>
+					<LineChart width={318} height={150} data={trend} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+						<CartesianGrid stroke="#f1f5f9" vertical={false} />
+						<XAxis dataKey="date" tick={{ fontSize: 9, fill: MUTE }} interval="preserveStartEnd" />
+						<YAxis tick={{ fontSize: 9, fill: MUTE }} domain={[0, 100]} />
+						<Line type="monotone" dataKey="visibility" stroke={PINK} strokeWidth={2} dot={false} isAnimationActive={false} />
+					</LineChart>
 				</div>
 				<div style={{ flex: 1 }}>
 					<div style={{ fontSize: 11, fontWeight: 700, color: MUTE, marginBottom: 6 }}>MENTION RATE BY ENGINE</div>
-					<div style={{ width: "100%", height: 150 }}>
-						<ResponsiveContainer width="100%" height="100%">
-							<BarChart data={engines} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
-								<CartesianGrid stroke="#f1f5f9" vertical={false} />
-								<XAxis dataKey="engine" tick={{ fontSize: 8, fill: MUTE }} />
-								<YAxis tick={{ fontSize: 9, fill: MUTE }} domain={[0, 100]} />
-								<Tooltip />
-								<Bar dataKey="pct" fill={PINK} radius={[3, 3, 0, 0]} isAnimationActive={false} />
-							</BarChart>
-						</ResponsiveContainer>
-					</div>
+					<BarChart width={318} height={150} data={engines} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+						<CartesianGrid stroke="#f1f5f9" vertical={false} />
+						<XAxis dataKey="engine" tick={{ fontSize: 8, fill: MUTE }} />
+						<YAxis tick={{ fontSize: 9, fill: MUTE }} domain={[0, 100]} />
+						<Bar dataKey="pct" fill={PINK} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+					</BarChart>
 				</div>
 			</div>
 
@@ -273,7 +263,11 @@ function PageTwo(props: ReportDocProps) {
 
 export const ReportDocument = forwardRef<HTMLDivElement, ReportDocProps>(function ReportDocument(props, ref) {
 	return (
-		<div ref={ref} style={{ position: "fixed", left: -10000, top: 0 }} aria-hidden>
+		<div
+			ref={ref}
+			aria-hidden
+			style={{ position: "fixed", left: 0, top: 0, zIndex: -1, opacity: 0, pointerEvents: "none", background: "#fff" }}
+		>
 			<div data-report-page="1" style={{ position: "relative" }}>
 				<PageOne {...props} />
 			</div>

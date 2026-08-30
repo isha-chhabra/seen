@@ -18,7 +18,7 @@ import { ReportDocument, type ReportDocProps } from "@/components/report/report-
 import { useBrand } from "@/hooks/use-brands";
 import { downloadReportPdf } from "@/lib/report-pdf";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
-import { generateBrandReportFn, getReportAvailabilityFn } from "@/server/brand-reports";
+import { generateBrandReportFn, getLatestBrandReportFn, getReportAvailabilityFn } from "@/server/brand-reports";
 
 export const Route = createFileRoute("/_authed/app/$brand/reports")({
 	head: ({ matches, match }) => ({
@@ -79,12 +79,27 @@ function ReportsPage() {
 	const [error, setError] = useState<string | null>(null);
 	const [availability, setAvailability] = useState<{ canGenerate: boolean; nextAvailableAt: string | null } | null>(null);
 	const [doc, setDoc] = useState<ReportDocProps | null>(null);
+	const [lastReport, setLastReport] = useState<ReportDocProps & { createdAt: string } | null>(null);
 	const docRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
 		getReportAvailabilityFn({ data: { brandId } })
 			.then((a) => setAvailability({ canGenerate: a.canGenerate, nextAvailableAt: a.nextAvailableAt }))
 			.catch(() => setAvailability({ canGenerate: true, nextAvailableAt: null }));
+		getLatestBrandReportFn({ data: { brandId } })
+			.then((r) =>
+				r
+					? setLastReport({
+							brandName: r.brandName,
+							periodLabel: r.periodLabel,
+							compareLabel: r.compareLabel,
+							digest: r.digest as ReportDocProps["digest"],
+							narrative: r.narrative as ReportDocProps["narrative"],
+							createdAt: String(r.createdAt),
+						})
+					: setLastReport(null),
+			)
+			.catch(() => setLastReport(null));
 	}, [brandId]);
 
 	// once a doc payload lands, snapshot it to a PDF and download
@@ -189,6 +204,30 @@ function ReportsPage() {
 						One report per brand per week. Any range is allowed — the limit is on how often you generate, not what you analyze.
 						The PDF downloads automatically when it's ready.
 					</p>
+
+					{lastReport && (
+						<div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-sm">
+							<span className="text-muted-foreground">
+								Last report: <strong>{lastReport.periodLabel}</strong>
+							</span>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => {
+									setStatus("working");
+									setDoc({
+										brandName: lastReport.brandName,
+										periodLabel: lastReport.periodLabel,
+										compareLabel: lastReport.compareLabel,
+										digest: lastReport.digest,
+										narrative: lastReport.narrative,
+									});
+								}}
+							>
+								Download PDF again
+							</Button>
+						</div>
+					)}
 				</CardContent>
 			</Card>
 
