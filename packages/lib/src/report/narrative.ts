@@ -1,57 +1,108 @@
 /**
- * LLM narrative for a brand analytics report.
+ * LLM narrative for a client-facing AI-visibility report (affiliate-marketing framing).
  *
- * One structured completion (web search OFF) over a deterministic data digest
- * assembled by the caller. Same provider selection as brand analysis
- * (resolveResearchProvider -> OPENAI_API_KEY / gpt-5-mini). No template
- * sentences: the schema is what the model must fill.
+ * The reader is a brand that hired an affiliate agency: no analytics access, no
+ * SEO/AEO vocabulary. Everything is explained in plain business English, straight
+ * and factual. One structured completion (web search OFF) over a deterministic
+ * digest. Same provider as brand analysis (OPENAI_API_KEY / gpt-5-mini).
  */
 import { z } from "zod";
 import { runStructuredCompletionPrompt } from "../onboarding";
 
-const performer = z.object({
-	label: z.string().describe("The named item verbatim — a tracked prompt, an engine, or a citation source/domain."),
-	metric: z.string().describe("What is measured, e.g. 'brand mention rate', 'share of voice', 'citation share'."),
-	value: z.string().describe("The figure with unit, e.g. '82%', '+14 pts', '31 of 120 answers'."),
-	note: z.string().describe("One short clause on why it stands out. No restating the value."),
-});
-
 export const reportNarrativeSchema = z.object({
-	page1: z.object({
+	// ── Page 1: what this is + where you stand ──────────────────────────
+	overview: z.object({
+		whatThisIs: z
+			.string()
+			.describe(
+				"2-3 plain sentences a non-technical brand owner understands: AI assistants (ChatGPT, Gemini, Perplexity, Google's AI answers) now answer 'what's the best <category>' directly, and this report measures how often they recommend this brand and where they leave it out. No jargon, no acronyms.",
+			),
 		headline: z
 			.string()
-			.describe("One specific sentence naming the single most important finding of the period, with a real number."),
-		summary: z
-			.array(z.string())
-			.min(3)
-			.max(5)
+			.describe("The single most important takeaway of the period in one plain sentence, containing a real number."),
+		keyNumbers: z
+			.array(
+				z.object({
+					label: z.string().describe("Plain label, e.g. 'AI recommendation rate', not 'visibility %'."),
+					value: z.string().describe("The figure with unit, e.g. '42%' or '+9 points'."),
+					whatItMeans: z.string().describe("One plain sentence: what this number tells the client about their business."),
+				}),
+			)
+			.length(3),
+	}),
+
+	// ── Page 2: which buying questions you win and lose ─────────────────
+	buyingQuestions: z.object({
+		intro: z.string().describe("One sentence framing this page for the client."),
+		winning: z
+			.array(
+				z.object({
+					question: z.string().describe("The buying question verbatim (a tracked prompt)."),
+					detail: z.string().describe("Plain: how consistently AI recommends the brand here and why it matters."),
+				}),
+			)
+			.max(6),
+		losing: z
+			.array(
+				z.object({
+					question: z.string().describe("The buying question verbatim."),
+					recommendedInstead: z.string().describe("Which competitor(s) AI names here instead, from the data."),
+					detail: z.string().describe("Plain: the gap and what it costs the brand."),
+				}),
+			)
+			.max(6),
+		engineNote: z
+			.string()
 			.describe(
-				"3-5 bullets. Each <= 25 words, each cites a real number or named item from the digest. Never make the same point twice. Terse — this must fit one page.",
+				"2-4 sentences, plain: which AI assistants show the brand most and least (with numbers), and a one-line reminder of what each named assistant is.",
 			),
-		topPerformers: z.array(performer).min(1).max(4),
-		bottomPerformers: z.array(performer).min(1).max(4),
 	}),
-	page2: z.object({
-		opportunities: z
+
+	// ── Page 3: which sites the AI trusts (the affiliate angle) ─────────
+	sources: z.object({
+		intro: z
+			.string()
+			.describe(
+				"2-3 plain sentences: when AI recommends products in this category it reads a set of third-party sites first; getting the brand featured on them — or featured better — is how the recommendation rate moves. This is the affiliate-placement opportunity.",
+			),
+		affiliateInsight: z
+			.string()
+			.describe(
+				"Specific, with numbers from the digest: what share of the sources AI relied on are affiliate / 'best of' roundup sites, name the biggest ones, and state plainly that these are placement targets.",
+			),
+		keySources: z
 			.array(
 				z.object({
-					title: z.string().describe("Short, action-oriented — the concrete move, not a metric."),
-					why: z.string().describe("1-2 sentences tying it to a specific figure or named item in the digest."),
-					priority: z.enum(["high", "medium", "low"]),
+					site: z.string().describe("Domain, e.g. 'goodhousekeeping.com'."),
+					type: z.string().describe("One of: Affiliate / roundup, Editorial, Retailer, Community, Reference — from the digest category."),
+					note: z.string().describe("Plain: what AI uses this site for and whether the brand appears there."),
 				}),
 			)
-			.min(3)
-			.max(7),
-		metricGuide: z
-			.array(
-				z.object({
-					term: z.string().describe("A metric shown on this report, e.g. 'Visibility', 'Share of Voice'."),
-					plainExplanation: z.string().describe("One plain sentence for a reader new to AI-visibility tracking."),
-				}),
-			)
-			.min(3)
-			.max(5),
+			.max(8),
+		competitorSourceGap: z
+			.string()
+			.describe(
+				"Sites that AI cites when recommending competitors but not this brand, if the data shows any; otherwise state plainly that no clear gap stood out this period.",
+			),
 	}),
+
+	// ── Page 4: action plan + glossary ─────────────────────────────────
+	actionPlan: z
+		.array(
+			z.object({
+				action: z
+					.string()
+					.describe("A concrete affiliate-marketing move, e.g. 'Pitch <site> for inclusion in their <topic> roundup'."),
+				rationale: z.string().describe("Tied to a specific number or named item in the digest."),
+				priority: z.enum(["high", "medium", "low"]),
+			}),
+		)
+		.min(5)
+		.max(8),
+	glossary: z
+		.array(z.object({ term: z.string(), definition: z.string().describe("One plain sentence, no other jargon inside it.") }))
+		.min(4)
+		.max(7),
 });
 
 export type ReportNarrative = z.infer<typeof reportNarrativeSchema>;
@@ -66,16 +117,20 @@ export interface ReportPromptArgs {
 export function buildReportPrompt(a: ReportPromptArgs): string {
 	const compare = Boolean(a.compareLabel);
 	return [
-		`You are writing a two-page AI-visibility report for the brand "${a.brandName}".`,
+		`You are writing a client-facing report for "${a.brandName}", a brand that has hired an affiliate-marketing agency.`,
+		`The reader is a brand owner or marketing lead with NO access to analytics tools and NO familiarity with SEO, AEO, "share of voice", "citations" or similar terms. Write for them.`,
 		compare
-			? `It compares ${a.periodLabel} against ${a.compareLabel}. Page 1 is about WHAT CHANGED between the two periods.`
-			: `It covers ${a.periodLabel}. Page 1 is about WHAT HAPPENED in that period.`,
-		`Rules:`,
+			? `The report covers ${a.periodLabel} compared with ${a.compareLabel}. Where it helps, say what changed between the two.`
+			: `The report covers ${a.periodLabel}.`,
+		``,
+		`FRAME everything through affiliate marketing: AI assistants have become the new "best <product>" roundup. The job is to get ${a.brandName} recommended by them, and to get it placed on the third-party sites those assistants pull from.`,
+		``,
+		`RULES:`,
+		`- Plain business English. Explain every concept the first time it appears. No acronyms, no marketing hype, no reassurance-speak — straight and factual.`,
 		`- Use ONLY the data in the digest below. Every claim references a real number or a named item from it.`,
-		`- No generic filler ("visibility improved", "solid progress"). Never state the same point twice in other words.`,
-		`- Page 1 must fit one printed page: be terse, specifics over prose.`,
-		`- Page 2 opportunities are each grounded in a specific figure or item from the digest — no generic marketing advice.`,
-		`- metricGuide is for a reader who has never used a visibility tracker: plain, one sentence each.`,
+		`- Never make the same point twice. Prefer specifics (named questions, named sites, named competitors, real percentages) over generalities.`,
+		`- "recommendedInstead" and "competitorSourceGap" must name real competitors/sites from the digest, or say plainly that none stood out.`,
+		`- The glossary defines the terms this report actually uses (e.g. the labels in keyNumbers), each in one plain sentence.`,
 		``,
 		`DATA DIGEST (JSON):`,
 		JSON.stringify(a.digest ?? {}, null, 1),
