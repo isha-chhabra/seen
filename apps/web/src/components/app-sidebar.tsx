@@ -107,6 +107,11 @@ function brandGroups(brand: BrandWithPrompts | null | undefined, features?: Clie
 				url: "/opportunities",
 				icon: IconTarget,
 			},
+			{
+				title: "Reports",
+				url: "/reports",
+				icon: IconReport,
+			},
 		);
 	}
 
