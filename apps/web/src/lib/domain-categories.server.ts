@@ -576,6 +576,10 @@ const AFFILIATE_PUBLISHER_DOMAINS = new Set([
 	"amazingribs.com", "theonlinegrill.com", "ownthegrill.com", "foodfirefriends.com",
 	"angrybbq.com", "wagyuhandbook.com", "pickyeaterblog.com", "mommyhood101.com",
 	"milk-drunk.com", "formulaatlas.com",
+	// Craft / art content-affiliate blogs
+	"artsideoflife.com", "coloringbliss.com", "artistcorneronline.com",
+	"whatmomslove.com", "thecommonmom.com", "doodlersanonymous.com",
+	"colorloudly.com", "creativekids.com",
 ]);
 
 /** True when a bare host/domain is a known affiliate-monetized publisher. */
@@ -682,7 +686,10 @@ export function classifyUrl(
 	if (cat !== "other") return cat;
 	const pt = inferPageType(url, title);
 	if (pt === "forum") return "social"; // a forum page on an unlisted domain is still community / UGC
-	if (EDITORIAL_PAGE_TYPES.has(pt)) return "editorial";
+	// "best X" / "X vs Y" / "X review" on an unlisted domain: on a small blog this is
+	// almost always affiliate-monetized commercial content, not neutral editorial.
+	if (pt === "listicle" || pt === "comparison" || pt === "review") return "affiliate";
+	if (EDITORIAL_PAGE_TYPES.has(pt)) return "editorial"; // remaining: article, howto
 	if (pt === "product" || pt === "shopping") return "ecommerce";
 	return "other";
 }
