@@ -34,7 +34,7 @@ interface PromptWizardProps {
 
 /** Brand analysis runs in the worker (LLM + web search, ~1 min); the client polls for the result. */
 const POLL_INTERVAL_MS = 2000;
-const ANALYZE_TIMEOUT_MS = 6 * 60 * 1000; // give up after ~6 minutes
+const ANALYZE_TIMEOUT_MS = 12 * 60 * 1000; // give up after ~12 minutes
 
 const analyzeStatusKey = (brandId: string) => ["analyze-brand", "status", brandId] as const;
 

@@ -111,7 +111,12 @@ export const openaiApi: Provider = {
 						},
 					}
 				: {}),
-			...(webSearch ? { providerOptions: { openai: { maxToolCalls: RESEARCH_WEB_SEARCH_MAX_USES } } } : {}),
+			providerOptions: {
+				openai: {
+					reasoningEffort: "low",
+					...(webSearch ? { maxToolCalls: RESEARCH_WEB_SEARCH_MAX_USES } : {}),
+				},
+			},
 			output: Output.object({ schema }),
 			prompt,
 		});
