@@ -106,7 +106,7 @@ export async function downloadReportPdf(pageEls: HTMLElement[], fileName: string
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement("a");
 	a.href = url;
-	a.download = `${fileName.replace(/[^\w.\- ]+/g, "").trim() || "report"}.pdf`;
+	a.download = `${String(fileName || "report").replace(/[^\w.\- ]+/g, "").trim() || "report"}.pdf`;
 	document.body.appendChild(a);
 	a.click();
 	a.remove();
