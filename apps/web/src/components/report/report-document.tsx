@@ -265,13 +265,24 @@ export const ReportDocument = forwardRef<HTMLDivElement, ReportDocProps>(functio
 	return (
 		<div
 			ref={ref}
-			aria-hidden
-			style={{ position: "fixed", left: 0, top: 0, zIndex: -1, opacity: 0, pointerEvents: "none", background: "#fff" }}
+			style={{
+				position: "fixed",
+				inset: 0,
+				zIndex: 2147483647,
+				background: "#fff",
+				overflow: "auto",
+				display: "flex",
+				flexDirection: "column",
+				alignItems: "center",
+				gap: 16,
+				padding: "24px 0",
+			}}
 		>
-			<div data-report-page="1" style={{ position: "relative" }}>
+			<div style={{ fontSize: 13, fontWeight: 600, color: "#ec4899" }}>Preparing your PDF…</div>
+			<div data-report-page="1" style={{ position: "relative", boxShadow: "0 4px 24px rgba(0,0,0,0.1)" }}>
 				<PageOne {...props} />
 			</div>
-			<div data-report-page="2" style={{ position: "relative" }}>
+			<div data-report-page="2" style={{ position: "relative", boxShadow: "0 4px 24px rgba(0,0,0,0.1)" }}>
 				<PageTwo {...props} />
 			</div>
 		</div>
