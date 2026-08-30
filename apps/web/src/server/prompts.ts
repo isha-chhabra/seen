@@ -10,6 +10,7 @@ import { requireAuthSession, requireBrandAccess } from "@/lib/auth/helpers";
 import type { LookbackPeriod } from "@/lib/chart-utils";
 import { generateDateRange } from "@/lib/chart-utils";
 import { rollUpCitationDomains, rollUpCitationUrls, tallyCitations } from "@/lib/citation-rollup";
+import { getBoss } from "@/lib/boss-client";
 import { extractDomain } from "@/lib/domain-categories";
 import { classifyUrl } from "@/lib/domain-categories.server";
 import { expeditePromptRuns } from "@/lib/expedite-prompts";
@@ -716,4 +717,50 @@ export const getPromptWebQueryFn = createServerFn({ method: "GET" })
 		}
 
 		return { webQuery };
+	});
+
+
+/**
+ * Manual "run all prompts now" for a brand: enqueue a forced cycle for every
+ * enabled prompt so all engines re-scrape immediately, bypassing the 24h
+ * per-target cadence. Rate-limited to one forced cycle per brand per 10 min.
+ */
+const RUN_NOW_COOLDOWN_MS = 10 * 60 * 1000;
+
+export const runBrandPromptsNowFn = createServerFn({ method: "POST" })
+	.validator(z.object({ brandId: z.string().min(1) }))
+	.handler(async ({ data }): Promise<{ queued: number; cooldownMs: number }> => {
+		const session = await requireAuthSession();
+		await requireBrandAccess(session.user.id, data.brandId);
+
+		const enabled = await db
+			.select({ id: prompts.id })
+			.from(prompts)
+			.innerJoin(brands, eq(prompts.brandId, brands.id))
+			.where(and(eq(brands.id, data.brandId), eq(prompts.enabled, true)));
+		if (enabled.length === 0) return { queued: 0, cooldownMs: 0 };
+
+		const idList = sql.join(
+			enabled.map((p) => sql`${p.id}`),
+			sql`, `,
+		);
+		const recent = await db.execute(sql`
+			SELECT max(created_on) AS last
+			FROM pgboss.job
+			WHERE name = 'process-prompt'
+			  AND (data->>'force') = 'true'
+			  AND (data->>'promptId') IN (${idList})
+			  AND created_on > now() - interval '10 minutes'
+		`);
+		const last = (recent.rows[0] as { last: string | null } | undefined)?.last ?? null;
+		if (last) {
+			const remaining = RUN_NOW_COOLDOWN_MS - (Date.now() - new Date(last).getTime());
+			return { queued: 0, cooldownMs: Math.max(0, remaining) };
+		}
+
+		const boss = await getBoss();
+		for (const p of enabled) {
+			await boss.send("process-prompt", { promptId: p.id, force: true, consecutiveFailures: 0 });
+		}
+		return { queued: enabled.length, cooldownMs: RUN_NOW_COOLDOWN_MS };
 	});

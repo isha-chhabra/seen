@@ -36,6 +36,8 @@ export interface ProcessPromptData {
 	cadenceHours?: number;
 	/** Cycles in a row where every run failed, carried forward to size the backoff. */
 	consecutiveFailures?: number;
+	/** Manual "run now": run every target this cycle, ignoring per-target cadence. */
+	force?: boolean;
 }
 
 /**
@@ -418,6 +420,7 @@ async function processPrompt(
 	promptId: string,
 	scrapeConfigs: ModelConfig[],
 	consecutiveFailures: number,
+	force = false,
 ): Promise<void> {
 	console.log(`Processing prompt ${promptId}`);
 
@@ -449,7 +452,7 @@ async function processPrompt(
 
 	const maxIntervalHours = Math.max(...plan.targets.map((t) => t.intervalHours));
 	const lastRuns = await getLastRunsByTargetKey(promptId, maxIntervalHours);
-	const dueTargets = selectDueTargets(plan.targets, lastRuns, new Date());
+	const dueTargets = force ? plan.targets : selectDueTargets(plan.targets, lastRuns, new Date());
 
 	if (dueTargets.length === 0) {
 		// Fired early (expedite, duplicate send): everything is fresh. Keep the
@@ -535,6 +538,6 @@ export async function processPromptJob(jobs: Job<ProcessPromptData>[]): Promise<
 
 	// pg-boss v12 passes an array of jobs - process each one
 	for (const job of jobs) {
-		await processPrompt(job.data.promptId, scrapeConfigs, job.data.consecutiveFailures ?? 0);
+		await processPrompt(job.data.promptId, scrapeConfigs, job.data.consecutiveFailures ?? 0, job.data.force ?? false);
 	}
 }

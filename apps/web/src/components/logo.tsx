@@ -24,7 +24,9 @@ export function Logo({ className, iconClassName, textClassName, ...props }: Logo
 	if (usesWordmarkFont(branding)) {
 		return (
 			<div {...props} className={cn("flex items-center gap-2", className)}>
-				<span className={cn("text-2xl font-bold lowercase tracking-tight text-pink-500", textClassName)}>seen</span>
+				<span className={cn("font-titan-one text-3xl font-normal leading-none lowercase text-pink-500", textClassName)}>
+					seen
+				</span>
 			</div>
 		);
 	}
