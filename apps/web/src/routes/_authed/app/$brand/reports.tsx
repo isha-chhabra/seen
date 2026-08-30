@@ -78,8 +78,8 @@ function ReportsPage() {
 	const [status, setStatus] = useState<"idle" | "working" | "error">("idle");
 	const [error, setError] = useState<string | null>(null);
 	const [availability, setAvailability] = useState<{ canGenerate: boolean; nextAvailableAt: string | null } | null>(null);
-	const [doc, setDoc] = useState<ReportDocProps | null>(null);
-	const [lastReport, setLastReport] = useState<ReportDocProps & { createdAt: string } | null>(null);
+	const [doc, setDoc] = useState<(ReportDocProps & { fileName: string }) | null>(null);
+	const [lastReport, setLastReport] = useState<(ReportDocProps & { createdAt: string; name: string }) | null>(null);
 	const docRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -90,6 +90,7 @@ function ReportsPage() {
 			.then((r) =>
 				r
 					? setLastReport({
+							name: r.name,
 							brandName: r.brandName,
 							periodLabel: r.periodLabel,
 							compareLabel: r.compareLabel,
@@ -106,7 +107,7 @@ function ReportsPage() {
 	useEffect(() => {
 		if (!doc || !docRef.current) return;
 		const pages = Array.from(docRef.current.querySelectorAll<HTMLElement>("[data-report-page]"));
-		downloadReportPdf(pages, doc.name)
+		downloadReportPdf(pages, doc.fileName)
 			.then(() => setStatus("idle"))
 			.catch(() => {
 				setStatus("error");
@@ -148,6 +149,7 @@ function ReportsPage() {
 				compareLabel: res.compareLabel,
 				digest: res.digest,
 				narrative: res.narrative,
+				fileName: name.trim(),
 			});
 			// refresh cooldown
 			getReportAvailabilityFn({ data: { brandId } }).then((a) =>
@@ -221,6 +223,7 @@ function ReportsPage() {
 										compareLabel: lastReport.compareLabel,
 										digest: lastReport.digest,
 										narrative: lastReport.narrative,
+										fileName: lastReport.name || `${lastReport.brandName} report`,
 									});
 								}}
 							>
