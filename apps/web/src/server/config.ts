@@ -3,7 +3,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { CRISP_WEBSITE_ID } from "@workspace/config/constants";
-import { getDeploymentModeFromEnv, getEnvValidationState } from "@workspace/config/env";
+import { getEnvValidationState } from "@workspace/config/env";
 import type { ClientConfig } from "@workspace/config/types";
 import { getDefaultDelayHours } from "@workspace/lib/constants";
 import { countUsers } from "@workspace/lib/db/provisioning";
@@ -25,14 +25,14 @@ export type PublicClientConfig = Omit<ClientConfig, "branding"> & {
 const POSTHOG_PUBLIC_KEY = "phc_Jhx9LnI9cTDFHpQmpOzJSDTW127qD9pFU65KRnYym6z";
 
 function resolvePosthogKey(): string | undefined {
-	if (process.env.DISABLE_TELEMETRY) return undefined;
-	return process.env.VITE_POSTHOG_KEY ?? POSTHOG_PUBLIC_KEY;
+	// Rebranded self-host: no upstream telemetry. Only phone home to an
+	// operator-supplied PostHog project.
+	return process.env.VITE_POSTHOG_KEY || undefined;
 }
 
 export function resolveCrispWebsiteId(): string | undefined {
-	const mode = getDeploymentModeFromEnv();
-	if (mode !== "cloud" && mode !== "demo") return undefined;
-	return CRISP_WEBSITE_ID;
+	// Rebranded self-host: never load the upstream Crisp support widget.
+	return process.env.VITE_CRISP_WEBSITE_ID || undefined;
 }
 
 export const getClientConfig = createServerFn({ method: "GET" }).handler(async (): Promise<PublicClientConfig> => {
