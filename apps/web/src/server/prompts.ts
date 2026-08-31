@@ -729,7 +729,7 @@ const RUN_NOW_COOLDOWN_MS = 10 * 60 * 1000;
 
 export const runBrandPromptsNowFn = createServerFn({ method: "POST" })
 	.validator(z.object({ brandId: z.string().min(1) }))
-	.handler(async ({ data }): Promise<{ queued: number; cooldownMs: number }> => {
+	.handler(async ({ data }): Promise<{ queued: number; cooldownMs: number; triggeredBy?: string; triggeredAt?: string }> => {
 		const session = await requireAuthSession();
 		await requireBrandAccess(session.user.id, data.brandId);
 
@@ -762,5 +762,13 @@ export const runBrandPromptsNowFn = createServerFn({ method: "POST" })
 		for (const p of enabled) {
 			await boss.send("process-prompt", { promptId: p.id, force: true, consecutiveFailures: 0 });
 		}
-		return { queued: enabled.length, cooldownMs: RUN_NOW_COOLDOWN_MS };
+
+		const triggeredBy = session.user.name?.trim() || session.user.email || "a teammate";
+		const triggeredAt = new Date();
+		await db
+			.update(brands)
+			.set({ lastRunTriggeredBy: triggeredBy, lastRunTriggeredAt: triggeredAt })
+			.where(eq(brands.id, data.brandId));
+
+		return { queued: enabled.length, cooldownMs: RUN_NOW_COOLDOWN_MS, triggeredBy, triggeredAt: triggeredAt.toISOString() };
 	});

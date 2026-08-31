@@ -21,9 +21,21 @@ import { buttonVariants } from "@workspace/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import PromptWizard from "@/components/prompt-wizard";
 import { RunNowButton } from "@/components/run-now-button";
+
+function LastRunLine({ by, at }: { by: string | null; at: string | null }) {
+	if (!at) return <p className="text-sm text-muted-foreground">No prompt run has been triggered yet.</p>;
+	const d = new Date(at);
+	return (
+		<p className="text-sm text-muted-foreground">
+			Last prompt run by <span className="font-medium text-foreground">{by || "a teammate"}</span> on{" "}
+			{d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} at{" "}
+			{d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+		</p>
+	);
+}
 import { TrendChart, type TrendPoint } from "@/components/trend-chart";
 import { useBrand } from "@/hooks/use-brands";
 import { useDashboardSummary } from "@/hooks/use-dashboard-summary";
@@ -412,6 +424,7 @@ function HeroStat({ value, loading }: { value: number | null; loading: boolean }
 function DashboardPage() {
 	const { brand: brandId } = Route.useParams();
 	const { brand, isLoading: isLoadingBrand } = useBrand();
+	const [lastRunOverride, setLastRunOverride] = useState<{ by: string; at: string } | null>(null);
 	// The footer reports what this brand actually runs, resolved server-side.
 	const trackedTargets = brand?.trackedTargets ?? [];
 	const { dashboardSummary, isLoading: isLoadingSummary } = useDashboardSummary(brand?.id, "1m");
@@ -460,9 +473,12 @@ function DashboardPage() {
 				<div className="flex flex-wrap items-center justify-between gap-3 pb-1">
 					<div>
 						<h1 className="text-2xl font-bold tracking-tight">Overview</h1>
-						<p className="text-sm text-muted-foreground">Prompts run automatically once a day. Trigger a full cycle now:</p>
+						<LastRunLine
+							by={lastRunOverride?.by ?? brand?.lastRunTriggeredBy ?? null}
+							at={lastRunOverride?.at ?? (brand?.lastRunTriggeredAt ? String(brand.lastRunTriggeredAt) : null)}
+						/>
 					</div>
-					<RunNowButton brandId={brandId} />
+					<RunNowButton brandId={brandId} onQueued={setLastRunOverride} />
 				</div>
 				<TrendSection
 					icon={IconEye}

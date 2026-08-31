@@ -120,6 +120,13 @@
       "when": 1788000000000,
       "tag": "0016_brand_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788500000000,
+      "tag": "0017_brand_last_run_trigger",
+      "breakpoints": true
     }
   ]
 }
