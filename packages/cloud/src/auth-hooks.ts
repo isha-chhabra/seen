@@ -15,8 +15,11 @@
  */
 
 import type { CreateAuthOptions } from "@workspace/lib/auth/server";
+import { db } from "@workspace/lib/db/db";
 import { provisionUmbrellaOrg } from "@workspace/lib/db/provisioning";
+import { invitation } from "@workspace/lib/db/schema";
 import { APIError } from "better-auth/api";
+import { and, eq, sql } from "drizzle-orm";
 import { createStripeBillingPlugin } from "./billing/plugin";
 import { isDisposableEmail } from "./disposable-domains";
 import { sendEmail } from "./email";
@@ -108,6 +111,17 @@ export function getCloudAuthOptions(): CreateAuthOptions {
 						}
 					},
 					after: async (user) => {
+						// An invited user joins the workspace they were invited to — they must
+						// not also get a personal umbrella workspace (that is what split brands
+						// off from the team). Direct self-serve signups still get their own.
+						const email = user.email.trim().toLowerCase();
+						const pendingInvite = await db
+							.select({ id: invitation.id })
+							.from(invitation)
+							.where(and(sql`lower(${invitation.email}) = ${email}`, eq(invitation.status, "pending")))
+							.limit(1);
+						if (pendingInvite.length > 0) return;
+
 						await provisionUmbrellaOrg({
 							userId: user.id,
 							name: user.name?.trim() ? `${user.name.trim()}'s workspace` : "My workspace",

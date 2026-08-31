@@ -168,5 +168,17 @@ export const acceptInvitationFn = createServerFn({ method: "POST" })
 			headers: getRequestHeaders(),
 		});
 
+		// Make the joined workspace the active one so the member's first view is
+		// the shared brand list, not an empty state. Non-fatal: getBrands() already
+		// spans every org the user belongs to.
+		try {
+			await auth.api.setActiveOrganization({
+				body: { organizationId: result.invitation.organizationId },
+				headers: getRequestHeaders(),
+			});
+		} catch {
+			/* ignore */
+		}
+
 		return { orgId: result.invitation.organizationId };
 	});
