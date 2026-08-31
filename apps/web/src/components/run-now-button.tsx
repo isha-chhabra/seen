@@ -16,7 +16,15 @@ type RunState =
  * enabled prompt + engine for the brand, bypassing the per-target 24h cadence.
  * Server enforces a cooldown; the button reflects it.
  */
-export function RunNowButton({ brandId, className }: { brandId: string; className?: string }) {
+export function RunNowButton({
+	brandId,
+	className,
+	onQueued,
+}: {
+	brandId: string;
+	className?: string;
+	onQueued?: (info: { by: string; at: string }) => void;
+}) {
 	const [state, setState] = useState<RunState>({ kind: "idle" });
 	const [now, setNow] = useState(() => Date.now());
 
@@ -38,7 +46,10 @@ export function RunNowButton({ brandId, className }: { brandId: string; classNam
 		try {
 			const res = await runBrandPromptsNowFn({ data: { brandId } });
 			const until = Date.now() + (res.cooldownMs || 0);
-			if (res.queued > 0) setState({ kind: "queued", count: res.queued, until: Date.now() + 6000 });
+			if (res.queued > 0) {
+				if (res.triggeredBy && res.triggeredAt) onQueued?.({ by: res.triggeredBy, at: res.triggeredAt });
+				setState({ kind: "queued", count: res.queued, until: Date.now() + 6000 });
+			}
 			else if (res.cooldownMs > 0) setState({ kind: "cooldown", until });
 			else setState({ kind: "error", message: "No enabled prompts to run" });
 		} catch (e) {

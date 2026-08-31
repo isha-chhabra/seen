@@ -39,6 +39,8 @@ export const brands = pgTable(
 		delayOverrideHours: integer("delay_override_hours"),
 		enabledModels: text("enabled_models").array(),
 		lastReportGeneratedAt: timestamp("last_report_generated_at", { withTimezone: true }),
+		lastRunTriggeredBy: text("last_run_triggered_by"),
+		lastRunTriggeredAt: timestamp("last_run_triggered_at", { withTimezone: true }),
 		// Hard tenancy scope. Every brand belongs to exactly one better-auth
 		// organization; org membership (the `member` table) is the access-control
 		// mechanism. Brand and organization ids are independent, so billing and
