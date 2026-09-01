@@ -361,6 +361,8 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 			from: z.string().regex(ymdRe),
 			to: z.string().regex(ymdRe),
 			pagesPerSearch: z.number().int().min(1).max(MAX_PAGES),
+			// default: only surface articles that DON'T already name the brand — those are the pitch targets
+			includeAlreadyFeatured: z.boolean().optional(),
 		}),
 	)
 	.handler(
@@ -380,11 +382,21 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 			if (!brand) throw new Error("Brand not found");
 			const comps = await db.select().from(competitors).where(eq(competitors.brandId, data.brandId));
 
+			const wordRe = (term: string) =>
+				new RegExp(`(?:^|[^a-z0-9])${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:$|[^a-z0-9])`, "i");
+
 			const competitorNames = comps.map((c) => c.name).filter(Boolean);
-			const compTermsByName = comps
+			const compResByName = comps
 				.filter((c) => c.name)
-				.map((c) => ({ name: c.name, terms: dedupeLower([c.name, ...(c.aliases ?? [])]).filter((t) => t.length >= 3) }));
-			const brandTerms = dedupeLower([brand.name, ...(brand.aliases ?? [])]).filter((t) => t.length >= 3);
+				.map((c) => ({
+					name: c.name,
+					res: dedupeLower([c.name, ...(c.aliases ?? [])])
+						.filter((t) => t.length >= 3)
+						.map(wordRe),
+				}));
+			const brandRes = dedupeLower([brand.name, ...(brand.aliases ?? [])])
+				.filter((t) => t.length >= 3)
+				.map(wordRe);
 			const brandDomains = new Set(
 				[brand.website, ...(brand.additionalDomains ?? [])].map((d) => extractDomain(d)).filter(Boolean),
 			);
@@ -502,7 +514,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 				if (sig.commerceMarkers && !domainKnown && !sig.strong) return null;
 
 				const text = extractReadableText(html) || c.snippet;
-				const haystack = `${c.title}\n${text}`.toLowerCase();
+				const haystack = `${c.title}\n${text}`;
 				return {
 					url: c.url,
 					title: c.title,
@@ -510,10 +522,10 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 					domain,
 					excerpt: text.slice(0, 1500),
 					signals: dedupeLower(domainKnown ? ["known affiliate publisher", ...sig.labels] : sig.labels),
-					competitorsMentioned: compTermsByName
-						.filter((cc) => cc.terms.some((t) => haystack.includes(t)))
+					competitorsMentioned: compResByName
+						.filter((cc) => cc.res.some((re) => re.test(haystack)))
 						.map((cc) => cc.name),
-					brandAlreadyMentioned: brandTerms.some((t) => haystack.includes(t)),
+					brandAlreadyMentioned: brandRes.some((re) => re.test(haystack)),
 					rank: c.rank,
 				};
 			});
@@ -543,7 +555,14 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 
 			const highAuthority: ArticleResult[] = [];
 			const nicheBlog: ArticleResult[] = [];
+			let excludedAlreadyFeatured = 0;
 			for (const s of survivors) {
+				// the point of the tool is finding pitch targets — skip articles that
+				// already name the brand unless the caller opts to see them
+				if (s.brandAlreadyMentioned && data.includeAlreadyFeatured !== true) {
+					excludedAlreadyFeatured++;
+					continue;
+				}
 				const j = byUrl.get(s.url);
 				const majorList = isMajorPublisher(s.domain, s.url);
 				// with no judgement, fall back to conservative keep for known publishers only
@@ -594,6 +613,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 					pagesFetched: toFetch.length,
 					highAuthority: highAuthority.length,
 					nicheBlog: nicheBlog.length,
+					excludedAlreadyFeatured,
 				},
 			};
 		},
