@@ -35,9 +35,9 @@ function googleSearchUrl(query: string, page: number, from?: string, to?: string
 	return `https://www.google.com/search?${params.toString()}`;
 }
 
-async function brightdataRaw(zone: string, url: string, timeoutMs: number): Promise<string | null> {
+async function brightdataRaw(zone: string, url: string, timeoutMs: number, attempts: number): Promise<string | null> {
 	const token = getCredential("BRIGHTDATA_API_TOKEN");
-	for (let attempt = 0; attempt < 3; attempt++) {
+	for (let attempt = 0; attempt < attempts; attempt++) {
 		try {
 			const res = await fetch(BRIGHTDATA_REQUEST_URL, {
 				method: "POST",
@@ -52,7 +52,7 @@ async function brightdataRaw(zone: string, url: string, timeoutMs: number): Prom
 		} catch {
 			// network / timeout — fall through to retry
 		}
-		await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+		if (attempt < attempts - 1) await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
 	}
 	return null;
 }
@@ -62,7 +62,7 @@ export async function googleSerp(
 	page: number,
 	opts: { from?: string; to?: string },
 ): Promise<SerpOrganicResult[]> {
-	const body = await brightdataRaw(SERP_ZONE, googleSearchUrl(query, page, opts.from, opts.to), 45_000);
+	const body = await brightdataRaw(SERP_ZONE, googleSearchUrl(query, page, opts.from, opts.to), 30_000, 3);
 	if (!body) return [];
 	let parsed: any;
 	try {
@@ -70,7 +70,11 @@ export async function googleSerp(
 	} catch {
 		return [];
 	}
-	const organic: any[] = Array.isArray(parsed?.organic) ? parsed.organic : [];
+	const organic: any[] = Array.isArray(parsed?.organic)
+		? parsed.organic
+		: Array.isArray(parsed?.organic_results)
+			? parsed.organic_results
+			: [];
 	return organic
 		.map((o, i) => ({
 			title: String(o?.title ?? o?.name ?? "").trim(),
@@ -87,7 +91,9 @@ export async function googleSerp(
 }
 
 export async function unlockerFetchHtml(url: string): Promise<string | null> {
-	return brightdataRaw(UNLOCKER_ZONE, url, 40_000);
+	// One attempt, tight timeout: with up to 40 of these per run a hung page
+	// must not stretch the whole request. A miss just drops the candidate.
+	return brightdataRaw(UNLOCKER_ZONE, url, 22_000, 1);
 }
 
 // ── affiliate HTML signal scan ──────────────────────────────────────
