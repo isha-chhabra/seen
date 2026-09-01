@@ -24,6 +24,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { generateSearchQueries, judgeArticles, triageCandidates } from "@workspace/lib/article-finder/llm";
 import {
 	extractContactHint,
+	extractPublishDate,
 	extractReadableText,
 	googleSerp,
 	scanHtmlForAffiliateSignals,
@@ -354,6 +355,9 @@ export interface ArticleResult {
 	verdict: string;
 	relevance: "strong" | "weak";
 	signals: string[];
+	merchants: string[];
+	linksCompetitor: boolean;
+	publishedDate?: string;
 	competitorsMentioned: string[];
 	brandAlreadyMentioned: boolean;
 	contactHint?: string;
@@ -380,6 +384,9 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 			pagesPerSearch: z.number().int().min(1).max(MAX_PAGES),
 			// default: only surface articles that DON'T already name the brand — those are the pitch targets
 			includeAlreadyFeatured: z.boolean().optional(),
+			// default (undefined) = strict: only keep articles that themselves carry
+			// affiliate links to 2+ retailers or to a competitor. false = balanced.
+			strict: z.boolean().optional(),
 		}),
 	)
 	.handler(async ({ data }): Promise<ArticleSearchPayload> => {
@@ -415,6 +422,24 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 				[brand.website, ...(brand.additionalDomains ?? [])].map((d) => extractDomain(d)).filter(Boolean),
 			);
 			const competitorDomains = new Set(comps.flatMap((c) => (c.domains ?? []).map((d) => extractDomain(d)).filter(Boolean)));
+			const competitorUrlNeedles = dedupeLower(
+				comps.flatMap((c) => [c.name, ...(c.aliases ?? [])]).flatMap((n) => {
+					const t = (n ?? "").trim().toLowerCase();
+					if (t.length < 4) return [];
+					return [t.replace(/\s+/g, ""), t.replace(/\s+/g, "+"), t.replace(/\s+/g, "-"), t.replace(/\s+/g, "%20")];
+				}),
+			).filter((n) => n.length >= 4);
+			const linksACompetitor = (taggedLinks: string[]): boolean =>
+				taggedLinks.some((href) => {
+					const low = href.toLowerCase();
+					try {
+						const h = new URL(href).hostname.replace(/^www\./, "");
+						if ([...competitorDomains].some((d) => h === d || h.endsWith(`.${d}`))) return true;
+					} catch {
+						/* ignore */
+					}
+					return competitorUrlNeedles.some((n) => low.includes(n));
+				});
 			const brandSummary = (await getWebsiteExcerpt(brand.website).catch(() => ""))
 				.replace(/\s+/g, " ")
 				.trim()
@@ -496,11 +521,14 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 			const afterTriage = triaged.length;
 
 			// 6. rank-order, then fetch survivors + scan page HTML
+			const strict = data.strict !== false;
+			let renderBudget = 12;
+			let droppedThinAffiliate = 0;
 			const toFetch = triaged.slice().sort((a, b) => a.rank - b.rank).slice(0, MAX_FETCHES);
 			const fetched = await mapPool(toFetch, FETCH_CONCURRENCY, async (c) => {
 				const domain = extractDomain(c.url);
 				const domainKnown = isAffiliatePublisherDomain(domain) || isAffiliateRedirectHost(domain) || isAffiliateUrl(c.url);
-				const html = await unlockerFetchHtml(c.url).catch(() => null);
+				let html = await unlockerFetchHtml(c.url).catch(() => null);
 				if (!html) {
 					if (!domainKnown) return null;
 					return {
@@ -510,23 +538,49 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 						domain,
 						excerpt: c.snippet,
 						signals: ["known affiliate publisher"],
+						merchants: [] as string[],
+						linksCompetitor: false,
+						publishedDate: undefined as string | undefined,
 						competitorsMentioned: [] as string[],
 						brandAlreadyMentioned: false,
 						contactHint: undefined as string | undefined,
 						rank: c.rank,
 					};
 				}
-				const sig = scanHtmlForAffiliateSignals(html);
-				// keep rule: a known publisher, OR a strong on-page signal, OR a
-				// disclosure backed by at least one tagged retailer link. A lone
-				// disclosure sentence, or commerce markers without a strong signal,
-				// is not enough.
-				const keep =
-					domainKnown ||
-					sig.strong ||
-					(sig.disclosure && sig.taggedOutboundHosts.length >= 1 && !sig.commerceMarkers);
-				if (!keep) return null;
-				if (sig.commerceMarkers && !domainKnown && !sig.strong) return null;
+				let sig = scanHtmlForAffiliateSignals(html);
+				let linkedComp = linksACompetitor(sig.taggedLinks);
+
+				// static HTML looks affiliate-ish (disclosure) but thin on links, and it's
+				// not a known publisher — re-fetch with JS rendered so client-side link
+				// monetizers can rewrite links, then re-scan. Best-effort, budget-capped.
+				if (!domainKnown && !linkedComp && sig.taggedOutboundHosts.length < 2 && sig.disclosure && renderBudget > 0) {
+					renderBudget--;
+					const rendered = await unlockerFetchHtml(c.url, true).catch(() => null);
+					if (rendered && rendered.length > html.length * 0.8) {
+						html = rendered;
+						sig = scanHtmlForAffiliateSignals(html);
+						linkedComp = linksACompetitor(sig.taggedLinks);
+					}
+				}
+
+				const merchantCount = sig.taggedOutboundHosts.length;
+				// keep rule. strict: the article ITSELF must prove affiliate behaviour —
+				// links 2+ retailers, links a competitor, has rel=sponsored, or is a known
+				// affiliate publisher. balanced also allows a single disclosure + link.
+				const keep = strict
+					? domainKnown || linkedComp || sig.sponsoredRel || merchantCount >= 2
+					: domainKnown ||
+						sig.strong ||
+						linkedComp ||
+						(sig.disclosure && merchantCount >= 1 && !sig.commerceMarkers);
+				if (!keep) {
+					droppedThinAffiliate++;
+					return null;
+				}
+				if (sig.commerceMarkers && !domainKnown && !sig.strong && !linkedComp) {
+					droppedThinAffiliate++;
+					return null;
+				}
 
 				const text = extractReadableText(html) || c.snippet;
 				const haystack = `${c.title}\n${text}`;
@@ -536,7 +590,12 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 					query: c.query,
 					domain,
 					excerpt: text.slice(0, 1500),
-					signals: dedupeLower(domainKnown ? ["known affiliate publisher", ...sig.labels] : sig.labels),
+					signals: dedupeLower(
+						[...(domainKnown ? ["known affiliate publisher"] : []), ...(linkedComp ? ["affiliate-links a competitor"] : []), ...sig.labels],
+					),
+					merchants: sig.taggedOutboundHosts.slice(0, 8),
+					linksCompetitor: linkedComp,
+					publishedDate: extractPublishDate(html),
 					competitorsMentioned: compResByName
 						.filter((cc) => cc.res.some((re) => re.test(haystack)))
 						.map((cc) => cc.name),
@@ -562,16 +621,29 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 						domain: s.domain,
 						excerpt: s.excerpt,
 						competitorsMentioned: s.competitorsMentioned,
+						affiliateMerchants: s.merchants,
+						linksCompetitor: s.linksCompetitor,
+						publishedOrUpdated: s.publishedDate ?? null,
 					})),
 				});
 			} catch {
 				judgements = [];
 			}
 			const byUrl = new Map(judgements.map((j) => [j.url, j]));
+			const staleYear = new Date().getFullYear() - 2;
 
 			const highAuthority: ArticleResult[] = [];
 			const nicheBlog: ArticleResult[] = [];
-			const drop = { alreadyFeatured: 0, offTopic: 0, notAffiliate: 0, nonUs: 0, unvetted: 0 };
+			const drop = {
+				alreadyFeatured: 0,
+				offTopic: 0,
+				notAffiliate: 0,
+				nonUs: 0,
+				unvetted: 0,
+				lowScore: 0,
+				stale: 0,
+				dupePublisher: 0,
+			};
 			for (const s of survivors) {
 				// the point of the tool is finding pitch targets — skip articles that
 				// already name the brand unless the caller opts to see them
@@ -581,9 +653,10 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 				}
 				const j = byUrl.get(s.url);
 				const majorList = isMajorPublisher(s.domain, s.url);
+				const merchantCount = s.merchants.length;
 				// with no judgement, fall back to conservative keep for known publishers only
 				if (!j) {
-					if (!majorList && !s.signals.includes("known affiliate publisher")) {
+					if (!majorList && !s.signals.includes("known affiliate publisher") && !s.linksCompetitor && merchantCount < 2) {
 						drop.unvetted++;
 						continue;
 					}
@@ -592,7 +665,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 						drop.offTopic++;
 						continue;
 					}
-					if (j.affiliateEditorial === "no") {
+					if (j.affiliateEditorial === "no" || (strict && j.affiliateEditorial === "unclear" && !s.linksCompetitor && merchantCount < 2)) {
 						drop.notAffiliate++;
 						continue;
 					}
@@ -600,25 +673,50 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 						drop.nonUs++;
 						continue;
 					}
-					if (j.relevance === "weak" && s.competitorsMentioned.length === 0 && j.affiliateEditorial !== "yes") {
+					if (j.relevance === "weak" && s.competitorsMentioned.length === 0 && !s.linksCompetitor && j.affiliateEditorial !== "yes") {
 						drop.offTopic++;
 						continue;
 					}
 				}
-				const baseScore = j?.relevance === "weak" ? 42 : 62;
+
+				let score = Math.max(0, Math.min(100, Math.round(j?.fitScore ?? (j?.relevance === "weak" ? 42 : 62))));
+				if (s.linksCompetitor) score = Math.max(score, 84);
+				else if (merchantCount >= 3) score = Math.max(score, 72);
+				else if (merchantCount >= 2) score = Math.max(score, 62);
+
+				// staleness: an old roundup with no update signal is a weak pitch
+				const year = s.publishedDate ? Number(s.publishedDate.slice(0, 4)) : null;
+				if (year && year < staleYear && !s.linksCompetitor) {
+					if (strict) {
+						drop.stale++;
+						continue;
+					}
+					score = Math.min(score, 44);
+				}
+
+				if (strict && score < 55) {
+					drop.lowScore++;
+					continue;
+				}
+
 				const row: ArticleResult = {
 					title: s.title,
 					url: s.url,
 					domain: s.domain,
 					tier: majorList ? "high_authority" : (j?.tier ?? "niche_blog"),
-					fitScore: Math.max(0, Math.min(100, Math.round(j?.fitScore ?? baseScore))),
+					fitScore: score,
 					verdict:
 						j?.outreachVerdict?.trim() ||
-						(s.competitorsMentioned.length > 0
-							? `Already features ${s.competitorsMentioned.join(", ")} — a natural fit to pitch ${brand.name} alongside them.`
-							: `${s.domain} runs affiliate roundups in this space; worth a pitch.`),
+						(s.linksCompetitor
+							? `Already affiliate-links a competitor — they monetize this category and would very likely add ${brand.name}.`
+							: s.competitorsMentioned.length > 0
+								? `Features ${s.competitorsMentioned.join(", ")} — a natural fit to pitch ${brand.name} alongside them.`
+								: `${s.domain} runs affiliate roundups in this space; worth a pitch.`),
 					relevance: j?.relevance === "weak" ? "weak" : "strong",
 					signals: s.signals,
+					merchants: s.merchants,
+					linksCompetitor: s.linksCompetitor,
+					publishedDate: s.publishedDate,
 					competitorsMentioned: s.competitorsMentioned,
 					brandAlreadyMentioned: s.brandAlreadyMentioned,
 					contactHint: s.contactHint,
@@ -626,25 +724,46 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 				};
 				(row.tier === "high_authority" ? highAuthority : nicheBlog).push(row);
 			}
+
+			// at most 2 articles per publisher — an outreach list shouldn't repeat a site
+			const cappedByDomain = (rows: ArticleResult[]): ArticleResult[] => {
+				const perDomain = new Map<string, number>();
+				const out: ArticleResult[] = [];
+				for (const r of [...rows].sort((a, b) => b.fitScore - a.fitScore)) {
+					const n = perDomain.get(r.domain) ?? 0;
+					if (n >= 2) {
+						drop.dupePublisher++;
+						continue;
+					}
+					perDomain.set(r.domain, n + 1);
+					out.push(r);
+				}
+				return out;
+			};
+
 			const sortRows = (rows: ArticleResult[]) =>
 				rows.sort((a, b) => b.fitScore - a.fitScore || (a.relevance === b.relevance ? 0 : a.relevance === "strong" ? -1 : 1));
-			sortRows(highAuthority);
-			sortRows(nicheBlog);
+			const highFinal = sortRows(cappedByDomain(highAuthority));
+			const nicheFinal = sortRows(cappedByDomain(nicheBlog));
 
 			const payload: ArticleSearchPayload = {
-				highAuthority,
-				nicheBlog,
+				highAuthority: highFinal,
+				nicheBlog: nicheFinal,
 				stats: {
 					queries: queries.length,
 					serpRequests: serpTasks.length,
 					candidates: afterJunk,
 					pagesFetched: toFetch.length,
-					highAuthority: highAuthority.length,
-					nicheBlog: nicheBlog.length,
+					highAuthority: highFinal.length,
+					nicheBlog: nicheFinal.length,
 					droppedAlreadyFeatured: drop.alreadyFeatured,
 					droppedOffTopic: drop.offTopic,
 					droppedNotAffiliate: drop.notAffiliate,
 					droppedNonUs: drop.nonUs,
+					droppedThinAffiliate,
+					droppedLowScore: drop.lowScore,
+					droppedStale: drop.stale,
+					droppedDupePublisher: drop.dupePublisher,
 					droppedRetailer: Math.max(0, afterJunk - afterRetail),
 					droppedSyndicated: syndicatedDrop.size,
 				},
@@ -684,6 +803,15 @@ export const getLatestArticleSearchFn = createServerFn({ method: "POST" })
 			.limit(1);
 		if (!row) return null;
 		const payload = row.payload as ArticleSearchPayload;
+		// backfill fields added after a row was written, so the UI never hits undefined
+		const norm = (list: ArticleResult[] | undefined): ArticleResult[] =>
+			(list ?? []).map((r) => ({
+				...r,
+				merchants: r.merchants ?? [],
+				linksCompetitor: r.linksCompetitor ?? false,
+				signals: r.signals ?? [],
+				competitorsMentioned: r.competitorsMentioned ?? [],
+			}));
 		return {
 			createdAt: String(row.createdAt),
 			createdBy: row.createdBy ?? "a teammate",
@@ -693,8 +821,8 @@ export const getLatestArticleSearchFn = createServerFn({ method: "POST" })
 			pagesPerSearch: row.pagesPerSearch,
 			freshOnly: row.freshOnly,
 			queries: (row.queries as { query: string; angle?: string }[] | null) ?? [],
-			highAuthority: payload?.highAuthority ?? [],
-			nicheBlog: payload?.nicheBlog ?? [],
+			highAuthority: norm(payload?.highAuthority),
+			nicheBlog: norm(payload?.nicheBlog),
 			stats: payload?.stats ?? {},
 		};
 	});
