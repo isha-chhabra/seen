@@ -1,12 +1,11 @@
 /**
  * Article Finder — BrightData search + page-signal layer.
  *
- * Reuses the two zones the deployment already runs on one BRIGHTDATA_API_TOKEN:
- *   • sdk_serp     — Google organic results as parsed JSON (brd_json=1)
+ *   • sdk_serp     — Google organic results as parsed JSON (brd_json=1), US/English
  *   • sdk_unlocker — raw HTML of a candidate page, for affiliate signal scanning
  *
- * Everything here is best-effort: a blocked SERP page or an un-fetchable
- * article is dropped, not surfaced as an error.
+ * Best-effort: a blocked SERP page or an un-fetchable article is dropped, not
+ * surfaced as an error.
  */
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
@@ -29,7 +28,14 @@ function gd(ymd: string): string {
 }
 
 function googleSearchUrl(query: string, page: number, from?: string, to?: string): string {
-	const params = new URLSearchParams({ q: query, brd_json: "1", gl: "us", hl: "en", num: "20" });
+	const params = new URLSearchParams({
+		q: query,
+		brd_json: "1",
+		gl: "us",
+		hl: "en",
+		lr: "lang_en",
+		num: "20",
+	});
 	if (page > 0) params.set("start", String(page * 10));
 	if (from && to) params.set("tbs", `cdr:1,cd_min:${gd(from)},cd_max:${gd(to)}`);
 	return `https://www.google.com/search?${params.toString()}`;
@@ -47,7 +53,6 @@ async function brightdataRaw(zone: string, url: string, timeoutMs: number, attem
 			});
 			const body = await res.text();
 			if (res.ok && body.trim()) return body;
-			// auth / bad-request errors won't fix themselves on retry
 			if (res.status === 400 || res.status === 401 || res.status === 403) return null;
 		} catch {
 			// network / timeout — fall through to retry
@@ -91,8 +96,8 @@ export async function googleSerp(
 }
 
 export async function unlockerFetchHtml(url: string): Promise<string | null> {
-	// One attempt, tight timeout: with up to 40 of these per run a hung page
-	// must not stretch the whole request. A miss just drops the candidate.
+	// One attempt, tight timeout: with dozens of these per run a hung page must
+	// not stretch the whole request. A miss just drops the candidate.
 	return brightdataRaw(UNLOCKER_ZONE, url, 22_000, 1);
 }
 
@@ -104,6 +109,7 @@ const AFFILIATE_NETWORK_HINTS = [
 	"shareasale.com",
 	"skimresources.com",
 	"skimlinks.com",
+	"go.redirectingat.com",
 	"prf.hn",
 	"partnerize",
 	"anrdoezrs.net",
@@ -127,26 +133,33 @@ const AFFILIATE_NETWORK_HINTS = [
 	"clickbank.net",
 	"awin1.com",
 	"zenaps.com",
-	"go.redirectingat.com",
 	"bam-x.com",
 	"narrativ.com",
 	"shop-links.co",
+	"cj.com",
+	"pepperjam",
+	"flexoffices",
+	"flexoffers.com",
 ];
 
 const DISCLOSURE_RE =
-	/(affiliate\s+(link|links|commission|partner|disclosure)|we\s+(may\s+)?earn\s+a?\s*commission|earn(s)?\s+(an?\s+)?commission|commission\s+(if|when)\s+you\s+(buy|purchase|click)|as\s+an\s+amazon\s+associate|supported\s+by\s+our\s+readers|this\s+(post|article|page)\s+contains\s+affiliate|may\s+(receive|get)\s+(a\s+)?(small\s+)?(commission|compensation))/i;
+	/(affiliate\s+(link|links|commission|partner|disclosure)|we\s+(may\s+)?earn\s+a?\s*commission|earn(s)?\s+(an?\s+)?commission|commission\s+(if|when)\s+you\s+(buy|purchase|click)|as\s+an\s+amazon\s+associate|supported\s+by\s+our\s+readers|this\s+(post|article|page)\s+contains\s+affiliate|may\s+(receive|get)\s+(a\s+)?(small\s+)?(commission|compensation)|independently\s+(chosen|selected|reviewed)\s+(products|by)|when\s+you\s+buy\s+through\s+(our\s+)?links)/i;
 
 const SPONSORED_REL_RE = /rel=["'][^"']*\bsponsored\b/i;
 
-const AFFILIATE_PARAM_IN_HREF_RE =
-	/href=["'][^"']*(?:[?&](?:tag=[\w.-]+-2\d|aff(?:iliate)?_?id=|utm_medium=affiliate|irclickid=|ranmid=|clickref=|awc=|asc=|siteid=|affid=|partner=)[^"'\s]*)/i;
+const AFFILIATE_PARAM_RE =
+	/[?&](?:tag=[\w.-]+-2\d|aff(?:iliate)?_?id=|utm_medium=affiliate|irclickid=|ranmid=|clickref=|awc=|asc=|siteid=|affid=|partner=|ascsubtag=|linkcode=)/i;
+
+const COMMERCE_RE =
+	/cdn\.shopify\.com|\.myshopify\.com|woocommerce|bigcommerce|"@type"\s*:\s*"product"|property=["']og:type["']\s+content=["']product["']|add[\s_-]?to[\s_-]?cart|class=["'][^"']*add-to-cart|\/checkout(?:["'/?]|$)|name=["']add-to-cart["']/i;
 
 export interface AffiliateHtmlSignals {
 	sponsoredRel: boolean;
 	networkScript: boolean;
-	trackedOutboundLink: boolean;
 	disclosure: boolean;
-	score: number;
+	taggedOutboundHosts: string[];
+	commerceMarkers: boolean;
+	strong: boolean;
 	labels: string[];
 }
 
@@ -155,20 +168,37 @@ export function scanHtmlForAffiliateSignals(html: string): AffiliateHtmlSignals 
 	const labels: string[] = [];
 
 	const sponsoredRel = SPONSORED_REL_RE.test(html);
-	if (sponsoredRel) labels.push('rel="sponsored" links');
-
 	const netHit = AFFILIATE_NETWORK_HINTS.find((h) => lower.includes(h));
 	const networkScript = Boolean(netHit);
-	if (netHit) labels.push(`affiliate network (${netHit})`);
-
-	const trackedOutboundLink = AFFILIATE_PARAM_IN_HREF_RE.test(html);
-	if (trackedOutboundLink && !networkScript) labels.push("affiliate tracking parameter in a link");
-
 	const disclosure = DISCLOSURE_RE.test(html);
+	const commerceMarkers = COMMERCE_RE.test(html);
+
+	// distinct off-domain hosts behind an affiliate-tagged link
+	const taggedHosts = new Set<string>();
+	const hrefRe = /href=["']([^"']+)["']/gi;
+	let m: RegExpExecArray | null;
+	let scanned = 0;
+	while ((m = hrefRe.exec(html)) !== null && scanned < 400 && taggedHosts.size < 12) {
+		scanned++;
+		const href = m[1] ?? "";
+		if (!/^https?:\/\//i.test(href)) continue;
+		const low = href.toLowerCase();
+		if (!AFFILIATE_PARAM_RE.test(low) && !AFFILIATE_NETWORK_HINTS.some((h) => low.includes(h))) continue;
+		try {
+			taggedHosts.add(new URL(href).hostname.replace(/^www\./, ""));
+		} catch {
+			/* ignore */
+		}
+	}
+	const taggedOutboundHosts = [...taggedHosts];
+
+	if (netHit) labels.push(`affiliate network (${netHit})`);
+	if (sponsoredRel) labels.push('rel="sponsored" links');
+	if (taggedOutboundHosts.length > 0) labels.push(`${taggedOutboundHosts.length} tagged retailer link${taggedOutboundHosts.length === 1 ? "" : "s"}`);
 	if (disclosure) labels.push("affiliate disclosure text");
 
-	const score = (sponsoredRel ? 1 : 0) + (networkScript ? 1 : 0) + (trackedOutboundLink ? 1 : 0) + (disclosure ? 1 : 0);
-	return { sponsoredRel, networkScript, trackedOutboundLink, disclosure, score, labels };
+	const strong = networkScript || sponsoredRel || taggedOutboundHosts.length >= 2;
+	return { sponsoredRel, networkScript, disclosure, taggedOutboundHosts, commerceMarkers, strong, labels };
 }
 
 export function extractReadableText(html: string): string {
