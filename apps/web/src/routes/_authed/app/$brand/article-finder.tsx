@@ -15,6 +15,7 @@ import { Card, CardContent } from "@workspace/ui/components/card";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Label } from "@workspace/ui/components/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover";
+import { Switch } from "@workspace/ui/components/switch";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { useState } from "react";
 import type { DateRange } from "react-day-picker";
@@ -108,6 +109,7 @@ function ArticleFinderPage() {
 		return { from, to };
 	});
 	const [pages, setPages] = useState(2);
+	const [freshOnly, setFreshOnly] = useState(true);
 	const [phase, setPhase] = useState<Phase>("idle");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -153,6 +155,7 @@ function ArticleFinderPage() {
 					from: ymd(range.from),
 					to: ymd(range.to),
 					pagesPerSearch: pages,
+					includeAlreadyFeatured: !freshOnly,
 				},
 			});
 			setHigh(res.highAuthority);
@@ -239,6 +242,16 @@ function ArticleFinderPage() {
 							</p>
 						</div>
 
+						<div className="flex items-start justify-between gap-4">
+							<div className="space-y-0.5">
+								<Label htmlFor="fresh-only">Only articles that don't mention {brand?.name ?? "the brand"} yet</Label>
+								<p className="text-xs text-muted-foreground">
+									These are the pitch targets. Turn off to also see articles that already feature the brand.
+								</p>
+							</div>
+							<Switch id="fresh-only" checked={freshOnly} onCheckedChange={setFreshOnly} disabled={busy} />
+						</div>
+
 						{error && <p className="text-sm text-destructive">{error}</p>}
 
 						{phase === "idle" && (
@@ -320,6 +333,8 @@ function ArticleFinderPage() {
 									{stats && (
 										<p className="text-xs text-muted-foreground">
 											{stats.candidates} candidates from {stats.serpRequests} searches · {stats.pagesFetched} pages fetched
+											{stats.excludedAlreadyFeatured > 0 &&
+												` · ${stats.excludedAlreadyFeatured} hidden (already feature ${brand?.name ?? "the brand"})`}
 										</p>
 									)}
 								</div>
