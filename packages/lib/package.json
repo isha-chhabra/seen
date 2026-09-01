@@ -33,7 +33,9 @@
     "./entitlements": "./src/entitlements/index.ts",
     "./run-policy": "./src/run-policy/index.ts",
     "./usage": "./src/usage/cost.ts",
-    "./report/narrative": "./src/report/narrative.ts"
+    "./report/narrative": "./src/report/narrative.ts",
+    "./article-finder/llm": "./src/article-finder/llm.ts",
+    "./article-finder/search": "./src/article-finder/search.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.39",

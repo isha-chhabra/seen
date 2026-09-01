@@ -8,6 +8,7 @@ import {
 	IconLink,
 	IconListDetails,
 	IconReport,
+	IconSearch,
 	IconSitemap,
 	IconSpeakerphone,
 	IconTable,
@@ -111,6 +112,11 @@ function brandGroups(brand: BrandWithPrompts | null | undefined, features?: Clie
 				title: "Reports",
 				url: "/reports",
 				icon: IconReport,
+			},
+			{
+				title: "Article Finder",
+				url: "/article-finder",
+				icon: IconSearch,
 			},
 		);
 	}
