@@ -85,6 +85,7 @@ function ScorePill({ score }: { score: number }) {
 
 function ArticleRow({ r, brandName }: { r: ArticleResult; brandName?: string }) {
 	const contactIsEmail = r.contactHint?.includes("@") && !r.contactHint.startsWith("http");
+	const merchantCount = r.merchants?.length ?? 0;
 	return (
 		<li className="space-y-1.5 py-4">
 			<div className="flex items-start gap-2">
@@ -99,9 +100,16 @@ function ArticleRow({ r, brandName }: { r: ArticleResult; brandName?: string }) 
 					<IconExternalLink className="mt-0.5 size-3.5 shrink-0 opacity-60" />
 				</a>
 			</div>
-			<p className="text-xs text-muted-foreground">{r.domain}</p>
+			<p className="text-xs text-muted-foreground">
+				{r.domain}
+				{r.publishedDate && ` · ${r.publishedDate}`}
+				{merchantCount > 0 && ` · links ${merchantCount} retailer${merchantCount === 1 ? "" : "s"}`}
+			</p>
 			<p className="text-sm">{r.verdict}</p>
 			<div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+				{r.linksCompetitor && (
+					<Badge className="bg-emerald-600 text-white hover:bg-emerald-600">Affiliate-links a competitor</Badge>
+				)}
 				{r.contactHint &&
 					(contactIsEmail ? (
 						<a
@@ -156,6 +164,7 @@ function ArticleFinderPage() {
 	});
 	const [pages, setPages] = useState(2);
 	const [freshOnly, setFreshOnly] = useState(true);
+	const [strict, setStrict] = useState(true);
 	const [phase, setPhase] = useState<Phase>("idle");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -226,6 +235,7 @@ function ArticleFinderPage() {
 					to: ymd(range.to),
 					pagesPerSearch: pages,
 					includeAlreadyFeatured: !freshOnly,
+					strict,
 				},
 			});
 			setHigh(res.highAuthority);
@@ -248,9 +258,18 @@ function ArticleFinderPage() {
 
 	function exportCsv() {
 		const esc = (v: string | number) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-		const rows = [["category", "fit score", "article name", "article link", "fit reasoning", "contact"].map(esc).join(",")];
+		const rows = [
+			["category", "fit score", "article name", "article link", "published", "links competitor", "fit reasoning", "contact"]
+				.map(esc)
+				.join(","),
+		];
 		const add = (label: string, list: ArticleResult[]) => {
-			for (const r of list) rows.push([label, r.fitScore, r.title, r.url, r.verdict, r.contactHint ?? ""].map(esc).join(","));
+			for (const r of list)
+				rows.push(
+					[label, r.fitScore, r.title, r.url, r.publishedDate ?? "", r.linksCompetitor ? "yes" : "", r.verdict, r.contactHint ?? ""]
+						.map(esc)
+						.join(","),
+				);
 		};
 		add("High-authority", high);
 		add("Niche / blog", niche);
@@ -271,10 +290,14 @@ function ArticleFinderPage() {
 	const dropParts = stats
 		? [
 				stats.droppedOffTopic ? `${stats.droppedOffTopic} off-topic` : "",
-				stats.droppedNotAffiliate ? `${stats.droppedNotAffiliate} not affiliate` : "",
+				stats.droppedNotAffiliate ? `${stats.droppedNotAffiliate} not an affiliate outlet` : "",
+				stats.droppedThinAffiliate ? `${stats.droppedThinAffiliate} no confirmable affiliate links` : "",
+				stats.droppedLowScore ? `${stats.droppedLowScore} scored too low` : "",
+				stats.droppedStale ? `${stats.droppedStale} stale` : "",
 				stats.droppedNonUs ? `${stats.droppedNonUs} non-US` : "",
 				stats.droppedRetailer ? `${stats.droppedRetailer} retailers` : "",
 				stats.droppedSyndicated ? `${stats.droppedSyndicated} syndicated` : "",
+				stats.droppedDupePublisher ? `${stats.droppedDupePublisher} extra from same site` : "",
 				stats.droppedAlreadyFeatured ? `${stats.droppedAlreadyFeatured} already feature ${brand?.name ?? "the brand"}` : "",
 			].filter(Boolean)
 		: [];
@@ -332,6 +355,17 @@ function ArticleFinderPage() {
 									</p>
 								</div>
 								<Switch id="fresh-only" checked={freshOnly} onCheckedChange={setFreshOnly} disabled={busy} />
+							</div>
+
+							<div className="flex items-start justify-between gap-4">
+								<div className="space-y-0.5">
+									<Label htmlFor="strict">Strict — only proven affiliate outlets</Label>
+									<p className="text-xs text-muted-foreground">
+										Keeps only articles that already carry affiliate links to 2+ retailers, or to a competitor. Turn off for
+										a wider list that also includes sites that look affiliate-monetized but didn't expose confirmable links.
+									</p>
+								</div>
+								<Switch id="strict" checked={strict} onCheckedChange={setStrict} disabled={busy} />
 							</div>
 
 							{error && <p className="text-sm text-destructive">{error}</p>}
@@ -498,11 +532,12 @@ function ArticleFinderPage() {
 					<p className="max-w-2xl text-xs text-muted-foreground">
 						How it works: an LLM turns your direction into a handful of US-focused Google searches (grounded in this
 						brand's tracked topics — you review them first), the results run through your BrightData SERP zone, then non-US
-						sites, retailers and syndicated wire copy are dropped. Each surviving page is fetched and checked for real
-						affiliate monetization — affiliate networks, <code>rel="sponsored"</code> links, tagged retailer links,
-						disclosures — then vetted by an LLM for topical fit, a 0–100 pitch score, and whether an editor would
-						plausibly feature the brand. Results are split into high-authority publications and credible niche/blog sites,
-						and the last run is saved so re-opening this tab costs nothing.
+						sites, retailers and syndicated wire copy are dropped. Each surviving page is fetched — with JS rendered when
+						its affiliate links look thin — and checked for real monetization: affiliate networks, tagged retailer links,
+						and especially an <strong>affiliate link to a competitor</strong>, the strongest signal that they'd take you
+						too. An LLM then scores topical fit and editor-yes likelihood 0–100. In Strict mode only articles that clear
+						that bar make the list. Results split into high-authority publications and credible niche/blog sites, and the
+						last run is saved so re-opening this tab costs nothing.
 					</p>
 				)}
 			</div>

@@ -41,14 +41,23 @@ function googleSearchUrl(query: string, page: number, from?: string, to?: string
 	return `https://www.google.com/search?${params.toString()}`;
 }
 
-async function brightdataRaw(zone: string, url: string, timeoutMs: number, attempts: number): Promise<string | null> {
+async function brightdataRaw(
+	zone: string,
+	url: string,
+	timeoutMs: number,
+	attempts: number,
+	render = false,
+): Promise<string | null> {
 	const token = getCredential("BRIGHTDATA_API_TOKEN");
 	for (let attempt = 0; attempt < attempts; attempt++) {
 		try {
 			const res = await fetch(BRIGHTDATA_REQUEST_URL, {
 				method: "POST",
 				headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-				body: JSON.stringify({ zone, url, method: "GET", format: "raw" }),
+				// render:true makes the Unlocker execute page JS, so client-side link
+				// monetizers (Skimlinks, Sovrn, Amazon OneLink) get a chance to rewrite
+				// plain links into affiliate links before we scan.
+				body: JSON.stringify({ zone, url, method: "GET", format: "raw", ...(render ? { render: true } : {}) }),
 				signal: AbortSignal.timeout(timeoutMs),
 			});
 			const body = await res.text();
@@ -95,10 +104,10 @@ export async function googleSerp(
 		.filter((o) => o.url.startsWith("http") && o.title.length > 0);
 }
 
-export async function unlockerFetchHtml(url: string): Promise<string | null> {
+export async function unlockerFetchHtml(url: string, render = false): Promise<string | null> {
 	// One attempt, tight timeout: with dozens of these per run a hung page must
 	// not stretch the whole request. A miss just drops the candidate.
-	return brightdataRaw(UNLOCKER_ZONE, url, 22_000, 1);
+	return brightdataRaw(UNLOCKER_ZONE, url, render ? 35_000 : 22_000, 1, render);
 }
 
 // ── affiliate HTML signal scan ──────────────────────────────────────
@@ -157,7 +166,10 @@ export interface AffiliateHtmlSignals {
 	sponsoredRel: boolean;
 	networkScript: boolean;
 	disclosure: boolean;
+	/** distinct off-domain hosts reached by an affiliate-tagged link in this article */
 	taggedOutboundHosts: string[];
+	/** the raw tagged hrefs (capped) — so callers can test them against competitor domains */
+	taggedLinks: string[];
 	commerceMarkers: boolean;
 	strong: boolean;
 	labels: string[];
@@ -173,12 +185,12 @@ export function scanHtmlForAffiliateSignals(html: string): AffiliateHtmlSignals 
 	const disclosure = DISCLOSURE_RE.test(html);
 	const commerceMarkers = COMMERCE_RE.test(html);
 
-	// distinct off-domain hosts behind an affiliate-tagged link
 	const taggedHosts = new Set<string>();
+	const taggedLinks: string[] = [];
 	const hrefRe = /href=["']([^"']+)["']/gi;
 	let m: RegExpExecArray | null;
 	let scanned = 0;
-	while ((m = hrefRe.exec(html)) !== null && scanned < 400 && taggedHosts.size < 12) {
+	while ((m = hrefRe.exec(html)) !== null && scanned < 800 && taggedLinks.length < 24) {
 		scanned++;
 		const href = m[1] ?? "";
 		if (!/^https?:\/\//i.test(href)) continue;
@@ -186,6 +198,7 @@ export function scanHtmlForAffiliateSignals(html: string): AffiliateHtmlSignals 
 		if (!AFFILIATE_PARAM_RE.test(low) && !AFFILIATE_NETWORK_HINTS.some((h) => low.includes(h))) continue;
 		try {
 			taggedHosts.add(new URL(href).hostname.replace(/^www\./, ""));
+			taggedLinks.push(href);
 		} catch {
 			/* ignore */
 		}
@@ -194,11 +207,35 @@ export function scanHtmlForAffiliateSignals(html: string): AffiliateHtmlSignals 
 
 	if (netHit) labels.push(`affiliate network (${netHit})`);
 	if (sponsoredRel) labels.push('rel="sponsored" links');
-	if (taggedOutboundHosts.length > 0) labels.push(`${taggedOutboundHosts.length} tagged retailer link${taggedOutboundHosts.length === 1 ? "" : "s"}`);
+	if (taggedOutboundHosts.length > 0)
+		labels.push(`links ${taggedOutboundHosts.length} retailer${taggedOutboundHosts.length === 1 ? "" : "s"} w/ affiliate tags`);
 	if (disclosure) labels.push("affiliate disclosure text");
 
 	const strong = networkScript || sponsoredRel || taggedOutboundHosts.length >= 2;
-	return { sponsoredRel, networkScript, disclosure, taggedOutboundHosts, commerceMarkers, strong, labels };
+	return { sponsoredRel, networkScript, disclosure, taggedOutboundHosts, taggedLinks, commerceMarkers, strong, labels };
+}
+
+const JSONLD_MODIFIED_RE = /"dateModified"\s*:\s*"([0-9]{4}-[0-9]{2}-[0-9]{2})/;
+const JSONLD_PUBLISHED_RE = /"datePublished"\s*:\s*"([0-9]{4}-[0-9]{2}-[0-9]{2})/;
+const META_DATE_RE =
+	/<meta[^>]+(?:property|name|itemprop)=["'](?:article:modified_time|article:published_time|dateModified|datePublished|date|pubdate)["'][^>]+content=["']([^"']+)["']/i;
+const TIME_TAG_RE = /<time[^>]+datetime=["']([0-9]{4}-[0-9]{2}-[0-9]{2})/i;
+
+/** Best-effort published/updated date (YYYY-MM-DD), preferring "modified". */
+export function extractPublishDate(html: string): string | undefined {
+	const tryDate = (v?: string): string | undefined => {
+		if (!v) return undefined;
+		const iso = v.trim().slice(0, 10);
+		if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+		const d = new Date(v);
+		return Number.isNaN(d.getTime()) ? undefined : d.toISOString().slice(0, 10);
+	};
+	return (
+		tryDate(html.match(JSONLD_MODIFIED_RE)?.[1]) ??
+		tryDate(html.match(META_DATE_RE)?.[1]) ??
+		tryDate(html.match(JSONLD_PUBLISHED_RE)?.[1]) ??
+		tryDate(html.match(TIME_TAG_RE)?.[1])
+	);
 }
 
 export function extractReadableText(html: string): string {

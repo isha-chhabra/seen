@@ -122,7 +122,7 @@ export const articleJudgementSchema = z.object({
 					.min(0)
 					.max(100)
 					.describe(
-						"How strong a pitch target this is, 0-100, weighing topical fit, whether the outlet actually runs affiliate editorial, authority, and how likely an editor would say yes. 80+ = clear yes, 50-79 = worth a try, <50 = weak.",
+						"How strong a pitch target this is, 0-100. Weigh: topical fit; whether the article ITSELF carries affiliate links to multiple retailers (affiliateMerchants — 2+ is near-decisive that they'd add another brand); whether it already affiliate-links a direct competitor (linksCompetitor — the strongest signal, 85+); authority; recency. 80+ = clear yes, 55-79 = worth a try, <55 = weak. Be strict — an outreach list is worthless if half the targets won't respond.",
 					),
 				outreachVerdict: z
 					.string()
@@ -141,7 +141,16 @@ export async function judgeArticles(args: {
 	brandSummary: string;
 	direction: string;
 	competitors: string[];
-	articles: { url: string; title: string; domain: string; excerpt: string; competitorsMentioned: string[] }[];
+	articles: {
+		url: string;
+		title: string;
+		domain: string;
+		excerpt: string;
+		competitorsMentioned: string[];
+		affiliateMerchants: string[];
+		linksCompetitor: boolean;
+		publishedOrUpdated: string | null;
+	}[];
 }): Promise<ArticleJudgement[]> {
 	if (args.articles.length === 0) return [];
 	const prompt = [
@@ -150,9 +159,12 @@ export async function judgeArticles(args: {
 		`User's content direction: "${args.direction}".`,
 		`Known competitors: ${args.competitors.join(", ") || "none"}.`,
 		``,
-		`You are vetting candidate articles for an affiliate-outreach list. For each you get the title, domain, any known competitors detected on the page, and a text excerpt. Use ONLY that text.`,
+		`You are vetting candidate articles for an affiliate-outreach list. This list must be all-qualified — every entry should be an outlet that would realistically add the brand if asked. When in doubt, mark it down.`,
+		`For each article you get: title, domain, a text excerpt, competitors detected in the text, and — read directly from the page's HTML —`,
+		`  affiliateMerchants: retailers this article links with affiliate tracking. [] = none found in static HTML (could still be client-side; judge from the excerpt). 1 = minimal. 2+ = the outlet clearly runs multi-retailer affiliate roundups → affiliateEditorial "yes", fitScore 75+.`,
+		`  linksCompetitor: true = the article already has an affiliate-tracked link to a direct competitor. Strongest possible signal → affiliateEditorial "yes", fitScore 85+ unless relevance is off_topic.`,
+		`  publishedOrUpdated: the page's date if found. Prefer recent. Older than ~2 years with no sign of updates → cap fitScore around 45 and say so.`,
 		`Judge each on: relevance, affiliateEditorial, tier, usCentric, a 0-100 fitScore, and a one-sentence outreachVerdict.`,
-		`If competitors are already on the page, that is a strong sign the brand belongs there too — reflect it in the verdict.`,
 		`Return one entry per input article, url copied verbatim. Plain business English.`,
 		``,
 		`ARTICLES (JSON):`,
@@ -162,6 +174,9 @@ export async function judgeArticles(args: {
 				title: a.title,
 				domain: a.domain,
 				competitorsMentioned: a.competitorsMentioned,
+				affiliateMerchants: a.affiliateMerchants,
+				linksCompetitor: a.linksCompetitor,
+				publishedOrUpdated: a.publishedOrUpdated,
 				excerpt: a.excerpt.slice(0, 1400),
 			})),
 			null,
