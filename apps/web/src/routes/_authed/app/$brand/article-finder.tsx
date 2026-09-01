@@ -3,11 +3,12 @@
  * list of US affiliate articles this brand could be pitched into, split by
  * publisher authority.
  *
- * Stateless: nothing is saved, every search starts fresh. Two steps —
- * generate + review queries, then run them (SERP -> filter -> vet).
+ * The latest run per brand is persisted: opening the tab shows it for free.
+ * A new search is a deliberate click. Two steps — generate + review queries,
+ * then run them (SERP -> filter -> vet).
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { IconBolt, IconCalendar, IconExternalLink, IconLoader2, IconRefresh, IconSearch, IconTable } from "@tabler/icons-react";
+import { IconBolt, IconCalendar, IconExternalLink, IconLoader2, IconMail, IconRefresh, IconSearch, IconTable } from "@tabler/icons-react";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Calendar } from "@workspace/ui/components/calendar";
@@ -17,12 +18,17 @@ import { Label } from "@workspace/ui/components/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover";
 import { Switch } from "@workspace/ui/components/switch";
 import { Textarea } from "@workspace/ui/components/textarea";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { PageHeader } from "@/components/page-header";
 import { useBrand } from "@/hooks/use-brands";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
-import { type ArticleResult, findArticlesFn, generateArticleQueriesFn } from "@/server/article-finder";
+import {
+	type ArticleResult,
+	findArticlesFn,
+	generateArticleQueriesFn,
+	getLatestArticleSearchFn,
+} from "@/server/article-finder";
 
 export const Route = createFileRoute("/_authed/app/$brand/article-finder")({
 	head: ({ matches, match }) => ({
@@ -37,8 +43,14 @@ export const Route = createFileRoute("/_authed/app/$brand/article-finder")({
 function ymd(d: Date): string {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+function parseYmd(s: string): Date {
+	return new Date(`${s}T00:00:00`);
+}
 function pretty(d?: Date): string {
 	return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+}
+function prettyAt(iso: string): string {
+	return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function RangeField({ value, onChange, label }: { value?: DateRange; onChange: (r?: DateRange) => void; label: string }) {
@@ -61,21 +73,55 @@ function RangeField({ value, onChange, label }: { value?: DateRange; onChange: (
 type Query = { query: string; angle?: string; on: boolean };
 type Phase = "idle" | "queries" | "searching" | "results";
 
+function ScorePill({ score }: { score: number }) {
+	const tone =
+		score >= 80
+			? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+			: score >= 55
+				? "bg-pink-500/15 text-pink-700 dark:text-pink-400"
+				: "bg-muted text-muted-foreground";
+	return <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${tone}`}>{score}</span>;
+}
+
 function ArticleRow({ r, brandName }: { r: ArticleResult; brandName?: string }) {
+	const contactIsEmail = r.contactHint?.includes("@") && !r.contactHint.startsWith("http");
 	return (
 		<li className="space-y-1.5 py-4">
-			<a
-				href={r.url}
-				target="_blank"
-				rel="noreferrer"
-				className="inline-flex items-start gap-1.5 font-medium text-pink-600 hover:underline dark:text-pink-400"
-			>
-				{r.title}
-				<IconExternalLink className="mt-0.5 size-3.5 shrink-0 opacity-60" />
-			</a>
+			<div className="flex items-start gap-2">
+				<ScorePill score={r.fitScore} />
+				<a
+					href={r.url}
+					target="_blank"
+					rel="noreferrer"
+					className="inline-flex items-start gap-1.5 font-medium text-pink-600 hover:underline dark:text-pink-400"
+				>
+					{r.title}
+					<IconExternalLink className="mt-0.5 size-3.5 shrink-0 opacity-60" />
+				</a>
+			</div>
 			<p className="text-xs text-muted-foreground">{r.domain}</p>
 			<p className="text-sm">{r.verdict}</p>
-			<div className="flex flex-wrap gap-1.5 pt-0.5">
+			<div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+				{r.contactHint &&
+					(contactIsEmail ? (
+						<a
+							href={`mailto:${r.contactHint}`}
+							className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs hover:underline"
+						>
+							<IconMail className="size-3" />
+							{r.contactHint}
+						</a>
+					) : (
+						<a
+							href={r.contactHint}
+							target="_blank"
+							rel="noreferrer"
+							className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs hover:underline"
+						>
+							<IconMail className="size-3" />
+							Contact / submissions
+						</a>
+					))}
 				{r.relevance === "weak" && (
 					<Badge variant="outline" className="text-muted-foreground">
 						Loose fit
@@ -117,6 +163,33 @@ function ArticleFinderPage() {
 	const [high, setHigh] = useState<ArticleResult[]>([]);
 	const [niche, setNiche] = useState<ArticleResult[]>([]);
 	const [stats, setStats] = useState<Record<string, number> | null>(null);
+	const [loaded, setLoaded] = useState<{ at: string; by: string } | null>(null);
+	const [loading, setLoading] = useState(true);
+
+	// on open: show the last saved search for this brand, for free
+	useEffect(() => {
+		let cancelled = false;
+		setLoading(true);
+		getLatestArticleSearchFn({ data: { brandId } })
+			.then((r) => {
+				if (cancelled || !r) return;
+				setDirection(r.direction);
+				if (r.from && r.to) setRange({ from: parseYmd(r.from), to: parseYmd(r.to) });
+				setPages(r.pagesPerSearch || 2);
+				setFreshOnly(r.freshOnly);
+				setQueries(r.queries.map((q) => ({ query: q.query, angle: q.angle, on: true })));
+				setHigh(r.highAuthority);
+				setNiche(r.nicheBlog);
+				setStats(r.stats);
+				setLoaded({ at: r.createdAt, by: r.createdBy });
+				setPhase("results");
+			})
+			.catch(() => {})
+			.finally(() => !cancelled && setLoading(false));
+		return () => {
+			cancelled = true;
+		};
+	}, [brandId]);
 
 	const selected = queries.filter((q) => q.on);
 	const totalResults = high.length + niche.length;
@@ -130,9 +203,6 @@ function ArticleFinderPage() {
 				data: { brandId, direction: direction.trim(), from: ymd(range.from), to: ymd(range.to) },
 			});
 			setQueries(res.queries.map((q) => ({ query: q.query, angle: q.angle, on: true })));
-			setHigh([]);
-			setNiche([]);
-			setStats(null);
 			setPhase("queries");
 		} catch (e) {
 			setError(e instanceof Error ? e.message : "Couldn't generate queries.");
@@ -161,6 +231,7 @@ function ArticleFinderPage() {
 			setHigh(res.highAuthority);
 			setNiche(res.nicheBlog);
 			setStats(res.stats);
+			setLoaded(null);
 			setPhase("results");
 		} catch (e) {
 			setError(e instanceof Error ? e.message : "Search failed.");
@@ -170,20 +241,19 @@ function ArticleFinderPage() {
 		}
 	}
 
-	function reset() {
+	function newSearch() {
 		setPhase("idle");
-		setQueries([]);
-		setHigh([]);
-		setNiche([]);
-		setStats(null);
 		setError(null);
 	}
 
 	function exportCsv() {
-		const esc = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-		const rows = [["category", "article name", "article link", "fit reasoning"].map(esc).join(",")];
-		for (const r of high) rows.push(["High-authority", r.title, r.url, r.verdict].map(esc).join(","));
-		for (const r of niche) rows.push(["Niche / blog", r.title, r.url, r.verdict].map(esc).join(","));
+		const esc = (v: string | number) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+		const rows = [["category", "fit score", "article name", "article link", "fit reasoning", "contact"].map(esc).join(",")];
+		const add = (label: string, list: ArticleResult[]) => {
+			for (const r of list) rows.push([label, r.fitScore, r.title, r.url, r.verdict, r.contactHint ?? ""].map(esc).join(","));
+		};
+		add("High-authority", high);
+		add("Niche / blog", niche);
 		const blob = new Blob([`﻿${rows.join("\r\n")}`], { type: "text/csv;charset=utf-8" });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
@@ -198,74 +268,87 @@ function ArticleFinderPage() {
 	const pinkBtn =
 		"h-11 gap-2 rounded-xl bg-pink-500 px-5 font-semibold text-white shadow-lg shadow-pink-500/25 hover:bg-pink-600 disabled:opacity-60";
 
+	const dropParts = stats
+		? [
+				stats.droppedOffTopic ? `${stats.droppedOffTopic} off-topic` : "",
+				stats.droppedNotAffiliate ? `${stats.droppedNotAffiliate} not affiliate` : "",
+				stats.droppedNonUs ? `${stats.droppedNonUs} non-US` : "",
+				stats.droppedRetailer ? `${stats.droppedRetailer} retailers` : "",
+				stats.droppedSyndicated ? `${stats.droppedSyndicated} syndicated` : "",
+				stats.droppedAlreadyFeatured ? `${stats.droppedAlreadyFeatured} already feature ${brand?.name ?? "the brand"}` : "",
+			].filter(Boolean)
+		: [];
+
 	return (
 		<PageHeader
 			title="Article Finder"
 			subtitle="Find US editorial articles and roundups you could pitch this brand into. Results are vetted for topical fit and affiliate monetization — it's a heuristic, so skim before you send."
 		>
 			<div className="max-w-3xl space-y-6">
-				<Card>
-					<CardContent className="space-y-5 pt-6">
-						<div className="space-y-1.5">
-							<Label htmlFor="direction">What kind of articles are you looking for?</Label>
-							<Textarea
-								id="direction"
-								rows={3}
-								placeholder="e.g. gift guides and product roundups for eco-friendly kitchen gear, aimed at home cooks"
-								value={direction}
-								onChange={(e) => setDirection(e.target.value)}
-								disabled={busy}
-							/>
-						</div>
-
-						<RangeField label="Published between" value={range} onChange={setRange} />
-
-						<div className="space-y-1.5">
-							<Label>Pages of results per search</Label>
-							<div className="flex gap-1.5">
-								{[1, 2, 3, 4, 5].map((n) => (
-									<Button
-										key={n}
-										type="button"
-										size="sm"
-										variant={pages === n ? "default" : "outline"}
-										className={pages === n ? "bg-pink-500 text-white hover:bg-pink-600" : ""}
-										onClick={() => setPages(n)}
-										disabled={busy}
-									>
-										{n}
-									</Button>
-								))}
+				{phase !== "results" && (
+					<Card>
+						<CardContent className="space-y-5 pt-6">
+							<div className="space-y-1.5">
+								<Label htmlFor="direction">What kind of articles are you looking for?</Label>
+								<Textarea
+									id="direction"
+									rows={3}
+									placeholder="e.g. gift guides and product roundups for eco-friendly kitchen gear, aimed at home cooks"
+									value={direction}
+									onChange={(e) => setDirection(e.target.value)}
+									disabled={busy}
+								/>
 							</div>
-							<p className="text-xs text-muted-foreground">
-								More pages means more candidates and a higher cost per search. Two is enough for most directions.
-							</p>
-						</div>
 
-						<div className="flex items-start justify-between gap-4">
-							<div className="space-y-0.5">
-								<Label htmlFor="fresh-only">Only articles that don't mention {brand?.name ?? "the brand"} yet</Label>
+							<RangeField label="Published between" value={range} onChange={setRange} />
+
+							<div className="space-y-1.5">
+								<Label>Pages of results per search</Label>
+								<div className="flex gap-1.5">
+									{[1, 2, 3, 4, 5].map((n) => (
+										<Button
+											key={n}
+											type="button"
+											size="sm"
+											variant={pages === n ? "default" : "outline"}
+											className={pages === n ? "bg-pink-500 text-white hover:bg-pink-600" : ""}
+											onClick={() => setPages(n)}
+											disabled={busy}
+										>
+											{n}
+										</Button>
+									))}
+								</div>
 								<p className="text-xs text-muted-foreground">
-									These are the pitch targets. Turn off to also see articles that already feature the brand.
+									More pages means more candidates and a higher cost per search. Two is enough for most directions.
 								</p>
 							</div>
-							<Switch id="fresh-only" checked={freshOnly} onCheckedChange={setFreshOnly} disabled={busy} />
-						</div>
 
-						{error && <p className="text-sm text-destructive">{error}</p>}
+							<div className="flex items-start justify-between gap-4">
+								<div className="space-y-0.5">
+									<Label htmlFor="fresh-only">Only articles that don't mention {brand?.name ?? "the brand"} yet</Label>
+									<p className="text-xs text-muted-foreground">
+										These are the pitch targets. Turn off to also see articles that already feature the brand.
+									</p>
+								</div>
+								<Switch id="fresh-only" checked={freshOnly} onCheckedChange={setFreshOnly} disabled={busy} />
+							</div>
 
-						{phase === "idle" && (
-							<Button
-								onClick={genQueries}
-								disabled={busy || direction.trim().length < 3 || !range?.from || !range?.to}
-								className={pinkBtn}
-							>
-								{busy ? <IconLoader2 className="size-5 animate-spin" /> : <IconBolt className="size-5" />}
-								{busy ? "Thinking…" : "Generate search queries"}
-							</Button>
-						)}
-					</CardContent>
-				</Card>
+							{error && <p className="text-sm text-destructive">{error}</p>}
+
+							{phase === "idle" && (
+								<Button
+									onClick={genQueries}
+									disabled={busy || direction.trim().length < 3 || !range?.from || !range?.to}
+									className={pinkBtn}
+								>
+									{busy ? <IconLoader2 className="size-5 animate-spin" /> : <IconBolt className="size-5" />}
+									{busy ? "Thinking…" : "Generate search queries"}
+								</Button>
+							)}
+						</CardContent>
+					</Card>
+				)}
 
 				{(phase === "queries" || phase === "searching") && (
 					<Card>
@@ -277,9 +360,11 @@ function ArticleFinderPage() {
 										<IconRefresh className="size-3.5" />
 										Regenerate
 									</Button>
-									<Button variant="ghost" size="sm" className="text-xs" onClick={reset} disabled={busy}>
-										Start over
-									</Button>
+									{totalResults > 0 && (
+										<Button variant="ghost" size="sm" className="text-xs" onClick={() => setPhase("results")} disabled={busy}>
+											Back to results
+										</Button>
+									)}
 								</div>
 							</div>
 							<p className="text-xs text-muted-foreground">
@@ -324,6 +409,12 @@ function ArticleFinderPage() {
 				{phase === "results" && (
 					<Card>
 						<CardContent className="space-y-5 pt-6">
+							{loaded && (
+								<div className="rounded-lg border border-pink-200 bg-pink-50 px-4 py-3 text-sm dark:border-pink-900/50 dark:bg-pink-950/30">
+									Showing the last search — run by <strong>{loaded.by}</strong> on {prettyAt(loaded.at)}. Re-opening this
+									tab is free; a new search runs fresh queries.
+								</div>
+							)}
 							<div className="flex flex-wrap items-center justify-between gap-2">
 								<div>
 									<h3 className="text-sm font-semibold">
@@ -332,10 +423,12 @@ function ArticleFinderPage() {
 									</h3>
 									{stats && (
 										<p className="text-xs text-muted-foreground">
-											{stats.candidates} candidates from {stats.serpRequests} searches · {stats.pagesFetched} pages fetched
-											{stats.excludedAlreadyFeatured > 0 &&
-												` · ${stats.excludedAlreadyFeatured} hidden (already feature ${brand?.name ?? "the brand"})`}
+											{stats.candidates ?? 0} candidates from {stats.serpRequests ?? 0} searches · {stats.pagesFetched ?? 0}{" "}
+											pages fetched
 										</p>
+									)}
+									{dropParts.length > 0 && (
+										<p className="text-xs text-muted-foreground">Filtered out: {dropParts.join(" · ")}</p>
 									)}
 								</div>
 								<div className="flex gap-2">
@@ -349,7 +442,12 @@ function ArticleFinderPage() {
 										<IconTable className="size-4" />
 										Export CSV
 									</Button>
-									<Button variant="ghost" size="sm" className="gap-1.5" onClick={reset}>
+									{queries.length > 0 && (
+										<Button variant="ghost" size="sm" onClick={() => setPhase("queries")}>
+											Edit queries
+										</Button>
+									)}
+									<Button variant="ghost" size="sm" className="gap-1.5" onClick={newSearch}>
 										<IconRefresh className="size-4" />
 										New search
 									</Button>
@@ -396,14 +494,15 @@ function ArticleFinderPage() {
 					</Card>
 				)}
 
-				{phase === "idle" && (
+				{phase === "idle" && !loading && (
 					<p className="max-w-2xl text-xs text-muted-foreground">
-						How it works: an LLM turns your direction into a handful of US-focused Google searches (you review them
-						first), the results run through your BrightData SERP zone, then non-US sites, retailers and syndicated wire
-						copy are dropped. Each surviving page is fetched and checked for real affiliate monetization — affiliate
-						networks, <code>rel="sponsored"</code> links, tagged retailer links, disclosures — and then vetted by an LLM
-						for topical fit and whether an editor would plausibly feature the brand. Results are split into
-						high-authority publications and credible niche/blog sites. Nothing is saved; every search starts fresh.
+						How it works: an LLM turns your direction into a handful of US-focused Google searches (grounded in this
+						brand's tracked topics — you review them first), the results run through your BrightData SERP zone, then non-US
+						sites, retailers and syndicated wire copy are dropped. Each surviving page is fetched and checked for real
+						affiliate monetization — affiliate networks, <code>rel="sponsored"</code> links, tagged retailer links,
+						disclosures — then vetted by an LLM for topical fit, a 0–100 pitch score, and whether an editor would
+						plausibly feature the brand. Results are split into high-authority publications and credible niche/blog sites,
+						and the last run is saved so re-opening this tab costs nothing.
 					</p>
 				)}
 			</div>

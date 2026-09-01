@@ -29,6 +29,7 @@ export async function generateSearchQueries(args: {
 	brandWebsite: string;
 	brandSummary: string;
 	competitors: string[];
+	trackedTopics: string[];
 	direction: string;
 	rangeLabel: string;
 }): Promise<SearchQuery[]> {
@@ -36,6 +37,9 @@ export async function generateSearchQueries(args: {
 		`Brand: ${args.brandName} (${args.brandWebsite}).`,
 		args.brandSummary ? `What the brand sells (from its site): ${args.brandSummary}` : "",
 		`Competitors: ${args.competitors.join(", ") || "none listed"}.`,
+		args.trackedTopics.length > 0
+			? `The brand is already tracked on these AI-search topics — stay in the same product territory: ${args.trackedTopics.join("; ")}.`
+			: "",
 		`The affiliate team wants US articles they could pitch ${args.brandName} into.`,
 		`Their direction, verbatim: "${args.direction}". Timeframe of interest: ${args.rangeLabel}.`,
 		``,
@@ -112,6 +116,14 @@ export const articleJudgementSchema = z.object({
 						"high_authority = large well-known national publication or one of its verticals; niche_blog = smaller independent blog / niche site that still looks credible (real bylines, original testing or photography, consistent focus).",
 					),
 				usCentric: z.boolean().describe("true if this is a US publication or the US edition of one."),
+				fitScore: z
+					.number()
+					.int()
+					.min(0)
+					.max(100)
+					.describe(
+						"How strong a pitch target this is, 0-100, weighing topical fit, whether the outlet actually runs affiliate editorial, authority, and how likely an editor would say yes. 80+ = clear yes, 50-79 = worth a try, <50 = weak.",
+					),
 				outreachVerdict: z
 					.string()
 					.describe(
@@ -139,7 +151,7 @@ export async function judgeArticles(args: {
 		`Known competitors: ${args.competitors.join(", ") || "none"}.`,
 		``,
 		`You are vetting candidate articles for an affiliate-outreach list. For each you get the title, domain, any known competitors detected on the page, and a text excerpt. Use ONLY that text.`,
-		`Judge each on: relevance, affiliateEditorial, tier, usCentric, and a one-sentence outreachVerdict.`,
+		`Judge each on: relevance, affiliateEditorial, tier, usCentric, a 0-100 fitScore, and a one-sentence outreachVerdict.`,
 		`If competitors are already on the page, that is a strong sign the brand belongs there too — reflect it in the verdict.`,
 		`Return one entry per input article, url copied verbatim. Plain business English.`,
 		``,
