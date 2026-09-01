@@ -246,6 +246,32 @@ export const brandReports = pgTable(
 export type BrandReport = typeof brandReports.$inferSelect;
 export type NewBrandReport = typeof brandReports.$inferInsert;
 
+// ── Article Finder: latest search kept per brand so re-opening the tab is free ──
+export const brandArticleSearches = pgTable(
+	"brand_article_searches",
+	{
+		id: uuid("id").defaultRandom().primaryKey().notNull(),
+		brandId: text("brand_id")
+			.references(() => brands.id, { onDelete: "cascade" })
+			.notNull(),
+		direction: text("direction"),
+		periodStart: text("period_start").notNull(),
+		periodEnd: text("period_end").notNull(),
+		pagesPerSearch: integer("pages_per_search").notNull(),
+		freshOnly: boolean("fresh_only").notNull().default(true),
+		queries: json("queries"),
+		payload: json("payload").notNull(),
+		createdBy: text("created_by"),
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+	},
+	(table) => ({
+		brandCreatedIdx: index("brand_article_searches_brand_id_created_at_idx").on(table.brandId, table.createdAt),
+	}),
+).enableRLS();
+
+export type BrandArticleSearch = typeof brandArticleSearches.$inferSelect;
+export type NewBrandArticleSearch = typeof brandArticleSearches.$inferInsert;
+
 export type Brand = typeof brands.$inferSelect;
 export type NewBrand = typeof brands.$inferInsert;
 

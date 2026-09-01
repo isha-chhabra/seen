@@ -211,3 +211,38 @@ export function extractReadableText(html: string): string {
 		return "";
 	}
 }
+
+const EDITORIAL_MAILBOX_RE =
+	/\b(editor|editorial|tips?|pitch(?:es)?|news(?:desk|room)?|hello|hi|press|contact|submissions?|write|contribute|partnerships?)\b/i;
+const CONTACT_LINK_TEXT_RE =
+	/(write for us|contribute|guest post|editorial guidelines|submit a (?:tip|pitch|story)|pitch us|work with us|partner with us|contact us|about us|masthead|meet the team)/i;
+
+/**
+ * Best-effort outreach lead: an editorial email address if the page exposes one,
+ * else a "write for us" / contact / masthead link. Returns undefined when neither
+ * is present. Absolute URL for links.
+ */
+export function extractContactHint(html: string, baseUrl: string): string | undefined {
+	const mailtos = html.match(/mailto:([^"'?\s>]+@[^"'?\s>]+)/gi) ?? [];
+	for (const raw of mailtos) {
+		const email = raw.slice(7).toLowerCase();
+		if (EDITORIAL_MAILBOX_RE.test(email.split("@")[0] ?? "")) return email;
+	}
+	if (mailtos[0]) return mailtos[0].slice(7).toLowerCase();
+
+	const anchorRe = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+	let m: RegExpExecArray | null;
+	let scanned = 0;
+	while ((m = anchorRe.exec(html)) !== null && scanned < 600) {
+		scanned++;
+		const href = m[1] ?? "";
+		const textAndHref = `${m[2]?.replace(/<[^>]+>/g, " ") ?? ""} ${href}`;
+		if (!CONTACT_LINK_TEXT_RE.test(textAndHref)) continue;
+		try {
+			return new URL(href, baseUrl).toString();
+		} catch {
+			/* ignore */
+		}
+	}
+	return undefined;
+}

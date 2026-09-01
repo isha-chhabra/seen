@@ -16,20 +16,23 @@
  *
  * Hard caps keep one run bounded (~$0.15-0.35): <=8 queries, <=5 pages/query,
  * <=36 page fetches. A short in-process debounce per brand guards against
- * accidental double-runs. No persistence, no history.
+ * accidental double-runs. The latest run per brand is persisted so re-opening
+ * the tab shows it for free (getLatestArticleSearchFn) — a new search is a
+ * deliberate click.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { generateSearchQueries, judgeArticles, triageCandidates } from "@workspace/lib/article-finder/llm";
 import {
+	extractContactHint,
 	extractReadableText,
 	googleSerp,
 	scanHtmlForAffiliateSignals,
 	unlockerFetchHtml,
 } from "@workspace/lib/article-finder/search";
 import { db } from "@workspace/lib/db/db";
-import { brands, competitors } from "@workspace/lib/db/schema";
+import { brandArticleSearches, brands, competitors, prompts } from "@workspace/lib/db/schema";
 import { getWebsiteExcerpt } from "@workspace/lib/website-excerpt";
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuthSession, requireBrandAccess } from "@/lib/auth/helpers";
 import { extractDomain, isAffiliateRedirectHost, isAffiliateUrl } from "@/lib/domain-categories";
@@ -316,6 +319,11 @@ export const generateArticleQueriesFn = createServerFn({ method: "POST" })
 		const [brand] = await db.select().from(brands).where(eq(brands.id, data.brandId)).limit(1);
 		if (!brand) throw new Error("Brand not found");
 		const comps = await db.select({ name: competitors.name }).from(competitors).where(eq(competitors.brandId, data.brandId));
+		const trackedRows = await db
+			.select({ value: prompts.value })
+			.from(prompts)
+			.where(and(eq(prompts.brandId, data.brandId), eq(prompts.enabled, true)))
+			.limit(12);
 		const brandSummary = (await getWebsiteExcerpt(brand.website).catch(() => ""))
 			.replace(/\s+/g, " ")
 			.trim()
@@ -326,6 +334,7 @@ export const generateArticleQueriesFn = createServerFn({ method: "POST" })
 			brandWebsite: brand.website,
 			brandSummary,
 			competitors: comps.map((c) => c.name).filter(Boolean),
+			trackedTopics: trackedRows.map((r) => r.value).filter(Boolean),
 			direction: data.direction,
 			rangeLabel: `${data.from} to ${data.to}`,
 		});
@@ -341,12 +350,20 @@ export interface ArticleResult {
 	url: string;
 	domain: string;
 	tier: ArticleTier;
+	fitScore: number;
 	verdict: string;
 	relevance: "strong" | "weak";
 	signals: string[];
 	competitorsMentioned: string[];
 	brandAlreadyMentioned: boolean;
+	contactHint?: string;
 	query: string;
+}
+
+export interface ArticleSearchPayload {
+	highAuthority: ArticleResult[];
+	nicheBlog: ArticleResult[];
+	stats: Record<string, number>;
 }
 
 export const findArticlesFn = createServerFn({ method: "POST" })
@@ -365,10 +382,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 			includeAlreadyFeatured: z.boolean().optional(),
 		}),
 	)
-	.handler(
-		async ({
-			data,
-		}): Promise<{ highAuthority: ArticleResult[]; nicheBlog: ArticleResult[]; stats: Record<string, number> }> => {
+	.handler(async ({ data }): Promise<ArticleSearchPayload> => {
 			const session = await requireAuthSession();
 			await requireBrandAccess(session.user.id, data.brandId);
 
@@ -498,6 +512,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 						signals: ["known affiliate publisher"],
 						competitorsMentioned: [] as string[],
 						brandAlreadyMentioned: false,
+						contactHint: undefined as string | undefined,
 						rank: c.rank,
 					};
 				}
@@ -526,6 +541,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 						.filter((cc) => cc.res.some((re) => re.test(haystack)))
 						.map((cc) => cc.name),
 					brandAlreadyMentioned: brandRes.some((re) => re.test(haystack)),
+					contactHint: extractContactHint(html, c.url),
 					rank: c.rank,
 				};
 			});
@@ -555,30 +571,47 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 
 			const highAuthority: ArticleResult[] = [];
 			const nicheBlog: ArticleResult[] = [];
-			let excludedAlreadyFeatured = 0;
+			const drop = { alreadyFeatured: 0, offTopic: 0, notAffiliate: 0, nonUs: 0, unvetted: 0 };
 			for (const s of survivors) {
 				// the point of the tool is finding pitch targets — skip articles that
 				// already name the brand unless the caller opts to see them
 				if (s.brandAlreadyMentioned && data.includeAlreadyFeatured !== true) {
-					excludedAlreadyFeatured++;
+					drop.alreadyFeatured++;
 					continue;
 				}
 				const j = byUrl.get(s.url);
 				const majorList = isMajorPublisher(s.domain, s.url);
 				// with no judgement, fall back to conservative keep for known publishers only
 				if (!j) {
-					if (!majorList && !s.signals.includes("known affiliate publisher")) continue;
+					if (!majorList && !s.signals.includes("known affiliate publisher")) {
+						drop.unvetted++;
+						continue;
+					}
 				} else {
-					if (j.relevance === "off_topic") continue;
-					if (j.affiliateEditorial === "no") continue;
-					if (!j.usCentric && !majorList) continue;
-					if (j.relevance === "weak" && s.competitorsMentioned.length === 0 && j.affiliateEditorial !== "yes") continue;
+					if (j.relevance === "off_topic") {
+						drop.offTopic++;
+						continue;
+					}
+					if (j.affiliateEditorial === "no") {
+						drop.notAffiliate++;
+						continue;
+					}
+					if (!j.usCentric && !majorList) {
+						drop.nonUs++;
+						continue;
+					}
+					if (j.relevance === "weak" && s.competitorsMentioned.length === 0 && j.affiliateEditorial !== "yes") {
+						drop.offTopic++;
+						continue;
+					}
 				}
+				const baseScore = j?.relevance === "weak" ? 42 : 62;
 				const row: ArticleResult = {
 					title: s.title,
 					url: s.url,
 					domain: s.domain,
 					tier: majorList ? "high_authority" : (j?.tier ?? "niche_blog"),
+					fitScore: Math.max(0, Math.min(100, Math.round(j?.fitScore ?? baseScore))),
 					verdict:
 						j?.outreachVerdict?.trim() ||
 						(s.competitorsMentioned.length > 0
@@ -588,33 +621,80 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 					signals: s.signals,
 					competitorsMentioned: s.competitorsMentioned,
 					brandAlreadyMentioned: s.brandAlreadyMentioned,
+					contactHint: s.contactHint,
 					query: s.query,
 				};
 				(row.tier === "high_authority" ? highAuthority : nicheBlog).push(row);
 			}
-			const rankOf = new Map(survivors.map((s) => [s.url, s.rank]));
 			const sortRows = (rows: ArticleResult[]) =>
-				rows.sort((a, b) => {
-					if (a.relevance !== b.relevance) return a.relevance === "strong" ? -1 : 1;
-					return (rankOf.get(a.url) ?? 999) - (rankOf.get(b.url) ?? 999);
-				});
+				rows.sort((a, b) => b.fitScore - a.fitScore || (a.relevance === b.relevance ? 0 : a.relevance === "strong" ? -1 : 1));
 			sortRows(highAuthority);
 			sortRows(nicheBlog);
 
-			return {
+			const payload: ArticleSearchPayload = {
 				highAuthority,
 				nicheBlog,
 				stats: {
 					queries: queries.length,
 					serpRequests: serpTasks.length,
 					candidates: afterJunk,
-					afterRetailFilter: afterRetail,
-					afterTriage,
 					pagesFetched: toFetch.length,
 					highAuthority: highAuthority.length,
 					nicheBlog: nicheBlog.length,
-					excludedAlreadyFeatured,
+					droppedAlreadyFeatured: drop.alreadyFeatured,
+					droppedOffTopic: drop.offTopic,
+					droppedNotAffiliate: drop.notAffiliate,
+					droppedNonUs: drop.nonUs,
+					droppedRetailer: Math.max(0, afterJunk - afterRetail),
+					droppedSyndicated: syndicatedDrop.size,
 				},
 			};
+
+			// persist the latest run so re-opening the tab is free
+			try {
+				await db.insert(brandArticleSearches).values({
+					brandId: data.brandId,
+					direction: userDirection.slice(0, 500),
+					periodStart: data.from,
+					periodEnd: data.to,
+					pagesPerSearch: data.pagesPerSearch,
+					freshOnly: data.includeAlreadyFeatured !== true,
+					queries: data.queries,
+					payload,
+					createdBy: session.user.name?.trim() || session.user.email || "a teammate",
+				});
+			} catch (e) {
+				console.error("[article-finder] failed to persist search", e);
+			}
+
+			return payload;
 		},
 	);
+
+export const getLatestArticleSearchFn = createServerFn({ method: "POST" })
+	.validator(z.object({ brandId: z.string().min(1) }))
+	.handler(async ({ data }) => {
+		const session = await requireAuthSession();
+		await requireBrandAccess(session.user.id, data.brandId);
+		const [row] = await db
+			.select()
+			.from(brandArticleSearches)
+			.where(eq(brandArticleSearches.brandId, data.brandId))
+			.orderBy(desc(brandArticleSearches.createdAt))
+			.limit(1);
+		if (!row) return null;
+		const payload = row.payload as ArticleSearchPayload;
+		return {
+			createdAt: String(row.createdAt),
+			createdBy: row.createdBy ?? "a teammate",
+			direction: row.direction ?? "",
+			from: row.periodStart,
+			to: row.periodEnd,
+			pagesPerSearch: row.pagesPerSearch,
+			freshOnly: row.freshOnly,
+			queries: (row.queries as { query: string; angle?: string }[] | null) ?? [],
+			highAuthority: payload?.highAuthority ?? [],
+			nicheBlog: payload?.nicheBlog ?? [],
+			stats: payload?.stats ?? {},
+		};
+	});
