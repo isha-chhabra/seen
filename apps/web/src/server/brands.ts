@@ -6,7 +6,18 @@ import { createServerFn } from "@tanstack/react-start";
 import { getDefaultDelayHours } from "@workspace/lib/constants";
 import { db } from "@workspace/lib/db/db";
 import { findUniqueBrandId, slugify } from "@workspace/lib/db/provisioning";
-import { type Brand, type BrandWithPrompts, brands, competitors, prompts } from "@workspace/lib/db/schema";
+import {
+	type Brand,
+	type BrandWithPrompts,
+	brandArticleSearches,
+	brandOpportunities,
+	brandReports,
+	brands,
+	citations,
+	competitors,
+	promptRuns,
+	prompts,
+} from "@workspace/lib/db/schema";
 import {
 	assertAllowed,
 	assertCanCreateBrand,
@@ -579,4 +590,31 @@ export const createCompetitorFromDomainFn = createServerFn({ method: "POST" })
 			.returning();
 
 		return result;
+	});
+
+/**
+ * Permanently remove a brand and every row that hangs off it: competitors,
+ * prompts, prompt runs, citations, opportunities, reports and saved article
+ * searches. Two FK edges cascade; the rest are NO ACTION and are cleared here
+ * in FK-safe order inside one transaction. There is no undo.
+ */
+export const deleteBrandFn = createServerFn({ method: "POST" })
+	.validator(z.object({ brandId: z.string().min(1) }))
+	.handler(async ({ data }) => {
+		const session = await requireAuthSession();
+		await requireBrandAccess(session.user.id, data.brandId);
+		const id = data.brandId;
+
+		await db.transaction(async (tx) => {
+			await tx.delete(citations).where(eq(citations.brandId, id));
+			await tx.delete(promptRuns).where(eq(promptRuns.brandId, id));
+			await tx.delete(brandOpportunities).where(eq(brandOpportunities.brandId, id));
+			await tx.delete(competitors).where(eq(competitors.brandId, id));
+			await tx.delete(prompts).where(eq(prompts.brandId, id));
+			await tx.delete(brandReports).where(eq(brandReports.brandId, id));
+			await tx.delete(brandArticleSearches).where(eq(brandArticleSearches.brandId, id));
+			await tx.delete(brands).where(eq(brands.id, id));
+		});
+
+		return { deleted: true as const };
 	});
