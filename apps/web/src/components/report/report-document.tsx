@@ -33,10 +33,10 @@ const page: React.CSSProperties = {
 	minHeight: 1056,
 	background: "#fff",
 	color: INK,
-	padding: "52px 60px 64px",
+	padding: "44px 54px 52px",
 	fontFamily: "'Geist', ui-sans-serif, system-ui, sans-serif",
-	fontSize: 12,
-	lineHeight: 1.55,
+	fontSize: 11.5,
+	lineHeight: 1.5,
 	boxSizing: "border-box",
 	position: "relative",
 };
@@ -47,7 +47,7 @@ const note: React.CSSProperties = { color: MUTE };
 function Head({ brandName, periodLabel, compareLabel, n }: ReportDocProps & { n: number }) {
 	const titles = ["Where you stand", "Which questions you win and lose", "Which sites the AI trusts", "What to do next"];
 	return (
-		<div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: `2px solid ${PINK}`, paddingBottom: 12, marginBottom: 24 }}>
+		<div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: `2px solid ${PINK}`, paddingBottom: 10, marginBottom: 18 }}>
 			<div>
 				<span style={{ fontFamily: "'Titan One', system-ui", fontSize: 24, color: PINK, lineHeight: 1 }}>seen</span>
 				<div style={{ fontSize: 19, fontWeight: 700, marginTop: 8 }}>{brandName} AI Visibility Report</div>
@@ -87,7 +87,7 @@ function Page1(p: ReportDocProps) {
 	const o = p.narrative.overview;
 	const trend = p.digest.charts.dailyRecommendationRate.map((d) => ({ d: d.date.slice(5), rate: d.rate }));
 	return (
-		<div style={page}>
+		<div style={page} data-report-page={1}>
 			<Head {...p} n={1} />
 			<div style={{ marginBottom: 18 }}>
 				<div style={label}>What this report measures</div>
@@ -126,7 +126,7 @@ function QList({ items, kind }: { items: { question: string; detail: string; rec
 	return (
 		<div>
 			{items.map((it, i) => (
-				<div key={i} style={{ padding: "9px 0", borderTop: i ? `1px solid #f1f5f9` : "none" }}>
+				<div key={i} style={{ padding: "6px 0", borderTop: i ? `1px solid #f1f5f9` : "none" }}>
 					<div style={{ fontWeight: 600, fontSize: 12 }}>
 						<span style={{ color: kind === "win" ? "#059669" : "#dc2626", marginRight: 6 }}>{kind === "win" ? "▲" : "▼"}</span>
 						“{it.question}”
@@ -147,7 +147,7 @@ function Page2(p: ReportDocProps) {
 	const b = p.narrative.buyingQuestions;
 	const bars = p.digest.charts.byAssistant.map((e) => ({ a: e.assistant, rate: e.rate }));
 	return (
-		<div style={page}>
+		<div style={page} data-report-page={2}>
 			<Head {...p} n={2} />
 			<div style={{ marginBottom: 14 }}>{b.intro}</div>
 			<div style={{ display: "flex", gap: 28 }}>
@@ -181,7 +181,7 @@ function Page3(p: ReportDocProps) {
 	const mix = Object.entries(p.digest.charts.sourceMix).sort((a, b) => b[1] - a[1]);
 	const total = mix.reduce((t, [, n]) => t + n, 0) || 1;
 	return (
-		<div style={page}>
+		<div style={page} data-report-page={3}>
 			<Head {...p} n={3} />
 			<div style={{ marginBottom: 14 }}>{s.intro}</div>
 			<Callout>
@@ -233,12 +233,12 @@ function Page3(p: ReportDocProps) {
 const PRI: Record<string, string> = { high: "#dc2626", medium: "#d97706", low: "#0891b2" };
 function Page4(p: ReportDocProps) {
 	return (
-		<div style={page}>
+		<div style={page} data-report-page={4}>
 			<Head {...p} n={4} />
 			<div style={h2}>Your action plan</div>
-			<div style={{ marginBottom: 26 }}>
+			<div style={{ marginBottom: 16 }}>
 				{p.narrative.actionPlan.map((a, i) => (
-					<div key={i} style={{ display: "flex", gap: 10, padding: "10px 0", borderTop: i ? `1px solid #f1f5f9` : "none" }}>
+					<div key={i} style={{ display: "flex", gap: 10, padding: "7px 0", borderTop: i ? `1px solid #f1f5f9` : "none" }}>
 						<span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", color: "#fff", background: PRI[a.priority] ?? MUTE, borderRadius: 5, padding: "3px 6px", height: "fit-content", whiteSpace: "nowrap" }}>
 							{a.priority}
 						</span>
@@ -252,7 +252,7 @@ function Page4(p: ReportDocProps) {
 			<div style={h2}>How to read this report</div>
 			<div>
 				{p.narrative.glossary.map((g, i) => (
-					<div key={i} style={{ fontSize: 11.5, marginBottom: 7 }}>
+					<div key={i} style={{ fontSize: 11, marginBottom: 4 }}>
 						<strong>{g.term}. </strong>
 						<span style={note}>{g.definition}</span>
 					</div>
@@ -282,7 +282,7 @@ export const ReportDocument = forwardRef<HTMLDivElement, ReportDocProps>(functio
 		>
 			<div style={{ fontSize: 13, fontWeight: 600, color: PINK }}>Preparing your PDF…</div>
 			{[Page1, Page2, Page3, Page4].map((P, i) => (
-				<div key={i} data-report-page={i + 1} style={{ position: "relative", boxShadow: "0 4px 24px rgba(0,0,0,0.1)" }}>
+				<div key={i} style={{ position: "relative", boxShadow: "0 4px 24px rgba(0,0,0,0.1)" }}>
 					<P {...props} />
 				</div>
 			))}
