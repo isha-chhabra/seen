@@ -165,7 +165,8 @@ export async function judgeArticles(args: {
 		`  linksCompetitor: true = the article already has an affiliate-tracked link to a direct competitor. Strongest possible signal → affiliateEditorial "yes", fitScore 85+ unless relevance is off_topic.`,
 		`  publishedOrUpdated: the page's date if found. Prefer recent. Older than ~2 years with no sign of updates → cap fitScore around 45 and say so.`,
 		`Judge each on: relevance, affiliateEditorial, tier, usCentric, a 0-100 fitScore, and a one-sentence outreachVerdict.`,
-		`Return one entry per input article, url copied verbatim. outreachVerdict must be one short plain sentence. Do not use dashes; use commas or separate sentences.`,
+		`Return one entry per input article, url copied verbatim.`,
+		`outreachVerdict: ONE sentence, at most 18 words. Lead with the concrete reason, not "This site" or "This outlet". No dashes. Vary the wording between entries, do not use a template.`,
 		``,
 		`ARTICLES (JSON):`,
 		JSON.stringify(

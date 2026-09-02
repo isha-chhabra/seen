@@ -547,7 +547,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 						query: c.query,
 						domain,
 						excerpt: c.snippet,
-						signals: ["known affiliate publisher"],
+						signals: ["known publisher"],
 						merchants: [] as string[],
 						linksCompetitor: false,
 						publishedDate: undefined as string | undefined,
@@ -601,7 +601,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 					domain,
 					excerpt: text.slice(0, 1500),
 					signals: dedupeLower(
-						[...(domainKnown ? ["known affiliate publisher"] : []), ...(linkedComp ? ["affiliate-links a competitor"] : []), ...sig.labels],
+						[...(domainKnown ? ["known publisher"] : []), ...sig.labels],
 					),
 					merchants: sig.taggedOutboundHosts.slice(0, 8),
 					linksCompetitor: linkedComp,
@@ -666,7 +666,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 				const merchantCount = s.merchants.length;
 				// with no judgement, fall back to conservative keep for known publishers only
 				if (!j) {
-					if (!majorList && !s.signals.includes("known affiliate publisher") && !s.linksCompetitor && merchantCount < 2) {
+					if (!majorList && !s.signals.includes("known publisher") && !s.linksCompetitor && merchantCount < 2) {
 						drop.unvetted++;
 						continue;
 					}

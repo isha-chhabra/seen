@@ -163,74 +163,73 @@ function ReportsPage() {
 
 	return (
 		<PageHeader title="Reports" subtitle="A client-facing PDF report from this brand's tracked data.">
-			<Card className="max-w-2xl">
-				<CardContent className="space-y-5 pt-6">
-					{inCooldown && nextLabel && (
-						<div className="rounded-lg border border-pink-200 bg-pink-50 px-4 py-3 text-sm text-pink-900 dark:border-pink-900/50 dark:bg-pink-950/30 dark:text-pink-200">
-							One report per week. Next available <strong>{nextLabel}</strong>.
+			<div className="max-w-xl space-y-4">
+				<Card>
+					<CardContent className="space-y-5 pt-6">
+						{inCooldown && nextLabel && (
+							<div className="rounded-xl border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+								One report per week. Next available <span className="font-medium text-foreground">{nextLabel}</span>.
+							</div>
+						)}
+
+						<div className="space-y-1.5">
+							<Label htmlFor="report-name">Report name</Label>
+							<Input
+								id="report-name"
+								placeholder={`${brand?.name ?? "Brand"} visibility, ${pretty(range?.from)} to ${pretty(range?.to)}`}
+								value={name}
+								onChange={(e) => setName(e.target.value)}
+								disabled={status === "working" || Boolean(inCooldown)}
+							/>
 						</div>
-					)}
 
-					<div className="space-y-1.5">
-						<Label htmlFor="report-name">Report name</Label>
-						<Input
-							id="report-name"
-							placeholder={`${brand?.name ?? "Brand"} visibility, ${pretty(range?.from)} to ${pretty(range?.to)}`}
-							value={name}
-							onChange={(e) => setName(e.target.value)}
-							disabled={status === "working" || Boolean(inCooldown)}
-						/>
-					</div>
+						<RangeField label="Report period" value={range} onChange={setRange} />
 
-					<RangeField label="Report period" value={range} onChange={setRange} />
-
-					<div className="flex items-center gap-3">
-						<Switch id="cmp" checked={compareOn} onCheckedChange={setCompareOn} disabled={status === "working"} />
-						<Label htmlFor="cmp" className="cursor-pointer">Compare to another period</Label>
-					</div>
-					{compareOn && <RangeField label="Comparison period" value={compareRange} onChange={setCompareRange} />}
-
-					{error && <p className="text-sm text-destructive">{error}</p>}
-
-					<Button
-						onClick={generate}
-						disabled={!canSubmit}
-						className="h-11 gap-2 rounded-xl bg-pink-500 px-5 font-semibold text-white shadow-lg shadow-pink-500/25 hover:bg-pink-600 disabled:opacity-60"
-					>
-						{status === "working" ? <IconLoader2 className="size-5 animate-spin" /> : <IconReport className="size-5" />}
-						{status === "working" ? "Generating…" : inCooldown ? `Next available ${nextLabel ?? "soon"}` : "Generate report"}
-					</Button>
-
-					<p className="text-xs text-muted-foreground">
-						One report per brand per week. The PDF downloads automatically.
-					</p>
-
-					{lastReport && (
-						<div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-sm">
-							<span className="text-muted-foreground">
-								Last report: <strong>{lastReport.periodLabel}</strong>
-							</span>
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() => {
-									setStatus("working");
-									setDoc({
-										brandName: lastReport.brandName,
-										periodLabel: lastReport.periodLabel,
-										compareLabel: lastReport.compareLabel,
-										digest: lastReport.digest,
-										narrative: lastReport.narrative,
-										fileName: lastReport.name || `${lastReport.brandName} report`,
-									});
-								}}
-							>
-								Download PDF again
-							</Button>
+						<div className="flex items-center gap-3">
+							<Switch id="cmp" checked={compareOn} onCheckedChange={setCompareOn} disabled={status === "working"} />
+							<Label htmlFor="cmp" className="cursor-pointer font-normal">
+								Compare to another period
+							</Label>
 						</div>
-					)}
-				</CardContent>
-			</Card>
+						{compareOn && <RangeField label="Comparison period" value={compareRange} onChange={setCompareRange} />}
+
+						{error && <p className="text-sm text-destructive">{error}</p>}
+
+						<Button onClick={generate} disabled={!canSubmit} className="h-11 w-full gap-2 font-semibold">
+							{status === "working" ? <IconLoader2 className="size-4 animate-spin" /> : <IconReport className="size-4" />}
+							{status === "working" ? "Generating…" : inCooldown ? `Next available ${nextLabel ?? "soon"}` : "Generate report"}
+						</Button>
+
+						<p className="text-xs text-muted-foreground">One report per brand per week. The PDF downloads automatically.</p>
+					</CardContent>
+				</Card>
+
+				{lastReport && (
+					<div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4 text-sm">
+						<div className="min-w-0">
+							<div className="font-medium">Last report</div>
+							<div className="truncate text-xs text-muted-foreground">{lastReport.periodLabel}</div>
+						</div>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => {
+								setStatus("working");
+								setDoc({
+									brandName: lastReport.brandName,
+									periodLabel: lastReport.periodLabel,
+									compareLabel: lastReport.compareLabel,
+									digest: lastReport.digest,
+									narrative: lastReport.narrative,
+									fileName: lastReport.name || `${lastReport.brandName} report`,
+								});
+							}}
+						>
+							Download PDF
+						</Button>
+					</div>
+				)}
+			</div>
 
 			{doc && <ReportDocument ref={docRef} {...doc} />}
 		</PageHeader>

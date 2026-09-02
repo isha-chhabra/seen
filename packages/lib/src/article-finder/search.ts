@@ -205,11 +205,11 @@ export function scanHtmlForAffiliateSignals(html: string): AffiliateHtmlSignals 
 	}
 	const taggedOutboundHosts = [...taggedHosts];
 
-	if (netHit) labels.push(`affiliate network (${netHit})`);
-	if (sponsoredRel) labels.push('rel="sponsored" links');
-	if (taggedOutboundHosts.length > 0)
-		labels.push(`links ${taggedOutboundHosts.length} retailer${taggedOutboundHosts.length === 1 ? "" : "s"} w/ affiliate tags`);
-	if (disclosure) labels.push("affiliate disclosure text");
+	// Standardized short vocabulary. The retailer count is shown separately in the
+	// UI meta line, so it is not repeated as a tag here.
+	if (netHit) labels.push("affiliate network");
+	if (sponsoredRel) labels.push("sponsored links");
+	if (disclosure) labels.push("disclosure");
 
 	const strong = networkScript || sponsoredRel || taggedOutboundHosts.length >= 2;
 	return { sponsoredRel, networkScript, disclosure, taggedOutboundHosts, taggedLinks, commerceMarkers, strong, labels };

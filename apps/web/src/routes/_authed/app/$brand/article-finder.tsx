@@ -14,9 +14,13 @@ import { Label } from "@workspace/ui/components/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover";
 import { Switch } from "@workspace/ui/components/switch";
 import { Textarea } from "@workspace/ui/components/textarea";
+import { cn } from "@workspace/ui/lib/utils";
 import { useEffect, useState } from "react";
 import type { DateRange } from "react-day-picker";
+import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
+import { ScorePill } from "@/components/score-pill";
+import { SectionHeading } from "@/components/section-heading";
 import { useBrand } from "@/hooks/use-brands";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
 import {
@@ -69,81 +73,71 @@ function RangeField({ value, onChange, label }: { value?: DateRange; onChange: (
 type Query = { query: string; angle?: string; on: boolean };
 type Phase = "idle" | "queries" | "searching" | "results";
 
-function ScorePill({ score }: { score: number }) {
-	const tone =
-		score >= 80
-			? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-			: score >= 55
-				? "bg-pink-500/15 text-pink-700 dark:text-pink-400"
-				: "bg-muted text-muted-foreground";
-	return <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${tone}`}>{score}</span>;
-}
-
 function ArticleRow({ r, brandName }: { r: ArticleResult; brandName?: string }) {
 	const contactIsEmail = r.contactHint?.includes("@") && !r.contactHint.startsWith("http");
 	const merchantCount = r.merchants?.length ?? 0;
+	const meta = [
+		r.domain,
+		r.publishedDate || null,
+		merchantCount > 0 ? `${merchantCount} retailer${merchantCount === 1 ? "" : "s"} linked` : null,
+	]
+		.filter(Boolean)
+		.join("   ·   ");
 	return (
-		<li className="space-y-1.5 py-4">
-			<div className="flex items-start gap-2">
-				<ScorePill score={r.fitScore} />
+		<div
+			className={cn(
+				"flex gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/30",
+				r.linksCompetitor && "border-l-[3px] border-l-primary",
+			)}
+		>
+			<ScorePill score={r.fitScore} />
+			<div className="min-w-0 flex-1 space-y-1">
 				<a
 					href={r.url}
 					target="_blank"
 					rel="noreferrer"
-					className="inline-flex items-start gap-1.5 font-medium text-pink-600 hover:underline dark:text-pink-400"
+					className="inline-flex items-start gap-1 text-sm font-medium hover:text-primary hover:underline"
 				>
 					{r.title}
-					<IconExternalLink className="mt-0.5 size-3.5 shrink-0 opacity-60" />
+					<IconExternalLink className="mt-0.5 size-3 shrink-0 opacity-40" />
 				</a>
-			</div>
-			<p className="text-xs text-muted-foreground">
-				{r.domain}
-				{r.publishedDate && `, ${r.publishedDate}`}
-				{merchantCount > 0 && `, links ${merchantCount} retailer${merchantCount === 1 ? "" : "s"}`}
-			</p>
-			<p className="text-sm">{r.verdict}</p>
-			<div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-				{r.linksCompetitor && (
-					<Badge className="bg-emerald-600 text-white hover:bg-emerald-600">Affiliate-links a competitor</Badge>
-				)}
-				{r.contactHint &&
-					(contactIsEmail ? (
-						<a
-							href={`mailto:${r.contactHint}`}
-							className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs hover:underline"
-						>
-							<IconMail className="size-3" />
-							{r.contactHint}
-						</a>
-					) : (
-						<a
-							href={r.contactHint}
-							target="_blank"
-							rel="noreferrer"
-							className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs hover:underline"
-						>
-							<IconMail className="size-3" />
-							Contact / submissions
-						</a>
+				<p className="text-xs text-muted-foreground">{meta}</p>
+				<p className="text-[13px] leading-relaxed text-foreground/90">{r.verdict}</p>
+				<div className="flex flex-wrap items-center gap-1.5 pt-1">
+					{r.linksCompetitor && <Badge variant="accent">competitor linked</Badge>}
+					{r.relevance === "weak" && <span className="text-[11px] text-muted-foreground">loose fit</span>}
+					{r.competitorsMentioned.length > 0 && (
+						<Badge variant="quiet">mentions {r.competitorsMentioned.slice(0, 2).join(", ")}</Badge>
+					)}
+					{r.brandAlreadyMentioned && <Badge variant="quiet">mentions {brandName ?? "the brand"}</Badge>}
+					{r.signals.map((s) => (
+						<Badge key={s} variant="quiet">
+							{s}
+						</Badge>
 					))}
-				{r.relevance === "weak" && (
-					<Badge variant="outline" className="text-muted-foreground">
-						Loose fit
-					</Badge>
-				)}
-				{r.competitorsMentioned.map((c) => (
-					<Badge key={c} className="bg-amber-500/90 text-white hover:bg-amber-500/90">
-						Features {c}
-					</Badge>
-				))}
-				{r.brandAlreadyMentioned && <Badge variant="outline">Already mentions {brandName ?? "the brand"}</Badge>}
-				{r.signals.map((s) => (
-					<Badge key={s} variant="secondary" className="font-normal">
-						{s}
-					</Badge>
-				))}
+					{r.contactHint &&
+						(contactIsEmail ? (
+							<a
+								href={`mailto:${r.contactHint}`}
+								className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary hover:underline"
+							>
+								<IconMail className="size-3" />
+								{r.contactHint}
+							</a>
+						) : (
+							<a
+								href={r.contactHint}
+								target="_blank"
+								rel="noreferrer"
+								className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary hover:underline"
+							>
+								<IconMail className="size-3" />
+								contact
+							</a>
+						))}
+				</div>
 			</div>
-		</li>
+		</div>
 	);
 }
 
@@ -280,8 +274,7 @@ function ArticleFinderPage() {
 		URL.revokeObjectURL(url);
 	}
 
-	const pinkBtn =
-		"h-11 gap-2 rounded-xl bg-pink-500 px-5 font-semibold text-white shadow-lg shadow-pink-500/25 hover:bg-pink-600 disabled:opacity-60";
+	const pinkBtn = "h-11 w-full gap-2 text-sm font-semibold";
 
 	const dropParts = stats
 		? [
@@ -330,7 +323,7 @@ function ArticleFinderPage() {
 											type="button"
 											size="sm"
 											variant={pages === n ? "default" : "outline"}
-											className={pages === n ? "bg-pink-500 text-white hover:bg-pink-600" : ""}
+											
 											onClick={() => setPages(n)}
 											disabled={busy}
 										>
@@ -426,7 +419,7 @@ function ArticleFinderPage() {
 					<Card>
 						<CardContent className="space-y-5 pt-6">
 							{loaded && (
-								<div className="rounded-lg border border-pink-200 bg-pink-50 px-4 py-3 text-sm dark:border-pink-900/50 dark:bg-pink-950/30">
+								<div className="rounded-xl border border-highlight-border bg-highlight px-4 py-3 text-sm text-highlight-foreground">
 									Last search by <strong>{loaded.by}</strong>, {prettyAt(loaded.at)}. Reopening is free.
 								</div>
 							)}
@@ -469,39 +462,33 @@ function ArticleFinderPage() {
 							</div>
 
 							{totalResults === 0 ? (
-								<p className="py-6 text-center text-sm text-muted-foreground">
-									Nothing cleared vetting. Try a broader direction, a wider date range, or more pages per search.
-								</p>
+								<EmptyState
+									icon={IconSearch}
+									title="Nothing cleared vetting"
+									description="Try a broader direction, a wider date range, or more pages per search."
+								/>
 							) : (
-								<div className="space-y-6">
-									<section>
-										<h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-											High-authority publications
-										</h4>
-										{high.length === 0 ? (
-											<p className="py-3 text-sm text-muted-foreground">None found in this run.</p>
-										) : (
-											<ul className="divide-y">
+								<div className="space-y-8">
+									{high.length > 0 && (
+										<section>
+											<SectionHeading count={high.length}>High-authority publications</SectionHeading>
+											<div className="space-y-2">
 												{high.map((r) => (
 													<ArticleRow key={r.url} r={r} brandName={brand?.name} />
 												))}
-											</ul>
-										)}
-									</section>
-									<section>
-										<h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-											Niche &amp; blog sites
-										</h4>
-										{niche.length === 0 ? (
-											<p className="py-3 text-sm text-muted-foreground">None found in this run.</p>
-										) : (
-											<ul className="divide-y">
+											</div>
+										</section>
+									)}
+									{niche.length > 0 && (
+										<section>
+											<SectionHeading count={niche.length}>Niche &amp; blog sites</SectionHeading>
+											<div className="space-y-2">
 												{niche.map((r) => (
 													<ArticleRow key={r.url} r={r} brandName={brand?.name} />
 												))}
-											</ul>
-										)}
-									</section>
+											</div>
+										</section>
+									)}
 								</div>
 							)}
 						</CardContent>

@@ -21,6 +21,14 @@ export interface NavGroup {
 	items: NavItem[];
 }
 
+// Active item: pink-tint fill, pink icon, and a pink rail on the left edge.
+// The `data-[active=true]:` prefixes mean this string is safe to apply to every item.
+const ACTIVE =
+	"relative data-[active=true]:!bg-highlight data-[active=true]:!text-highlight-foreground data-[active=true]:font-medium " +
+	"[&[data-active=true]>svg]:!text-primary " +
+	"data-[active=true]:before:absolute data-[active=true]:before:inset-y-1.5 data-[active=true]:before:left-0 " +
+	"data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-full data-[active=true]:before:bg-primary";
+
 export function NavMain({ groups }: { groups: NavGroup[] }) {
 	const params = useParams({ strict: false }) as { brand?: string };
 	const brandId = params.brand;
@@ -44,7 +52,9 @@ export function NavMain({ groups }: { groups: NavGroup[] }) {
 		<>
 			{groups.map((group) => (
 				<SidebarGroup key={group.label}>
-					<SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+					<SidebarGroupLabel className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+						{group.label}
+					</SidebarGroupLabel>
 					<SidebarMenu>
 						{group.items.map((item) => (
 							<SidebarMenuItem key={item.title}>
@@ -52,6 +62,7 @@ export function NavMain({ groups }: { groups: NavGroup[] }) {
 									render={<Link to={getHref(item.url, item.absolute)} onClick={() => setOpenMobile(false)} />}
 									tooltip={item.title}
 									isActive={isActive(item.url, item.absolute)}
+									className={ACTIVE}
 								>
 									{item.icon && <item.icon />}
 									<span>{item.title}</span>
