@@ -13,13 +13,13 @@ import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { TagsInput } from "@workspace/ui/components/tags-input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { brandKeys, useBrand } from "@/hooks/use-brands";
 import { citationKeys } from "@/hooks/use-citations";
 import { dashboardKeys } from "@/hooks/use-dashboard-summary";
 import { cleanAndValidateDomain } from "@/lib/domain-categories";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
-import { deleteBrandFn, updateBrandFn } from "@/server/brands";
+import { deleteBrandFn, getMyBrandRoleFn, updateBrandFn } from "@/server/brands";
 
 export const Route = createFileRoute("/_authed/app/$brand/settings/brand")({
 	head: ({ matches, match }) => {
@@ -46,6 +46,19 @@ function BrandSettingsPage() {
 	const [aliases, setAliases] = useState<string[]>([]);
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
 	const [deleting, setDeleting] = useState(false);
+	const [canDelete, setCanDelete] = useState(false);
+
+	// Only a workspace admin/owner may remove a brand.
+	useEffect(() => {
+		if (!brand?.id) return;
+		let cancelled = false;
+		getMyBrandRoleFn({ data: { brandId: brand.id } })
+			.then((r) => !cancelled && setCanDelete(r.role === "admin" || r.role === "owner"))
+			.catch(() => !cancelled && setCanDelete(false));
+		return () => {
+			cancelled = true;
+		};
+	}, [brand?.id]);
 
 	// Reseed the fields when the brand changes server-side, without discarding
 	// whatever is being typed in between.
@@ -218,6 +231,7 @@ function BrandSettingsPage() {
 				</Button>
 			</form>
 
+			{canDelete && (
 			<div className="rounded-xl border border-destructive/30 bg-destructive/[0.03] p-4">
 				<div className="flex flex-wrap items-center justify-between gap-3">
 					<div className="min-w-0">
@@ -248,6 +262,7 @@ function BrandSettingsPage() {
 					)}
 				</div>
 			</div>
+			)}
 		</div>
 	);
 }

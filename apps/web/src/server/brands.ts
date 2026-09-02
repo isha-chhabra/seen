@@ -42,6 +42,7 @@ import {
 	listUserOrganizations,
 	requireAuthSession,
 	requireBrandAccess,
+	requireBrandOrganization,
 	requireOrgAccess,
 	requirePlatformPicksEditable,
 } from "@/lib/auth/helpers";
@@ -602,7 +603,10 @@ export const deleteBrandFn = createServerFn({ method: "POST" })
 	.validator(z.object({ brandId: z.string().min(1) }))
 	.handler(async ({ data }) => {
 		const session = await requireAuthSession();
-		await requireBrandAccess(session.user.id, data.brandId);
+		const org = await requireBrandOrganization(session.user.id, data.brandId);
+		if (org.role !== "admin" && org.role !== "owner") {
+			throw new Error("Only a workspace admin can delete a brand.");
+		}
 		const id = data.brandId;
 
 		await db.transaction(async (tx) => {
@@ -617,4 +621,13 @@ export const deleteBrandFn = createServerFn({ method: "POST" })
 		});
 
 		return { deleted: true as const };
+	});
+
+/** The caller's role in the brand's workspace, for gating admin-only UI. */
+export const getMyBrandRoleFn = createServerFn({ method: "GET" })
+	.validator(z.object({ brandId: z.string().min(1) }))
+	.handler(async ({ data }) => {
+		const session = await requireAuthSession();
+		const org = await requireBrandOrganization(session.user.id, data.brandId);
+		return { role: org.role };
 	});
