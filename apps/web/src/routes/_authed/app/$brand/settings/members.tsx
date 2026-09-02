@@ -6,12 +6,14 @@
  * boundary is the teamInvites guard inside every team server function.
  */
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
+import { isOrgAdminRole } from "@workspace/config/roles";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
+import { cn } from "@workspace/ui/lib/utils";
 import { useState } from "react";
 import { trackEvent } from "@/lib/posthog";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
@@ -47,6 +49,7 @@ export const Route = createFileRoute("/_authed/app/$brand/settings/members")({
 function TeamSettingsPage() {
 	const { brand: brandId } = Route.useParams();
 	const { members, invitations, currentUserId, organization } = Route.useLoaderData();
+	const isAdmin = isOrgAdminRole(members.find((m) => m.userId === currentUserId)?.role ?? "");
 	const router = useRouter();
 	const [inviteEmail, setInviteEmail] = useState("");
 	const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
@@ -71,6 +74,7 @@ function TeamSettingsPage() {
 
 	async function handleInvite(e: React.FormEvent) {
 		e.preventDefault();
+		if (!isAdmin) return;
 		setError(null);
 		setInviting(true);
 		try {
@@ -138,39 +142,50 @@ function TeamSettingsPage() {
 				</form>
 			</div>
 
-			<form onSubmit={handleInvite} className="flex flex-wrap items-end gap-3">
-				<div className="flex flex-col gap-2">
-					<Label htmlFor="invite-email">Email</Label>
-					<Input
-						id="invite-email"
-						type="email"
-						placeholder="teammate@example.com"
-						value={inviteEmail}
-						onChange={(e) => setInviteEmail(e.target.value)}
-						required
-						className="w-64"
-					/>
-				</div>
-				<div className="flex flex-col gap-2">
-					<Label htmlFor="invite-role">Role</Label>
-					<Select
-						items={{ member: "Member", admin: "Admin" }}
-						value={inviteRole}
-						onValueChange={(value) => setInviteRole(value as "member" | "admin")}
-					>
-						<SelectTrigger id="invite-role" className="w-32">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="member">Member</SelectItem>
-							<SelectItem value="admin">Admin</SelectItem>
-						</SelectContent>
-					</Select>
-				</div>
-				<Button type="submit" disabled={inviting}>
-					{inviting ? "Inviting..." : "Invite"}
-				</Button>
-			</form>
+			<div className="space-y-2">
+				<h2 className="text-lg font-semibold">Invite a teammate</h2>
+				{!isAdmin && (
+					<p className="text-sm text-muted-foreground">Contact an admin to invite more members.</p>
+				)}
+				<form
+					onSubmit={handleInvite}
+					className={cn("flex flex-wrap items-end gap-3", !isAdmin && "pointer-events-none opacity-50")}
+				>
+					<div className="flex flex-col gap-2">
+						<Label htmlFor="invite-email">Email</Label>
+						<Input
+							id="invite-email"
+							type="email"
+							placeholder="teammate@example.com"
+							value={inviteEmail}
+							onChange={(e) => setInviteEmail(e.target.value)}
+							required
+							disabled={!isAdmin || inviting}
+							className="w-64"
+						/>
+					</div>
+					<div className="flex flex-col gap-2">
+						<Label htmlFor="invite-role">Role</Label>
+						<Select
+							items={{ member: "Member", admin: "Admin" }}
+							value={inviteRole}
+							onValueChange={(value) => setInviteRole(value as "member" | "admin")}
+							disabled={!isAdmin}
+						>
+							<SelectTrigger id="invite-role" className="w-32">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="member">Member</SelectItem>
+								<SelectItem value="admin">Admin</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
+					<Button type="submit" disabled={!isAdmin || inviting}>
+						{inviting ? "Inviting..." : "Invite"}
+					</Button>
+				</form>
+			</div>
 
 			<div className="space-y-3">
 				<h2 className="text-lg font-semibold">Members</h2>

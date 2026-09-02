@@ -33,8 +33,8 @@ function Shell({ children }: { children: ReactNode }) {
 			<div className="relative w-full max-w-2xl">
 				<div className="mb-8 flex flex-col items-center text-center">
 					<Logo />
-					<h1 className="mt-6 text-2xl font-semibold tracking-tight">Your brands</h1>
-					<p className="mt-1 text-sm text-muted-foreground">Pick a brand to open its dashboard.</p>
+					<h1 className="mt-6 text-2xl font-semibold tracking-tight">Brand Roster</h1>
+					<p className="mt-1 text-sm text-muted-foreground">Every brand in your workspace.</p>
 				</div>
 				{children}
 			</div>
@@ -126,8 +126,8 @@ export const Route = createFileRoute("/_authed/app/")({
 		const appName = getAppName(match);
 		return {
 			meta: [
-				{ title: buildTitle("Brand Switcher", { appName }) },
-				{ name: "description", content: "Select a brand to get started." },
+				{ title: buildTitle("Brand Roster", { appName }) },
+				{ name: "description", content: "Every brand in your workspace." },
 			],
 		};
 	},
