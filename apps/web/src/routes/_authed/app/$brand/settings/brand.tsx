@@ -9,6 +9,15 @@ import { IconInfoCircle, IconTrash } from "@tabler/icons-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "@workspace/ui/components/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@workspace/ui/components/dialog";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { TagsInput } from "@workspace/ui/components/tags-input";
@@ -44,7 +53,7 @@ function BrandSettingsPage() {
 	const [success, setSuccess] = useState("");
 	const [additionalDomains, setAdditionalDomains] = useState<string[]>([]);
 	const [aliases, setAliases] = useState<string[]>([]);
-	const [confirmingDelete, setConfirmingDelete] = useState(false);
+	const [deleteOpen, setDeleteOpen] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [canDelete, setCanDelete] = useState(false);
 
@@ -136,7 +145,7 @@ function BrandSettingsPage() {
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Could not delete the brand");
 			setDeleting(false);
-			setConfirmingDelete(false);
+			setDeleteOpen(false);
 		}
 	};
 
@@ -236,7 +245,8 @@ function BrandSettingsPage() {
 					<div className="min-w-0">
 						<p className="text-sm font-semibold text-destructive">Delete brand</p>
 						<p className="text-xs text-muted-foreground">
-							Permanently removes {brand.name} and all of its prompts, runs, citations, competitors and reports. No undo.
+							Permanently removes {brand.name} and all of its prompts, runs, citations, competitors and reports. This
+							action cannot be undone.
 						</p>
 					</div>
 					{!canDelete ? (
@@ -254,25 +264,38 @@ function BrandSettingsPage() {
 							</TooltipTrigger>
 							<TooltipContent className="text-xs font-normal">Contact an admin to delete this brand</TooltipContent>
 						</Tooltip>
-					) : confirmingDelete ? (
-						<div className="flex shrink-0 items-center gap-2">
-							<Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
-								{deleting ? "Deleting..." : `Delete ${brand.name}`}
-							</Button>
-							<Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
-								Cancel
-							</Button>
-						</div>
 					) : (
-						<Button
-							variant="outline"
-							size="sm"
-							className="shrink-0 border-destructive/40 text-destructive hover:bg-destructive hover:text-white"
-							onClick={() => setConfirmingDelete(true)}
-						>
-							<IconTrash className="size-4" />
-							Delete brand
-						</Button>
+						<Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+							<DialogTrigger
+								render={
+									<Button
+										variant="outline"
+										size="sm"
+										className="shrink-0 border-destructive/40 text-destructive hover:bg-destructive hover:text-white"
+									/>
+								}
+							>
+								<IconTrash className="size-4" />
+								Delete brand
+							</DialogTrigger>
+							<DialogContent>
+								<DialogHeader>
+									<DialogTitle>Delete {brand.name}?</DialogTitle>
+									<DialogDescription>
+										This action cannot be undone. It permanently removes {brand.name} and every prompt, run, citation,
+										competitor and report tied to it.
+									</DialogDescription>
+								</DialogHeader>
+								<DialogFooter>
+									<Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+										Cancel
+									</Button>
+									<Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+										{deleting ? "Deleting..." : "Delete brand"}
+									</Button>
+								</DialogFooter>
+							</DialogContent>
+						</Dialog>
 					)}
 				</div>
 			</div>
