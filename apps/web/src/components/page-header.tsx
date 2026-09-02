@@ -7,25 +7,30 @@ interface PageHeaderProps {
 	title: string;
 	subtitle: string;
 	infoContent?: ReactNode;
+	/** Rendered flush-right on the title row (buttons, filters). */
+	actions?: ReactNode;
 	children?: ReactNode;
 }
 
 /** Title + subtitle block. No filter state, no data fetching — callers
  *  compose the filter section and content as children. */
-export function PageHeader({ title, subtitle, infoContent, children }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, infoContent, actions, children }: PageHeaderProps) {
 	return (
 		<div className="space-y-0">
-			<div className="mb-4">
-				<h1 className="text-3xl font-bold flex items-center gap-2">
-					{title}
-					{infoContent && (
-						<Tooltip>
-							<TooltipTrigger render={<IconInfoCircle className="h-5 w-5 text-muted-foreground cursor-help" />} />
-							<TooltipContent className="max-w-xs text-sm font-normal">{infoContent}</TooltipContent>
-						</Tooltip>
-					)}
-				</h1>
-				<p className="text-muted-foreground mt-1">{subtitle}</p>
+			<div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+				<div className="min-w-0">
+					<h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+						{title}
+						{infoContent && (
+							<Tooltip>
+								<TooltipTrigger render={<IconInfoCircle className="size-4 cursor-help text-muted-foreground" />} />
+								<TooltipContent className="max-w-xs text-sm font-normal">{infoContent}</TooltipContent>
+							</Tooltip>
+						)}
+					</h1>
+					<p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+				</div>
+				{actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
 			</div>
 			{children}
 		</div>
@@ -34,9 +39,9 @@ export function PageHeader({ title, subtitle, infoContent, children }: PageHeade
 
 export function PageHeaderTitleSkeleton() {
 	return (
-		<div className="mb-4 space-y-2">
-			<Skeleton className="h-9 w-48" />
-			<Skeleton className="h-5 w-80" />
+		<div className="mb-6 space-y-2">
+			<Skeleton className="h-8 w-48" />
+			<Skeleton className="h-4 w-80" />
 		</div>
 	);
 }
