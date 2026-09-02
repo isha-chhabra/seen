@@ -1,10 +1,10 @@
 /**
- * Article Finder — stateless per-search server functions.
+ * Article Finder, stateless per-search server functions.
  *
- * 1. generateArticleQueriesFn — LLM expands a free-text direction into concrete
+ * 1. generateArticleQueriesFn, LLM expands a free-text direction into concrete
  *    US-editorial Google queries, grounded in an excerpt of the brand's own site.
  *    Returned to the UI for review before anything runs.
- * 2. findArticlesFn — runs the chosen queries through BrightData SERP, then:
+ * 2. findArticlesFn, runs the chosen queries through BrightData SERP, then:
  *      dedupe -> drop junk / aggregators / foreign ccTLDs / the brand's own site
  *      -> collapse syndicated (same headline across domains)
  *      -> cheap LLM triage on title+snippet
@@ -17,7 +17,7 @@
  * Hard caps keep one run bounded (~$0.15-0.35): <=8 queries, <=5 pages/query,
  * <=36 page fetches. A short in-process debounce per brand guards against
  * accidental double-runs. The latest run per brand is persisted so re-opening
- * the tab shows it for free (getLatestArticleSearchFn) — a new search is a
+ * the tab shows it for free (getLatestArticleSearchFn), a new search is a
  * deliberate click.
  */
 import { createServerFn } from "@tanstack/react-start";
@@ -77,7 +77,7 @@ const JUNK_DOMAINS = new Set([
 	"indeed.com",
 	"apple.com",
 	"play.google.com",
-	// aggregators / newswire — the usual syndication carriers
+	// aggregators / newswire, the usual syndication carriers
 	"yahoo.com",
 	"news.yahoo.com",
 	"msn.com",
@@ -275,6 +275,16 @@ function normalizeTitleKey(title: string): string {
 		.slice(0, 90);
 }
 
+/** Replace em/en dashes in model text with a comma so nothing renders with dashes. */
+function plain(s: string): string {
+	return s
+		.replace(/\s*[—–]\s*/g, ", ")
+		.replace(/,\s*,/g, ",")
+		.replace(/\s+/g, " ")
+		.replace(/\s+([.,;:!?])/g, "$1")
+		.trim();
+}
+
 function dedupeLower(values: (string | null | undefined)[]): string[] {
 	const seen = new Set<string>();
 	const out: string[] = [];
@@ -382,7 +392,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 			from: z.string().regex(ymdRe),
 			to: z.string().regex(ymdRe),
 			pagesPerSearch: z.number().int().min(1).max(MAX_PAGES),
-			// default: only surface articles that DON'T already name the brand — those are the pitch targets
+			// default: only surface articles that DON'T already name the brand, those are the pitch targets
 			includeAlreadyFeatured: z.boolean().optional(),
 			// default (undefined) = strict: only keep articles that themselves carry
 			// affiliate links to 2+ retailers or to a competitor. false = balanced.
@@ -395,7 +405,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 
 			const now = Date.now();
 			if (now - (lastRunByBrand.get(data.brandId) ?? 0) < DEBOUNCE_MS) {
-				throw new Error("A search for this brand just ran — give it a moment and try again.");
+				throw new Error("A search for this brand just ran. Give it a moment and try again.");
 			}
 			lastRunByBrand.set(data.brandId, now);
 
@@ -551,7 +561,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 				let linkedComp = linksACompetitor(sig.taggedLinks);
 
 				// static HTML looks affiliate-ish (disclosure) but thin on links, and it's
-				// not a known publisher — re-fetch with JS rendered so client-side link
+				// not a known publisher, re-fetch with JS rendered so client-side link
 				// monetizers can rewrite links, then re-scan. Best-effort, budget-capped.
 				if (!domainKnown && !linkedComp && sig.taggedOutboundHosts.length < 2 && sig.disclosure && renderBudget > 0) {
 					renderBudget--;
@@ -564,7 +574,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 				}
 
 				const merchantCount = sig.taggedOutboundHosts.length;
-				// keep rule. strict: the article ITSELF must prove affiliate behaviour —
+				// keep rule. strict: the article ITSELF must prove affiliate behaviour -
 				// links 2+ retailers, links a competitor, has rel=sponsored, or is a known
 				// affiliate publisher. balanced also allows a single disclosure + link.
 				const keep = strict
@@ -645,7 +655,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 				dupePublisher: 0,
 			};
 			for (const s of survivors) {
-				// the point of the tool is finding pitch targets — skip articles that
+				// the point of the tool is finding pitch targets, skip articles that
 				// already name the brand unless the caller opts to see them
 				if (s.brandAlreadyMentioned && data.includeAlreadyFeatured !== true) {
 					drop.alreadyFeatured++;
@@ -705,13 +715,14 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 					domain: s.domain,
 					tier: majorList ? "high_authority" : (j?.tier ?? "niche_blog"),
 					fitScore: score,
-					verdict:
+					verdict: plain(
 						j?.outreachVerdict?.trim() ||
-						(s.linksCompetitor
-							? `Already affiliate-links a competitor — they monetize this category and would very likely add ${brand.name}.`
-							: s.competitorsMentioned.length > 0
-								? `Features ${s.competitorsMentioned.join(", ")} — a natural fit to pitch ${brand.name} alongside them.`
-								: `${s.domain} runs affiliate roundups in this space; worth a pitch.`),
+							(s.linksCompetitor
+								? `Already affiliate-links a competitor, so they monetize this category and would very likely add ${brand.name}.`
+								: s.competitorsMentioned.length > 0
+									? `Features ${s.competitorsMentioned.join(", ")}, a natural fit to pitch ${brand.name} alongside them.`
+									: `${s.domain} runs affiliate roundups in this space; worth a pitch.`),
+					),
 					relevance: j?.relevance === "weak" ? "weak" : "strong",
 					signals: s.signals,
 					merchants: s.merchants,
@@ -725,7 +736,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 				(row.tier === "high_authority" ? highAuthority : nicheBlog).push(row);
 			}
 
-			// at most 2 articles per publisher — an outreach list shouldn't repeat a site
+			// at most 2 articles per publisher, an outreach list shouldn't repeat a site
 			const cappedByDomain = (rows: ArticleResult[]): ArticleResult[] => {
 				const perDomain = new Map<string, number>();
 				const out: ArticleResult[] = [];

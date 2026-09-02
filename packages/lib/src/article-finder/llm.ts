@@ -1,9 +1,9 @@
 /**
- * Article Finder — LLM steps (gpt-5-mini via the onboarding provider).
+ * Article Finder, LLM steps (gpt-5-mini via the onboarding provider).
  *
- *   1. generateSearchQueries — free-text direction -> concrete US-editorial Google queries
- *   2. triageCandidates      — cheap title/snippet pass to drop obvious misfits before fetching
- *   3. judgeArticles         — full vetting of fetched pages: relevance, affiliate-editorial
+ *   1. generateSearchQueries, free-text direction -> concrete US-editorial Google queries
+ *   2. triageCandidates     , cheap title/snippet pass to drop obvious misfits before fetching
+ *   3. judgeArticles        , full vetting of fetched pages: relevance, affiliate-editorial
  *                              fit, authority tier, US focus, and the outreach verdict
  */
 import { z } from "zod";
@@ -38,7 +38,7 @@ export async function generateSearchQueries(args: {
 		args.brandSummary ? `What the brand sells (from its site): ${args.brandSummary}` : "",
 		`Competitors: ${args.competitors.join(", ") || "none listed"}.`,
 		args.trackedTopics.length > 0
-			? `The brand is already tracked on these AI-search topics — stay in the same product territory: ${args.trackedTopics.join("; ")}.`
+			? `The brand is already tracked on these AI-search topics, stay in the same product territory: ${args.trackedTopics.join("; ")}.`
 			: "",
 		`The affiliate team wants US articles they could pitch ${args.brandName} into.`,
 		`Their direction, verbatim: "${args.direction}". Timeframe of interest: ${args.rangeLabel}.`,
@@ -48,7 +48,7 @@ export async function generateSearchQueries(args: {
 		`- Every query must sit squarely in ${args.brandName}'s product category. Do NOT drift into adjacent categories the brand does not sell.`,
 		`- Phrase them the way US publications title this content: "best X 2026", "X we tested", "top X for <use-case>", "X gift guide", "X buying guide".`,
 		`- Vary the ANGLE across queries (occasion, audience, price band, use-case, sub-category). No two that are just reworded versions of each other.`,
-		`- Do NOT put "${args.brandName}" or any brand/competitor name in the query — we also want articles that don't feature the brand yet.`,
+		`- Do NOT put "${args.brandName}" or any brand/competitor name in the query, we also want articles that don't feature the brand yet.`,
 		`- No quotation marks around the whole query, no site: / intitle: operators.`,
 		`Good: best insulated water bottles 2026   Too narrow: purple 32oz bottle review   Too broad: best outdoor gear`,
 		`Return the queries ranked most-useful first, each with a short 'angle' label.`,
@@ -77,15 +77,15 @@ export async function triageCandidates(args: {
 }): Promise<number[]> {
 	if (args.candidates.length === 0) return [];
 	const list = args.candidates
-		.map((c, i) => `${i + 1}. [${c.domain}] ${c.title}${c.snippet ? ` — ${c.snippet.slice(0, 160)}` : ""}`)
+		.map((c, i) => `${i + 1}. [${c.domain}] ${c.title}${c.snippet ? `, ${c.snippet.slice(0, 160)}` : ""}`)
 		.join("\n");
 	const prompt = [
 		`Brand: ${args.brandName}. Sells: ${args.brandSummary || args.direction}.`,
 		`User is looking for: "${args.direction}".`,
 		``,
-		`Below is a numbered list of Google results. Return the numbers worth keeping — US editorial articles, roundups or buying guides in the brand's category that an outlet could add an affiliate link to.`,
+		`Below is a numbered list of Google results. Return the numbers worth keeping, US editorial articles, roundups or buying guides in the brand's category that an outlet could add an affiliate link to.`,
 		`Drop: retailers / brand-owned online stores, marketplaces, forums (Reddit/Quora), videos, PDFs, press releases, syndicated newswire reprints, and anything about a different product category.`,
-		`Be generous at this stage — when unsure, keep it; a later step vets each page in full.`,
+		`Be generous at this stage, when unsure, keep it; a later step vets each page in full.`,
 		``,
 		list,
 	].join("\n");
@@ -122,7 +122,7 @@ export const articleJudgementSchema = z.object({
 					.min(0)
 					.max(100)
 					.describe(
-						"How strong a pitch target this is, 0-100. Weigh: topical fit; whether the article ITSELF carries affiliate links to multiple retailers (affiliateMerchants — 2+ is near-decisive that they'd add another brand); whether it already affiliate-links a direct competitor (linksCompetitor — the strongest signal, 85+); authority; recency. 80+ = clear yes, 55-79 = worth a try, <55 = weak. Be strict — an outreach list is worthless if half the targets won't respond.",
+						"How strong a pitch target this is, 0-100. Weigh: topical fit; whether the article ITSELF carries affiliate links to multiple retailers (affiliateMerchants, 2+ is near-decisive that they'd add another brand); whether it already affiliate-links a direct competitor (linksCompetitor, the strongest signal, 85+); authority; recency. 80+ = clear yes, 55-79 = worth a try, <55 = weak. Be strict, an outreach list is worthless if half the targets won't respond.",
 					),
 				outreachVerdict: z
 					.string()
@@ -159,13 +159,13 @@ export async function judgeArticles(args: {
 		`User's content direction: "${args.direction}".`,
 		`Known competitors: ${args.competitors.join(", ") || "none"}.`,
 		``,
-		`You are vetting candidate articles for an affiliate-outreach list. This list must be all-qualified — every entry should be an outlet that would realistically add the brand if asked. When in doubt, mark it down.`,
-		`For each article you get: title, domain, a text excerpt, competitors detected in the text, and — read directly from the page's HTML —`,
+		`You are vetting candidate articles for an affiliate-outreach list. This list must be all-qualified, every entry should be an outlet that would realistically add the brand if asked. When in doubt, mark it down.`,
+		`For each article you get: title, domain, a text excerpt, competitors detected in the text, and, read directly from the page's HTML -`,
 		`  affiliateMerchants: retailers this article links with affiliate tracking. [] = none found in static HTML (could still be client-side; judge from the excerpt). 1 = minimal. 2+ = the outlet clearly runs multi-retailer affiliate roundups → affiliateEditorial "yes", fitScore 75+.`,
 		`  linksCompetitor: true = the article already has an affiliate-tracked link to a direct competitor. Strongest possible signal → affiliateEditorial "yes", fitScore 85+ unless relevance is off_topic.`,
 		`  publishedOrUpdated: the page's date if found. Prefer recent. Older than ~2 years with no sign of updates → cap fitScore around 45 and say so.`,
 		`Judge each on: relevance, affiliateEditorial, tier, usCentric, a 0-100 fitScore, and a one-sentence outreachVerdict.`,
-		`Return one entry per input article, url copied verbatim. Plain business English.`,
+		`Return one entry per input article, url copied verbatim. outreachVerdict must be one short plain sentence. Do not use dashes; use commas or separate sentences.`,
 		``,
 		`ARTICLES (JSON):`,
 		JSON.stringify(

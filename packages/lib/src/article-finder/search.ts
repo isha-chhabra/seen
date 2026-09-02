@@ -1,8 +1,8 @@
 /**
- * Article Finder — BrightData search + page-signal layer.
+ * Article Finder, BrightData search + page-signal layer.
  *
- *   • sdk_serp     — Google organic results as parsed JSON (brd_json=1), US/English
- *   • sdk_unlocker — raw HTML of a candidate page, for affiliate signal scanning
+ *   • sdk_serp    , Google organic results as parsed JSON (brd_json=1), US/English
+ *   • sdk_unlocker, raw HTML of a candidate page, for affiliate signal scanning
  *
  * Best-effort: a blocked SERP page or an un-fetchable article is dropped, not
  * surfaced as an error.
@@ -64,7 +64,7 @@ async function brightdataRaw(
 			if (res.ok && body.trim()) return body;
 			if (res.status === 400 || res.status === 401 || res.status === 403) return null;
 		} catch {
-			// network / timeout — fall through to retry
+			// network / timeout, fall through to retry
 		}
 		if (attempt < attempts - 1) await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
 	}
@@ -168,7 +168,7 @@ export interface AffiliateHtmlSignals {
 	disclosure: boolean;
 	/** distinct off-domain hosts reached by an affiliate-tagged link in this article */
 	taggedOutboundHosts: string[];
-	/** the raw tagged hrefs (capped) — so callers can test them against competitor domains */
+	/** the raw tagged hrefs (capped), so callers can test them against competitor domains */
 	taggedLinks: string[];
 	commerceMarkers: boolean;
 	strong: boolean;
