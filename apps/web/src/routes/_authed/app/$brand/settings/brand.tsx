@@ -1,24 +1,25 @@
 /**
  * /app/$brand/settings/brand - Brand settings page
  *
- * Form to edit brand name, website, additional domains, and aliases.
+ * Form to edit brand name, website, additional domains, and aliases, plus a
+ * danger zone to permanently remove the brand.
  */
 
-import { IconInfoCircle } from "@tabler/icons-react";
+import { IconInfoCircle, IconTrash } from "@tabler/icons-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { TagsInput } from "@workspace/ui/components/tags-input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip";
-import { useCallback, useEffect, useState } from "react";
-import { useBrand } from "@/hooks/use-brands";
+import { useCallback, useState } from "react";
+import { brandKeys, useBrand } from "@/hooks/use-brands";
 import { citationKeys } from "@/hooks/use-citations";
 import { dashboardKeys } from "@/hooks/use-dashboard-summary";
 import { cleanAndValidateDomain } from "@/lib/domain-categories";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
-import { updateBrandFn } from "@/server/brands";
+import { deleteBrandFn, updateBrandFn } from "@/server/brands";
 
 export const Route = createFileRoute("/_authed/app/$brand/settings/brand")({
 	head: ({ matches, match }) => {
@@ -37,11 +38,14 @@ export const Route = createFileRoute("/_authed/app/$brand/settings/brand")({
 function BrandSettingsPage() {
 	const { brand, isLoading, revalidate } = useBrand();
 	const queryClient = useQueryClient();
+	const navigate = useNavigate();
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState("");
 	const [success, setSuccess] = useState("");
 	const [additionalDomains, setAdditionalDomains] = useState<string[]>([]);
 	const [aliases, setAliases] = useState<string[]>([]);
+	const [confirmingDelete, setConfirmingDelete] = useState(false);
+	const [deleting, setDeleting] = useState(false);
 
 	// Reseed the fields when the brand changes server-side, without discarding
 	// whatever is being typed in between.
@@ -61,22 +65,18 @@ function BrandSettingsPage() {
 
 	if (isLoading) {
 		return (
-			<div className="space-y-6">
-				<div>
-					<h1 className="text-3xl font-bold">Brand</h1>
-					<p className="text-muted-foreground">Loading...</p>
-				</div>
+			<div className="max-w-2xl space-y-6">
+				<h1 className="text-2xl font-semibold">Brand</h1>
+				<p className="text-muted-foreground">Loading...</p>
 			</div>
 		);
 	}
 
 	if (!brand) {
 		return (
-			<div className="space-y-6">
-				<div>
-					<h1 className="text-3xl font-bold">Brand</h1>
-					<p className="text-destructive">Brand not found</p>
-				</div>
+			<div className="max-w-2xl space-y-6">
+				<h1 className="text-2xl font-semibold">Brand</h1>
+				<p className="text-destructive">Brand not found</p>
 			</div>
 		);
 	}
@@ -113,11 +113,25 @@ function BrandSettingsPage() {
 		}
 	};
 
+	const handleDelete = async () => {
+		setDeleting(true);
+		setError("");
+		try {
+			await deleteBrandFn({ data: { brandId: brand.id } });
+			queryClient.invalidateQueries({ queryKey: brandKeys.all });
+			navigate({ to: "/app" });
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Could not delete the brand");
+			setDeleting(false);
+			setConfirmingDelete(false);
+		}
+	};
+
 	return (
-		<div className="space-y-6 max-w-2xl">
+		<div className="max-w-2xl space-y-8">
 			<div>
-				<h1 className="text-3xl font-bold">Brand</h1>
-				<p className="text-muted-foreground">Manage your brand name and website</p>
+				<h1 className="text-2xl font-semibold tracking-tight">Brand</h1>
+				<p className="text-sm text-muted-foreground">Manage your brand name and website</p>
 			</div>
 
 			<form action={handleSubmit} className="space-y-6">
@@ -157,8 +171,8 @@ function BrandSettingsPage() {
 								<TooltipTrigger render={<IconInfoCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />} />
 								<TooltipContent className="max-w-xs text-xs font-normal">
 									Other domains your brand owns (e.g. blog.example.com, shop.example.com). Citations from these domains
-									will be counted as your brand&apos;s citations. <strong>Updates retroactively</strong> &mdash;
-									existing citations will be reclassified immediately.
+									will be counted as your brand&apos;s citations. <strong>Updates retroactively</strong>, existing
+									citations will be reclassified immediately.
 								</TooltipContent>
 							</Tooltip>
 						</Label>
@@ -179,9 +193,8 @@ function BrandSettingsPage() {
 							<Tooltip>
 								<TooltipTrigger render={<IconInfoCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />} />
 								<TooltipContent className="max-w-xs text-xs font-normal">
-									Alternative names for your brand (sub-brands, product lines, abbreviations). Used for mention
-									detection in <strong>future</strong> prompt runs only &mdash; does not apply retroactively to past
-									results.
+									Alternative names for your brand (sub-brands, product lines, abbreviations). Used for mention detection
+									in <strong>future</strong> prompt runs only, does not apply retroactively to past results.
 								</TooltipContent>
 							</Tooltip>
 						</Label>
@@ -195,15 +208,46 @@ function BrandSettingsPage() {
 					</div>
 				</div>
 
-				{error && <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">{error}</div>}
-				{success && <div className="text-sm text-green-600 bg-green-50 p-3 rounded-md">{success}</div>}
+				{error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+				{success && (
+					<div className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">{success}</div>
+				)}
 
-				<div className="flex gap-2">
-					<Button type="submit" disabled={isSubmitting} className="cursor-pointer">
-						{isSubmitting ? "Saving..." : "Save Changes"}
-					</Button>
-				</div>
+				<Button type="submit" disabled={isSubmitting}>
+					{isSubmitting ? "Saving..." : "Save Changes"}
+				</Button>
 			</form>
+
+			<div className="rounded-xl border border-destructive/30 bg-destructive/[0.03] p-4">
+				<div className="flex flex-wrap items-center justify-between gap-3">
+					<div className="min-w-0">
+						<p className="text-sm font-semibold text-destructive">Delete brand</p>
+						<p className="text-xs text-muted-foreground">
+							Permanently removes {brand.name} and all of its prompts, runs, citations, competitors and reports. No undo.
+						</p>
+					</div>
+					{confirmingDelete ? (
+						<div className="flex shrink-0 items-center gap-2">
+							<Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
+								{deleting ? "Deleting..." : `Delete ${brand.name}`}
+							</Button>
+							<Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
+								Cancel
+							</Button>
+						</div>
+					) : (
+						<Button
+							variant="outline"
+							size="sm"
+							className="shrink-0 border-destructive/40 text-destructive hover:bg-destructive hover:text-white"
+							onClick={() => setConfirmingDelete(true)}
+						>
+							<IconTrash className="size-4" />
+							Delete brand
+						</Button>
+					)}
+				</div>
+			</div>
 		</div>
 	);
 }
