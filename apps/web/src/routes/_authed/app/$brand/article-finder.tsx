@@ -320,22 +320,17 @@ function ArticleFinderPage() {
 							</div>
 						</div>
 
-						<details className="text-sm">
-							<summary className="cursor-pointer list-none transition-colors hover:text-foreground marker:content-none [&::-webkit-details-marker]:hidden text-muted-foreground">
-								Advanced options
-							</summary>
-							<div className="mt-3 space-y-3 border-l-2 pl-4">
-								<label className="flex items-center justify-between gap-4">
-									<span>Hide articles that already mention {brand?.name ?? "the brand"}</span>
-									<Switch checked={freshOnly} onCheckedChange={setFreshOnly} disabled={busy} />
-								</label>
-								<label className="flex items-center justify-between gap-4">
-									<span>Strict: only outlets with confirmed affiliate links</span>
-									<Switch checked={strict} onCheckedChange={setStrict} disabled={busy} />
-								</label>
-								<p className="text-xs text-muted-foreground">More depth means more results and a higher cost per search.</p>
-							</div>
-						</details>
+						<div className="space-y-2.5 border-t pt-4 text-sm">
+							<label className="flex cursor-pointer items-center justify-between gap-4">
+								<span>Hide articles that already mention {brand?.name ?? "the brand"}</span>
+								<Switch checked={freshOnly} onCheckedChange={setFreshOnly} disabled={busy} />
+							</label>
+							<label className="flex cursor-pointer items-center justify-between gap-4">
+								<span>Strict: only outlets with confirmed affiliate links</span>
+								<Switch checked={strict} onCheckedChange={setStrict} disabled={busy} />
+							</label>
+							<p className="text-xs text-muted-foreground">More depth means more results and a higher cost per search.</p>
+						</div>
 
 						{error && <p className="text-sm text-destructive">{error}</p>}
 
