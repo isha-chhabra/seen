@@ -63,7 +63,7 @@ export const reportNarrativeSchema = z.object({
 		intro: z
 			.string()
 			.describe(
-				"2-3 plain sentences: when AI recommends products in this category it reads a set of third-party sites first; getting the brand featured on them — or featured better — is how the recommendation rate moves. This is the affiliate-placement opportunity.",
+				"2-3 plain sentences: when AI recommends products in this category it reads a set of third-party sites first; getting the brand featured on them, or featured better, is how the recommendation rate moves. This is the affiliate-placement opportunity.",
 			),
 		affiliateInsight: z
 			.string()
@@ -74,7 +74,7 @@ export const reportNarrativeSchema = z.object({
 			.array(
 				z.object({
 					site: z.string().describe("Domain, e.g. 'goodhousekeeping.com'."),
-					type: z.string().describe("One of: Affiliate / roundup, Editorial, Retailer, Community, Reference — from the digest category."),
+					type: z.string().describe("One of: Affiliate / roundup, Editorial, Retailer, Community, Reference, from the digest category."),
 					note: z.string().describe("Plain: what AI uses this site for and whether the brand appears there."),
 				}),
 			)
@@ -126,7 +126,9 @@ export function buildReportPrompt(a: ReportPromptArgs): string {
 		`FRAME everything through affiliate marketing: AI assistants have become the new "best <product>" roundup. The job is to get ${a.brandName} recommended by them, and to get it placed on the third-party sites those assistants pull from.`,
 		``,
 		`RULES:`,
-		`- Plain business English. Explain every concept the first time it appears. No acronyms, no marketing hype, no reassurance-speak — straight and factual.`,
+		`- Plain business English. Explain every concept the first time it appears. No acronyms, no marketing hype, no reassurance-speak. Straight and factual.`,
+		`- Keep it short. One or two sentences per field. Cut every word that is not carrying information.`,
+		`- Do not use dashes (em or en). Use commas, or separate sentences.`,
 		`- Use ONLY the data in the digest below. Every claim references a real number or a named item from it.`,
 		`- Never make the same point twice. Prefer specifics (named questions, named sites, named competitors, real percentages) over generalities.`,
 		`- "recommendedInstead" and "competitorSourceGap" must name real competitors/sites from the digest, or say plainly that none stood out.`,
@@ -137,7 +139,24 @@ export function buildReportPrompt(a: ReportPromptArgs): string {
 	].join("\n");
 }
 
+/** Recursively strip em/en dashes from every string in the narrative. */
+function stripDashes<T>(v: T): T {
+	if (typeof v === "string") {
+		return v
+			.replace(/\s*[—–]\s*/g, ", ")
+			.replace(/,\s*,/g, ",")
+			.replace(/\s+([.,;:!?])/g, "$1")
+			.replace(/\s{2,}/g, " ")
+			.trim() as unknown as T;
+	}
+	if (Array.isArray(v)) return v.map(stripDashes) as unknown as T;
+	if (v && typeof v === "object") {
+		return Object.fromEntries(Object.entries(v).map(([k, val]) => [k, stripDashes(val)])) as T;
+	}
+	return v;
+}
+
 export async function generateReportNarrative(a: ReportPromptArgs): Promise<ReportNarrative> {
 	const { object } = await runStructuredCompletionPrompt(buildReportPrompt(a), reportNarrativeSchema);
-	return object;
+	return stripDashes(object);
 }

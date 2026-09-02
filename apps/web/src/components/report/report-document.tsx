@@ -1,5 +1,5 @@
 /**
- * Client-facing AI-visibility report — four pages, affiliate-marketing framing,
+ * Client-facing AI-visibility report, four pages, affiliate-marketing framing,
  * plain language. Rendered visibly for ~1s while downloadReportPdf() snapshots
  * each [data-report-page] to a PDF. US Letter at 96dpi (816 x 1056 px).
  */
@@ -50,7 +50,7 @@ function Head({ brandName, periodLabel, compareLabel, n }: ReportDocProps & { n:
 		<div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: `2px solid ${PINK}`, paddingBottom: 12, marginBottom: 24 }}>
 			<div>
 				<span style={{ fontFamily: "'Titan One', system-ui", fontSize: 24, color: PINK, lineHeight: 1 }}>seen</span>
-				<div style={{ fontSize: 19, fontWeight: 700, marginTop: 8 }}>{brandName} — AI Visibility Report</div>
+				<div style={{ fontSize: 19, fontWeight: 700, marginTop: 8 }}>{brandName} AI Visibility Report</div>
 				<div style={{ fontSize: 11, color: MUTE, marginTop: 3 }}>
 					{periodLabel}
 					{compareLabel ? `  ·  compared with  ${compareLabel}` : ""}
@@ -68,7 +68,7 @@ function Head({ brandName, periodLabel, compareLabel, n }: ReportDocProps & { n:
 function Foot({ periodLabel }: { periodLabel: string }) {
 	return (
 		<div style={{ position: "absolute", left: 60, right: 60, bottom: 34, borderTop: `1px solid ${LINE}`, paddingTop: 8, fontSize: 9, color: MUTE, display: "flex", justifyContent: "space-between" }}>
-			<span>Seen — AI Visibility Report</span>
+			<span>Seen AI Visibility Report</span>
 			<span>{periodLabel}</span>
 		</div>
 	);

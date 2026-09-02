@@ -1,11 +1,7 @@
 /**
- * /app/$brand/article-finder — turn a free-text content direction into a vetted
- * list of US affiliate articles this brand could be pitched into, split by
- * publisher authority.
- *
- * The latest run per brand is persisted: opening the tab shows it for free.
- * A new search is a deliberate click. Two steps — generate + review queries,
- * then run them (SERP -> filter -> vet).
+ * /app/$brand/article-finder: turn a free-text direction into a vetted list of
+ * US affiliate articles to pitch this brand to, split by publisher authority.
+ * The latest run per brand is persisted, so opening the tab shows it for free.
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { IconBolt, IconCalendar, IconExternalLink, IconLoader2, IconMail, IconRefresh, IconSearch, IconTable } from "@tabler/icons-react";
@@ -47,7 +43,7 @@ function parseYmd(s: string): Date {
 	return new Date(`${s}T00:00:00`);
 }
 function pretty(d?: Date): string {
-	return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+	return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 }
 function prettyAt(iso: string): string {
 	return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
@@ -60,7 +56,7 @@ function RangeField({ value, onChange, label }: { value?: DateRange; onChange: (
 			<Popover>
 				<PopoverTrigger render={<Button variant="outline" className="w-full justify-start gap-2 font-normal" />}>
 					<IconCalendar className="size-4" />
-					{value?.from ? `${pretty(value.from)} – ${pretty(value.to)}` : "Pick a range"}
+					{value?.from ? `${pretty(value.from)} to ${pretty(value.to)}` : "Pick a range"}
 				</PopoverTrigger>
 				<PopoverContent className="w-auto p-0" align="start">
 					<Calendar mode="range" numberOfMonths={2} selected={value} onSelect={onChange} defaultMonth={value?.from} />
@@ -102,8 +98,8 @@ function ArticleRow({ r, brandName }: { r: ArticleResult; brandName?: string }) 
 			</div>
 			<p className="text-xs text-muted-foreground">
 				{r.domain}
-				{r.publishedDate && ` · ${r.publishedDate}`}
-				{merchantCount > 0 && ` · links ${merchantCount} retailer${merchantCount === 1 ? "" : "s"}`}
+				{r.publishedDate && `, ${r.publishedDate}`}
+				{merchantCount > 0 && `, links ${merchantCount} retailer${merchantCount === 1 ? "" : "s"}`}
 			</p>
 			<p className="text-sm">{r.verdict}</p>
 			<div className="flex flex-wrap items-center gap-1.5 pt-0.5">
@@ -305,18 +301,18 @@ function ArticleFinderPage() {
 	return (
 		<PageHeader
 			title="Article Finder"
-			subtitle="Find US editorial articles and roundups you could pitch this brand into. Results are vetted for topical fit and affiliate monetization — it's a heuristic, so skim before you send."
+			subtitle="Find US articles to pitch this brand to. Vetted for topical fit and affiliate links, but skim before you send."
 		>
 			<div className="max-w-3xl space-y-6">
 				{phase !== "results" && (
 					<Card>
 						<CardContent className="space-y-5 pt-6">
 							<div className="space-y-1.5">
-								<Label htmlFor="direction">What kind of articles are you looking for?</Label>
+								<Label htmlFor="direction">What articles are you looking for?</Label>
 								<Textarea
 									id="direction"
 									rows={3}
-									placeholder="e.g. gift guides and product roundups for eco-friendly kitchen gear, aimed at home cooks"
+									placeholder="e.g. gift guides for eco-friendly kitchen products"
 									value={direction}
 									onChange={(e) => setDirection(e.target.value)}
 									disabled={busy}
@@ -326,7 +322,7 @@ function ArticleFinderPage() {
 							<RangeField label="Published between" value={range} onChange={setRange} />
 
 							<div className="space-y-1.5">
-								<Label>Pages of results per search</Label>
+								<Label>Result pages per search</Label>
 								<div className="flex gap-1.5">
 									{[1, 2, 3, 4, 5].map((n) => (
 										<Button
@@ -342,29 +338,20 @@ function ArticleFinderPage() {
 										</Button>
 									))}
 								</div>
-								<p className="text-xs text-muted-foreground">
-									More pages means more candidates and a higher cost per search. Two is enough for most directions.
-								</p>
+								<p className="text-xs text-muted-foreground">More pages, more results, higher cost. Two is usually enough.</p>
 							</div>
 
-							<div className="flex items-start justify-between gap-4">
-								<div className="space-y-0.5">
-									<Label htmlFor="fresh-only">Only articles that don't mention {brand?.name ?? "the brand"} yet</Label>
-									<p className="text-xs text-muted-foreground">
-										These are the pitch targets. Turn off to also see articles that already feature the brand.
-									</p>
-								</div>
+							<div className="flex items-center justify-between gap-4">
+								<Label htmlFor="fresh-only" className="font-normal">
+									Hide articles that already mention {brand?.name ?? "the brand"}
+								</Label>
 								<Switch id="fresh-only" checked={freshOnly} onCheckedChange={setFreshOnly} disabled={busy} />
 							</div>
 
-							<div className="flex items-start justify-between gap-4">
-								<div className="space-y-0.5">
-									<Label htmlFor="strict">Strict — only proven affiliate outlets</Label>
-									<p className="text-xs text-muted-foreground">
-										Keeps only articles that already carry affiliate links to 2+ retailers, or to a competitor. Turn off for
-										a wider list that also includes sites that look affiliate-monetized but didn't expose confirmable links.
-									</p>
-								</div>
+							<div className="flex items-center justify-between gap-4">
+								<Label htmlFor="strict" className="font-normal">
+									Strict: only outlets with confirmed affiliate links
+								</Label>
 								<Switch id="strict" checked={strict} onCheckedChange={setStrict} disabled={busy} />
 							</div>
 
@@ -401,9 +388,7 @@ function ArticleFinderPage() {
 									)}
 								</div>
 							</div>
-							<p className="text-xs text-muted-foreground">
-								These run on Google (US, English) through your BrightData SERP zone. Uncheck any you don't want.
-							</p>
+							<p className="text-xs text-muted-foreground">Uncheck any you don't want, then search.</p>
 							<ul className="space-y-2">
 								{queries.map((q, i) => (
 									<li key={`${q.query}-${i}`} className="flex items-start gap-3 rounded-lg border p-3">
@@ -427,14 +412,11 @@ function ArticleFinderPage() {
 									<IconSearch className="size-5" />
 								)}
 								{phase === "searching"
-									? "Searching, fetching & vetting…"
+									? "Searching and vetting..."
 									: `Find articles (${selected.length} ${selected.length === 1 ? "query" : "queries"})`}
 							</Button>
 							{phase === "searching" && (
-								<p className="text-xs text-muted-foreground">
-									Running the queries, fetching candidate pages, checking each for affiliate signals, and vetting topical
-									fit. This usually takes one to two minutes.
-								</p>
+								<p className="text-xs text-muted-foreground">Takes about a minute or two.</p>
 							)}
 						</CardContent>
 					</Card>
@@ -445,24 +427,22 @@ function ArticleFinderPage() {
 						<CardContent className="space-y-5 pt-6">
 							{loaded && (
 								<div className="rounded-lg border border-pink-200 bg-pink-50 px-4 py-3 text-sm dark:border-pink-900/50 dark:bg-pink-950/30">
-									Showing the last search — run by <strong>{loaded.by}</strong> on {prettyAt(loaded.at)}. Re-opening this
-									tab is free; a new search runs fresh queries.
+									Last search by <strong>{loaded.by}</strong>, {prettyAt(loaded.at)}. Reopening is free.
 								</div>
 							)}
 							<div className="flex flex-wrap items-center justify-between gap-2">
 								<div>
 									<h3 className="text-sm font-semibold">
-										{totalResults} article{totalResults === 1 ? "" : "s"} — {high.length} high-authority, {niche.length}{" "}
+										{totalResults} article{totalResults === 1 ? "" : "s"}: {high.length} high-authority, {niche.length}{" "}
 										niche/blog
 									</h3>
 									{stats && (
 										<p className="text-xs text-muted-foreground">
-											{stats.candidates ?? 0} candidates from {stats.serpRequests ?? 0} searches · {stats.pagesFetched ?? 0}{" "}
-											pages fetched
+											{stats.candidates ?? 0} candidates, {stats.pagesFetched ?? 0} pages fetched
 										</p>
 									)}
 									{dropParts.length > 0 && (
-										<p className="text-xs text-muted-foreground">Filtered out: {dropParts.join(" · ")}</p>
+										<p className="text-xs text-muted-foreground">Filtered out: {dropParts.join(", ")}</p>
 									)}
 								</div>
 								<div className="flex gap-2">
@@ -529,15 +509,10 @@ function ArticleFinderPage() {
 				)}
 
 				{phase === "idle" && !loading && (
-					<p className="max-w-2xl text-xs text-muted-foreground">
-						How it works: an LLM turns your direction into a handful of US-focused Google searches (grounded in this
-						brand's tracked topics — you review them first), the results run through your BrightData SERP zone, then non-US
-						sites, retailers and syndicated wire copy are dropped. Each surviving page is fetched — with JS rendered when
-						its affiliate links look thin — and checked for real monetization: affiliate networks, tagged retailer links,
-						and especially an <strong>affiliate link to a competitor</strong>, the strongest signal that they'd take you
-						too. An LLM then scores topical fit and editor-yes likelihood 0–100. In Strict mode only articles that clear
-						that bar make the list. Results split into high-authority publications and credible niche/blog sites, and the
-						last run is saved so re-opening this tab costs nothing.
+					<p className="max-w-xl text-xs text-muted-foreground">
+						We turn your direction into Google searches, drop non-US, retailer and syndicated results, then check each page
+						for real affiliate links and score how likely an editor is to feature the brand. Results split by publisher
+						authority. The last run is saved, so reopening this tab is free.
 					</p>
 				)}
 			</div>

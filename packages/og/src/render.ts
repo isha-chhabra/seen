@@ -14,11 +14,11 @@ export interface OgImageOptions {
 }
 
 export function renderOgImage({ appName, title, description, accentColors, iconDataUri }: OgImageOptions) {
-	const isElmo = appName === DEFAULT_APP_NAME;
-	const brandColor = isElmo ? ELMO_BRAND_COLOR : (accentColors?.[0] ?? "#1e293b");
+	const isDefaultBrand = appName === DEFAULT_APP_NAME;
+	const brandColor = isDefaultBrand ? ELMO_BRAND_COLOR : (accentColors?.[0] ?? "#1e293b");
 	const desc = description || DEFAULT_DESCRIPTION;
-	const watermarkColor = isElmo ? "rgba(37,99,235,0.04)" : "rgba(0,0,0,0.03)";
-	const gradientColors = isElmo
+	const watermarkColor = isDefaultBrand ? "rgba(236,72,153,0.05)" : "rgba(0,0,0,0.03)";
+	const gradientColors = isDefaultBrand
 		? ACCENT_COLORS
 		: accentColors && accentColors.length >= 2
 			? accentColors.slice(0, 4)
@@ -36,7 +36,7 @@ export function renderOgImage({ appName, title, description, accentColors, iconD
 				backgroundColor: "#ffffff",
 			},
 		},
-		isElmo
+		isDefaultBrand
 			? createElement(
 					"div",
 					{
@@ -50,7 +50,7 @@ export function renderOgImage({ appName, title, description, accentColors, iconD
 							top: -60,
 						},
 					},
-					"e",
+					appName.charAt(0).toLowerCase() || "s",
 				)
 			: null,
 		createElement(
@@ -65,7 +65,7 @@ export function renderOgImage({ appName, title, description, accentColors, iconD
 					paddingRight: 80,
 				},
 			},
-			isElmo
+			isDefaultBrand
 				? createElement(
 						"div",
 						{
@@ -77,7 +77,7 @@ export function renderOgImage({ appName, title, description, accentColors, iconD
 								marginBottom: 40,
 							},
 						},
-						"elmo",
+						appName.toLowerCase(),
 					)
 				: iconDataUri
 					? createElement("img", {
@@ -99,7 +99,7 @@ export function renderOgImage({ appName, title, description, accentColors, iconD
 						marginBottom: 28,
 					},
 				},
-				isElmo ? title || DEFAULT_TAGLINE : appName,
+				isDefaultBrand ? title || DEFAULT_TAGLINE : appName,
 			),
 			createElement(
 				"div",

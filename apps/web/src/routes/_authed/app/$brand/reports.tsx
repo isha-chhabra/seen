@@ -1,5 +1,5 @@
 /**
- * /app/$brand/reports — build a two-page AI-visibility report and download it as PDF.
+ * /app/$brand/reports, build a two-page AI-visibility report and download it as PDF.
  * One report per brand per rolling 7 days (enforced server-side).
  */
 import { createFileRoute } from "@tanstack/react-router";
@@ -34,7 +34,7 @@ function ymd(d: Date): string {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 function pretty(d?: Date): string {
-	return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—";
+	return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
 }
 function prettyAt(iso: string): string {
 	return new Date(iso).toLocaleString("en-US", {
@@ -162,13 +162,12 @@ function ReportsPage() {
 	}
 
 	return (
-		<PageHeader title="Reports" subtitle="A two-page AI-visibility report for any period, generated from this brand's tracked data.">
+		<PageHeader title="Reports" subtitle="A client-facing PDF report from this brand's tracked data.">
 			<Card className="max-w-2xl">
 				<CardContent className="space-y-5 pt-6">
 					{inCooldown && nextLabel && (
 						<div className="rounded-lg border border-pink-200 bg-pink-50 px-4 py-3 text-sm text-pink-900 dark:border-pink-900/50 dark:bg-pink-950/30 dark:text-pink-200">
-							A report was generated for <strong>{brand?.name}</strong> in the last 7 days. Next report available{" "}
-							<strong>{nextLabel}</strong>.
+							One report per week. Next available <strong>{nextLabel}</strong>.
 						</div>
 					)}
 
@@ -176,7 +175,7 @@ function ReportsPage() {
 						<Label htmlFor="report-name">Report name</Label>
 						<Input
 							id="report-name"
-							placeholder={`${brand?.name ?? "Brand"} visibility — ${pretty(range?.from)} to ${pretty(range?.to)}`}
+							placeholder={`${brand?.name ?? "Brand"} visibility, ${pretty(range?.from)} to ${pretty(range?.to)}`}
 							value={name}
 							onChange={(e) => setName(e.target.value)}
 							disabled={status === "working" || Boolean(inCooldown)}
@@ -203,8 +202,7 @@ function ReportsPage() {
 					</Button>
 
 					<p className="text-xs text-muted-foreground">
-						One report per brand per week. Any range is allowed — the limit is on how often you generate, not what you analyze.
-						The PDF downloads automatically when it's ready.
+						One report per brand per week. The PDF downloads automatically.
 					</p>
 
 					{lastReport && (
