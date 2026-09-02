@@ -231,7 +231,6 @@ function BrandSettingsPage() {
 				</Button>
 			</form>
 
-			{canDelete && (
 			<div className="rounded-xl border border-destructive/30 bg-destructive/[0.03] p-4">
 				<div className="flex flex-wrap items-center justify-between gap-3">
 					<div className="min-w-0">
@@ -240,7 +239,22 @@ function BrandSettingsPage() {
 							Permanently removes {brand.name} and all of its prompts, runs, citations, competitors and reports. No undo.
 						</p>
 					</div>
-					{confirmingDelete ? (
+					{!canDelete ? (
+						<Tooltip>
+							<TooltipTrigger render={<span className="inline-flex shrink-0 cursor-not-allowed" />}>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled
+									className="pointer-events-none border-destructive/30 text-destructive opacity-50"
+								>
+									<IconTrash className="size-4" />
+									Delete brand
+								</Button>
+							</TooltipTrigger>
+							<TooltipContent className="text-xs font-normal">Contact an admin to delete this brand</TooltipContent>
+						</Tooltip>
+					) : confirmingDelete ? (
 						<div className="flex shrink-0 items-center gap-2">
 							<Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
 								{deleting ? "Deleting..." : `Delete ${brand.name}`}
@@ -262,7 +276,6 @@ function BrandSettingsPage() {
 					)}
 				</div>
 			</div>
-			)}
 		</div>
 	);
 }

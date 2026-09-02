@@ -97,6 +97,7 @@ export const inviteTeamMemberFn = createServerFn({ method: "POST" })
 		requireTeamInvites();
 		const session = await requireAuthSession();
 		const org = await requireBrandOrganization(session.user.id, data.brandId);
+		if (!isOrgAdminRole(org.role)) throw new Error("Only a workspace admin can invite members");
 
 		await auth.api.createInvitation({
 			body: { email: data.email, role: data.role, organizationId: org.id },
