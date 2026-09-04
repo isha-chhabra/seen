@@ -91,6 +91,7 @@ export const inviteTeamMemberFn = createServerFn({ method: "POST" })
 			brandId: z.string(),
 			email: z.string().email(),
 			role: z.enum(["member", "admin"]),
+			expiresInDays: z.number().int().min(1).max(365).optional(),
 		}),
 	)
 	.handler(async ({ data }) => {
@@ -103,10 +104,19 @@ export const inviteTeamMemberFn = createServerFn({ method: "POST" })
 			body: { email: data.email, role: data.role, organizationId: org.id },
 			headers: getRequestHeaders(),
 		});
+		const id = (created as { id?: string })?.id ?? null;
+
+		// createInvitation has no per-call expiry, so set it on the row afterwards.
+		if (id && data.expiresInDays) {
+			await db
+				.update(invitation)
+				.set({ expiresAt: new Date(Date.now() + data.expiresInDays * 86_400_000) })
+				.where(eq(invitation.id, id));
+		}
 
 		// No transactional email on this deployment, so the caller shares
 		// `${origin}/accept-invitation/${id}` by hand. Return the id for that.
-		return { id: (created as { id?: string })?.id ?? null, email: data.email };
+		return { id, email: data.email };
 	});
 
 export const cancelInvitationFn = createServerFn({ method: "POST" })

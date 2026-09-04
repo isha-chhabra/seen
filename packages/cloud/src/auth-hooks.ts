@@ -139,19 +139,22 @@ export function getCloudAuthOptions(): CreateAuthOptions {
 			},
 		},
 		...(!billingDisabled && { extraPlugins: [createStripeBillingPlugin()] }),
-		organizationOptions: emailEnabled
-			? {
-					sendInvitationEmail: async (data) => {
-						await sendEmail(
-							data.email,
-							invitationEmail({
-								inviterName: data.inviter.user.name,
-								orgName: data.organization.name,
-								url: `${appUrl}/accept-invitation/${data.id}`,
-							}),
-						);
-					},
-				}
-			: {},
+		organizationOptions: {
+			// Links are shared by hand here, so a 2-day default is too tight.
+			// 30 days by default; the invite form can shorten it per invite.
+			invitationExpiresIn: 60 * 60 * 24 * 30,
+			...(emailEnabled && {
+				sendInvitationEmail: async (data) => {
+					await sendEmail(
+						data.email,
+						invitationEmail({
+							inviterName: data.inviter.user.name,
+							orgName: data.organization.name,
+							url: `${appUrl}/accept-invitation/${data.id}`,
+						}),
+					);
+				},
+			}),
+		},
 	};
 }
