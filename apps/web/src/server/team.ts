@@ -91,7 +91,7 @@ export const inviteTeamMemberFn = createServerFn({ method: "POST" })
 			brandId: z.string(),
 			email: z.string().email(),
 			role: z.enum(["member", "admin"]),
-			expiresInDays: z.number().int().min(1).max(365).optional(),
+			expiresInDays: z.number().int().min(1).max(36_500).optional(),
 		}),
 	)
 	.handler(async ({ data }) => {

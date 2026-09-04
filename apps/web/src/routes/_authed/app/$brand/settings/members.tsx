@@ -121,7 +121,7 @@ function TeamSettingsPage() {
 		const email = inviteEmail;
 		try {
 			const res = await inviteTeamMemberFn({
-				data: { brandId, email, role: inviteRole, expiresInDays: Number(inviteExpiry) },
+				data: { brandId, email, role: inviteRole, expiresInDays: inviteExpiry === "never" ? 36_500 : Number(inviteExpiry) },
 			});
 			trackEvent("team_member_invited", { role: inviteRole });
 			setInviteEmail("");
@@ -232,7 +232,7 @@ function TeamSettingsPage() {
 					<div className="flex flex-col gap-2">
 						<Label htmlFor="invite-expiry">Link expires</Label>
 						<Select
-							items={{ "7": "7 days", "30": "30 days", "90": "90 days" }}
+							items={{ "7": "7 days", "30": "30 days", never: "Never" }}
 							value={inviteExpiry}
 							onValueChange={(value) => setInviteExpiry(value)}
 							disabled={!isAdmin}
@@ -243,7 +243,7 @@ function TeamSettingsPage() {
 							<SelectContent>
 								<SelectItem value="7">7 days</SelectItem>
 								<SelectItem value="30">30 days</SelectItem>
-								<SelectItem value="90">90 days</SelectItem>
+								<SelectItem value="never">Never</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
@@ -299,7 +299,9 @@ function TeamSettingsPage() {
 								<div className="min-w-0">
 									<p className="truncate font-medium">{inv.email}</p>
 									<p className="text-sm text-muted-foreground">
-										Expires {new Date(inv.expiresAt).toLocaleDateString()}
+										{new Date(inv.expiresAt).getFullYear() - new Date().getFullYear() >= 50
+											? "Never expires"
+											: `Expires ${new Date(inv.expiresAt).toLocaleDateString()}`}
 									</p>
 								</div>
 								<div className="flex shrink-0 items-center gap-2">
