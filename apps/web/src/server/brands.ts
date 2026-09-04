@@ -42,6 +42,7 @@ import {
 	listUserOrganizations,
 	requireAuthSession,
 	requireBrandAccess,
+	requireBrandWriteAccess,
 	requireBrandOrganization,
 	requireOrgAccess,
 	requirePlatformPicksEditable,
@@ -396,7 +397,7 @@ export const updateBrandFn = createServerFn({ method: "POST" })
 	)
 	.handler(async ({ data }) => {
 		const session = await requireAuthSession();
-		await requireBrandAccess(session.user.id, data.brandId);
+		await requireBrandWriteAccess(session.user.id, data.brandId);
 
 		const normalized = normalizeBrandUpdate({
 			name: data.name,
@@ -454,7 +455,7 @@ export const updateCompetitors = createServerFn({ method: "POST" })
 	)
 	.handler(async ({ data }) => {
 		const session = await requireAuthSession();
-		await requireBrandAccess(session.user.id, data.brandId);
+		await requireBrandWriteAccess(session.user.id, data.brandId);
 
 		// A bulk replace, so the list submitted is the list the brand ends up with.
 		assertAllowed(decideCompetitorCap(data.competitors.length));
@@ -504,7 +505,7 @@ export const addDomainToBrandFn = createServerFn({ method: "POST" })
 	)
 	.handler(async ({ data }) => {
 		const session = await requireAuthSession();
-		await requireBrandAccess(session.user.id, data.brandId);
+		await requireBrandWriteAccess(session.user.id, data.brandId);
 
 		const domain = cleanAndValidateDomain(data.domain);
 		if (!domain) throw new Error(`Invalid domain: ${data.domain}`);
@@ -540,7 +541,7 @@ export const addDomainToCompetitorFn = createServerFn({ method: "POST" })
 	)
 	.handler(async ({ data }) => {
 		const session = await requireAuthSession();
-		await requireBrandAccess(session.user.id, data.brandId);
+		await requireBrandWriteAccess(session.user.id, data.brandId);
 
 		const existing = await db.query.competitors.findFirst({
 			where: and(eq(competitors.id, data.competitorId), eq(competitors.brandId, data.brandId)),
@@ -574,7 +575,7 @@ export const createCompetitorFromDomainFn = createServerFn({ method: "POST" })
 	)
 	.handler(async ({ data }) => {
 		const session = await requireAuthSession();
-		await requireBrandAccess(session.user.id, data.brandId);
+		await requireBrandWriteAccess(session.user.id, data.brandId);
 
 		const domain = cleanAndValidateDomain(data.domain);
 		if (!domain) throw new Error(`Invalid domain: ${data.domain}`);

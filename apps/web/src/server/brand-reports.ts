@@ -16,7 +16,7 @@ import { brandReports, brands, prompts } from "@workspace/lib/db/schema";
 import { generateReportNarrative } from "@workspace/lib/report/narrative";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuthSession, requireBrandAccess } from "@/lib/auth/helpers";
+import { requireAuthSession, requireBrandAccess, requireBrandWriteAccess } from "@/lib/auth/helpers";
 import { extractDomain } from "@/lib/domain-categories";
 import { categorizeDomain } from "@/lib/domain-categories.server";
 import { getCitationDomainStats } from "@/lib/postgres-read";
@@ -332,7 +332,7 @@ export const generateBrandReportFn = createServerFn({ method: "POST" })
 	)
 	.handler(async ({ data }) => {
 		const session = await requireAuthSession();
-		await requireBrandAccess(session.user.id, data.brandId);
+		await requireBrandWriteAccess(session.user.id, data.brandId);
 		const timezone = resolveTimezone();
 
 		const [brandRow] = await db

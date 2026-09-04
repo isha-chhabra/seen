@@ -35,7 +35,7 @@ import { brandArticleSearches, brands, competitors, prompts } from "@workspace/l
 import { getWebsiteExcerpt } from "@workspace/lib/website-excerpt";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuthSession, requireBrandAccess } from "@/lib/auth/helpers";
+import { requireAuthSession, requireBrandAccess, requireBrandWriteAccess } from "@/lib/auth/helpers";
 import { extractDomain, isAffiliateRedirectHost, isAffiliateUrl } from "@/lib/domain-categories";
 import { isAffiliatePublisherDomain, isEcommerceDomain, isPrWireDomain } from "@/lib/domain-categories.server";
 
@@ -325,7 +325,7 @@ export const generateArticleQueriesFn = createServerFn({ method: "POST" })
 	)
 	.handler(async ({ data }) => {
 		const session = await requireAuthSession();
-		await requireBrandAccess(session.user.id, data.brandId);
+		await requireBrandWriteAccess(session.user.id, data.brandId);
 
 		const [brand] = await db.select().from(brands).where(eq(brands.id, data.brandId)).limit(1);
 		if (!brand) throw new Error("Brand not found");
@@ -401,7 +401,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 	)
 	.handler(async ({ data }): Promise<ArticleSearchPayload> => {
 			const session = await requireAuthSession();
-			await requireBrandAccess(session.user.id, data.brandId);
+			await requireBrandWriteAccess(session.user.id, data.brandId);
 
 			const now = Date.now();
 			if (now - (lastRunByBrand.get(data.brandId) ?? 0) < DEBOUNCE_MS) {

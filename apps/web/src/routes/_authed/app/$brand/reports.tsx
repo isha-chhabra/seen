@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { PageHeader } from "@/components/page-header";
 import { ReportDocument, type ReportDocProps } from "@/components/report/report-document";
-import { useBrand } from "@/hooks/use-brands";
+import { useBrand, useBrandRole } from "@/hooks/use-brands";
 import { downloadReportPdf } from "@/lib/report-pdf";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
 import { generateBrandReportFn, getLatestBrandReportFn, getReportAvailabilityFn } from "@/server/brand-reports";
@@ -65,6 +65,7 @@ function RangeField({ value, onChange, label }: { value?: DateRange; onChange: (
 function ReportsPage() {
 	const { brand: brandId } = Route.useParams();
 	const { brand } = useBrand(brandId);
+	const { isViewer } = useBrandRole(brandId);
 
 	const [range, setRange] = useState<DateRange | undefined>(() => {
 		const to = new Date();
@@ -120,6 +121,7 @@ function ReportsPage() {
 	const nextLabel = availability?.nextAvailableAt ? prettyAt(availability.nextAvailableAt) : null;
 
 	const canSubmit =
+		!isViewer &&
 		status === "idle" &&
 		!inCooldown &&
 		name.trim().length > 0 &&
@@ -213,6 +215,7 @@ function ReportsPage() {
 						<Button
 							variant="outline"
 							size="sm"
+							disabled={isViewer}
 							onClick={() => {
 								setStatus("working");
 								setDoc({

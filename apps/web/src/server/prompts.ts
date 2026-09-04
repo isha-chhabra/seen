@@ -6,7 +6,7 @@ import { assertAllowed, assertPromptSaveAllowed, decidePromptCap, promptSaveDelt
 import { computeSystemTags, getEffectiveBrandedStatus } from "@workspace/lib/tag-utils";
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuthSession, requireBrandAccess } from "@/lib/auth/helpers";
+import { requireAuthSession, requireBrandAccess, requireBrandWriteAccess } from "@/lib/auth/helpers";
 import type { LookbackPeriod } from "@/lib/chart-utils";
 import { generateDateRange } from "@/lib/chart-utils";
 import { rollUpCitationDomains, rollUpCitationUrls, tallyCitations } from "@/lib/citation-rollup";
@@ -532,7 +532,7 @@ export const updatePromptsFn = createServerFn({ method: "POST" })
 	)
 	.handler(async ({ data }) => {
 		const session = await requireAuthSession();
-		await requireBrandAccess(session.user.id, data.brandId);
+		await requireBrandWriteAccess(session.user.id, data.brandId);
 
 		const brand = await db.query.brands.findFirst({
 			where: eq(brands.id, data.brandId),
@@ -731,7 +731,7 @@ export const runBrandPromptsNowFn = createServerFn({ method: "POST" })
 	.validator(z.object({ brandId: z.string().min(1) }))
 	.handler(async ({ data }): Promise<{ queued: number; cooldownMs: number; triggeredBy?: string; triggeredAt?: string }> => {
 		const session = await requireAuthSession();
-		await requireBrandAccess(session.user.id, data.brandId);
+		await requireBrandWriteAccess(session.user.id, data.brandId);
 
 		const enabled = await db
 			.select({ id: prompts.id })

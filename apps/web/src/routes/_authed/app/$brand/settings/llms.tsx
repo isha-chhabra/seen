@@ -26,6 +26,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { type ReactNode, useState } from "react";
 import { formatUsd, PlatformList, PlatformPicker, projectSelectionCostUsd } from "@/components/platform-picker";
 import { UnsavedChangesBar } from "@/components/unsaved-changes-bar";
+import { useBrandRole } from "@/hooks/use-brands";
 import { groupPlatformOptions, type PlatformGroup, platformGroupCopy } from "@/lib/platform-groups";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
 import { getModelPickerStateFn, type ModelPickerState, updateEnabledModelsFn } from "@/server/platform-picks";
@@ -129,6 +130,7 @@ function PlatformTierCard({
 function PlatformGroups({ picker }: { picker: ModelPickerState }) {
 	const { brand: brandId } = Route.useParams();
 	const router = useRouter();
+	const { isViewer } = useBrandRole(brandId);
 
 	const stored = new Set(picker.enabledModels);
 	const [selected, setSelected] = useState<Set<string>>(stored);
@@ -148,6 +150,7 @@ function PlatformGroups({ picker }: { picker: ModelPickerState }) {
 	const isDirty = selected.size !== stored.size || [...selected].some((m) => !stored.has(m));
 
 	const save = async () => {
+		if (isViewer) return;
 		setSaving(true);
 		setError(null);
 		try {
@@ -196,7 +199,7 @@ function PlatformGroups({ picker }: { picker: ModelPickerState }) {
 						selected={selected}
 						onSelectedChange={setSelected}
 						limit={limit}
-						disabled={saving}
+						disabled={saving || isViewer}
 					/>
 				)}
 			/>

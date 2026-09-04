@@ -5,6 +5,7 @@ import { getRequestHeaders } from "@tanstack/react-start/server";
 import { db } from "@workspace/lib/db/db";
 import { brands, member, organization } from "@workspace/lib/db/schema";
 import { and, eq } from "drizzle-orm";
+import { isViewerRole } from "@workspace/config/roles";
 import { getDeployment } from "@/lib/config/server";
 import { auth } from "./server";
 
@@ -76,6 +77,15 @@ export async function requireBrandAccess(userId: string, brandId: string): Promi
 	if (!(await checkBrandAccess(userId, brandId))) {
 		throw new Error("Forbidden: No access to this brand");
 	}
+}
+
+/**
+ * Like {@link requireBrandAccess} but also rejects a read-only viewer, for
+ * every mutation / paid action server fn.
+ */
+export async function requireBrandWriteAccess(userId: string, brandId: string): Promise<void> {
+	const org = await requireBrandOrganization(userId, brandId);
+	if (isViewerRole(org.role)) throw new Error("Viewers have read-only access.");
 }
 
 /**

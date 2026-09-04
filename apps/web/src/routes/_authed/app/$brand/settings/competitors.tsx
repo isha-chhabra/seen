@@ -12,7 +12,7 @@ import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { type CompetitorEntry, CompetitorsEditor } from "@/components/competitors-editor";
-import { useBrand, useCompetitors } from "@/hooks/use-brands";
+import { useBrand, useBrandRole, useCompetitors } from "@/hooks/use-brands";
 import { citationKeys } from "@/hooks/use-citations";
 import { dashboardKeys } from "@/hooks/use-dashboard-summary";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
@@ -35,6 +35,7 @@ export const Route = createFileRoute("/_authed/app/$brand/settings/competitors")
 function CompetitorsSettingsPage() {
 	const { brand: brandId } = Route.useParams();
 	const { brand, isLoading } = useBrand(brandId);
+	const { isViewer } = useBrandRole(brandId);
 	const { competitors: existingCompetitors, isLoading: competitorsLoading } = useCompetitors(brandId);
 	const queryClient = useQueryClient();
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -125,13 +126,13 @@ function CompetitorsSettingsPage() {
 			</Alert>
 
 			<form onSubmit={handleSubmit} className="space-y-6">
-				<CompetitorsEditor competitors={competitors} onChange={setCompetitors} disabled={isSubmitting} />
+				<CompetitorsEditor competitors={competitors} onChange={setCompetitors} disabled={isSubmitting || isViewer} />
 
 				{error && <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">{error}</div>}
 				{success && <div className="text-sm text-green-600 bg-green-50 p-3 rounded-md">{success}</div>}
 
 				<div className="flex gap-2">
-					<Button type="submit" disabled={isSubmitting} className="cursor-pointer">
+					<Button type="submit" disabled={isSubmitting || isViewer} className="cursor-pointer">
 						{isSubmitting ? "Saving..." : "Save Changes"}
 					</Button>
 				</div>
