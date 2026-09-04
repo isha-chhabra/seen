@@ -61,7 +61,12 @@ export const Route = createFileRoute("/_authed/app/$brand/settings/members")({
 		if (!context.clientConfig?.features.teamInvites) {
 			throw redirect({ to: "/app/$brand", params: { brand: params.brand } });
 		}
-		return listTeamFn({ data: { brandId: params.brand } });
+		const data = await listTeamFn({ data: { brandId: params.brand } });
+		// Viewers don't get the Team section at all.
+		if (data.members.find((m) => m.userId === data.currentUserId)?.role === "viewer") {
+			throw redirect({ to: "/app/$brand", params: { brand: params.brand } });
+		}
+		return data;
 	},
 	head: ({ matches, match }) => {
 		const appName = getAppName(match);
