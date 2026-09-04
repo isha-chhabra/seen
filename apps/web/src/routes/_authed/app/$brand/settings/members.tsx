@@ -83,6 +83,7 @@ function TeamSettingsPage() {
 	const router = useRouter();
 	const [inviteEmail, setInviteEmail] = useState("");
 	const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
+	const [inviteExpiry, setInviteExpiry] = useState("30");
 	const [inviting, setInviting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [workspaceName, setWorkspaceName] = useState(organization.name);
@@ -119,7 +120,9 @@ function TeamSettingsPage() {
 		setInviting(true);
 		const email = inviteEmail;
 		try {
-			const res = await inviteTeamMemberFn({ data: { brandId, email, role: inviteRole } });
+			const res = await inviteTeamMemberFn({
+				data: { brandId, email, role: inviteRole, expiresInDays: Number(inviteExpiry) },
+			});
 			trackEvent("team_member_invited", { role: inviteRole });
 			setInviteEmail("");
 			setInviteRole("member");
@@ -223,6 +226,24 @@ function TeamSettingsPage() {
 							<SelectContent>
 								<SelectItem value="member">Member</SelectItem>
 								<SelectItem value="admin">Admin</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
+					<div className="flex flex-col gap-2">
+						<Label htmlFor="invite-expiry">Link expires</Label>
+						<Select
+							items={{ "7": "7 days", "30": "30 days", "90": "90 days" }}
+							value={inviteExpiry}
+							onValueChange={(value) => setInviteExpiry(value)}
+							disabled={!isAdmin}
+						>
+							<SelectTrigger id="invite-expiry" className="w-32">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="7">7 days</SelectItem>
+								<SelectItem value="30">30 days</SelectItem>
+								<SelectItem value="90">90 days</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
