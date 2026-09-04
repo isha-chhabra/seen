@@ -37,6 +37,7 @@ import { Logo } from "@/components/logo";
 import { NavAppInfo } from "@/components/nav-app-info";
 import { type NavGroup, NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
+import { useBrandRole } from "@/hooks/use-brands";
 
 /**
  * How much of the app the shell around this page can reach:
@@ -56,6 +57,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 }
 
 function buildNavGroups(args: {
+	isViewer: boolean;
 	scope: SidebarScope;
 	brand?: BrandWithPrompts | null;
 	isAdmin: boolean;
@@ -63,15 +65,19 @@ function buildNavGroups(args: {
 	reportsEnabled: boolean;
 	features?: ClientConfig["features"];
 }): NavGroup[] {
-	const { scope, brand, isAdmin, showAdminSection, reportsEnabled, features } = args;
+	const { scope, brand, isAdmin, isViewer, showAdminSection, reportsEnabled, features } = args;
 	return [
 		// Only a brand context has a dashboard; a gate page has no destinations.
-		...(scope === "brand" ? brandGroups(brand, features) : []),
+		...(scope === "brand" ? brandGroups(brand, features, isViewer) : []),
 		...(showAdminSection ? [adminGroup(isAdmin, reportsEnabled)] : []),
 	];
 }
 
-function brandGroups(brand: BrandWithPrompts | null | undefined, features?: ClientConfig["features"]): NavGroup[] {
+function brandGroups(
+	brand: BrandWithPrompts | null | undefined,
+	features?: ClientConfig["features"],
+	isViewer = false,
+): NavGroup[] {
 	const groups: NavGroup[] = [];
 	const dashboardItems = [
 		{
@@ -150,7 +156,7 @@ function brandGroups(brand: BrandWithPrompts | null | undefined, features?: Clie
 					url: "/settings/llms",
 					icon: IconCpu,
 				},
-				...(features?.teamInvites ? [{ title: "Team", url: "/settings/members", icon: IconUsers }] : []),
+				...(features?.teamInvites && !isViewer ? [{ title: "Team", url: "/settings/members", icon: IconUsers }] : []),
 				...(features?.billing ? [{ title: "Billing", url: "/settings/billing", icon: IconCreditCard }] : []),
 			],
 		});
@@ -183,6 +189,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
 	const { setOpenMobile } = useSidebar();
 	const context = useRouteContext({ strict: false }) as { clientConfig?: ClientConfig };
+	const { isViewer } = useBrandRole();
 	// Reports are disabled entirely in cloud; hide the nav entry there.
 	const reportsEnabled = context.clientConfig?.features.reportGeneration ?? true;
 
@@ -194,6 +201,7 @@ export function AppSidebar({
 		scope,
 		brand,
 		isAdmin,
+		isViewer,
 		showAdminSection,
 		reportsEnabled,
 		features: context.clientConfig?.features,
