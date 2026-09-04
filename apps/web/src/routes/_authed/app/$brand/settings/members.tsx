@@ -5,6 +5,7 @@
  * invitations. The redirect in the loader is UX only — the security
  * boundary is the teamInvites guard inside every team server function.
  */
+import { IconCheck, IconCopy } from "@tabler/icons-react";
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { isOrgAdminRole } from "@workspace/config/roles";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
@@ -25,6 +26,35 @@ import {
 	type TeamData,
 	updateOrganizationFn,
 } from "@/server/team";
+
+/** No transactional email on this deployment, so the accept link is shared by hand. */
+function inviteLink(id: string): string {
+	return `${window.location.origin}/accept-invitation/${id}`;
+}
+
+async function copyText(text: string): Promise<boolean> {
+	try {
+		if (navigator.clipboard && window.isSecureContext) {
+			await navigator.clipboard.writeText(text);
+			return true;
+		}
+	} catch {
+		/* fall through to the legacy path */
+	}
+	try {
+		const ta = document.createElement("textarea");
+		ta.value = text;
+		ta.style.position = "fixed";
+		ta.style.opacity = "0";
+		document.body.appendChild(ta);
+		ta.select();
+		const ok = document.execCommand("copy");
+		ta.remove();
+		return ok;
+	} catch {
+		return false;
+	}
+}
 
 export const Route = createFileRoute("/_authed/app/$brand/settings/members")({
 	loader: async ({ params, context }): Promise<TeamData> => {
@@ -57,6 +87,16 @@ function TeamSettingsPage() {
 	const [error, setError] = useState<string | null>(null);
 	const [workspaceName, setWorkspaceName] = useState(organization.name);
 	const [savingWorkspace, setSavingWorkspace] = useState(false);
+	const [lastInvite, setLastInvite] = useState<{ email: string; id: string } | null>(null);
+	const [copiedId, setCopiedId] = useState<string | null>(null);
+
+	function copyInviteLink(id: string) {
+		void copyText(inviteLink(id)).then((ok) => {
+			if (!ok) return;
+			setCopiedId(id);
+			setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1600);
+		});
+	}
 
 	async function handleSaveWorkspace(e: React.FormEvent) {
 		e.preventDefault();
@@ -77,12 +117,17 @@ function TeamSettingsPage() {
 		if (!isAdmin) return;
 		setError(null);
 		setInviting(true);
+		const email = inviteEmail;
 		try {
-			await inviteTeamMemberFn({ data: { brandId, email: inviteEmail, role: inviteRole } });
+			const res = await inviteTeamMemberFn({ data: { brandId, email, role: inviteRole } });
 			trackEvent("team_member_invited", { role: inviteRole });
 			setInviteEmail("");
 			setInviteRole("member");
 			await router.invalidate();
+			if (res?.id) {
+				setLastInvite({ email, id: res.id });
+				copyInviteLink(res.id);
+			}
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to send invitation");
 		} finally {
@@ -185,6 +230,21 @@ function TeamSettingsPage() {
 						{inviting ? "Inviting..." : "Invite"}
 					</Button>
 				</form>
+
+				{lastInvite && (
+					<div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/[0.06] px-3 py-2 text-sm">
+						<span className="text-muted-foreground">
+							Invited <span className="font-medium text-foreground">{lastInvite.email}</span>. Send them this link:
+						</span>
+						<code className="min-w-0 flex-1 truncate rounded bg-background px-1.5 py-0.5 text-xs">
+							{inviteLink(lastInvite.id)}
+						</code>
+						<Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => copyInviteLink(lastInvite.id)}>
+							{copiedId === lastInvite.id ? <IconCheck className="size-3.5" /> : <IconCopy className="size-3.5" />}
+							{copiedId === lastInvite.id ? "Copied" : "Copy"}
+						</Button>
+					</div>
+				)}
 			</div>
 
 			<div className="space-y-3">
@@ -221,11 +281,23 @@ function TeamSettingsPage() {
 										Expires {new Date(inv.expiresAt).toLocaleDateString()}
 									</p>
 								</div>
-								<div className="flex shrink-0 items-center gap-3">
+								<div className="flex shrink-0 items-center gap-2">
 									<Badge variant="secondary">{inv.role ?? "member"}</Badge>
-									<Button type="button" variant="outline" size="sm" onClick={() => handleCancel(inv.id)}>
-										Cancel
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										className="gap-1.5"
+										onClick={() => copyInviteLink(inv.id)}
+									>
+										{copiedId === inv.id ? <IconCheck className="size-3.5" /> : <IconCopy className="size-3.5" />}
+										{copiedId === inv.id ? "Copied" : "Copy link"}
 									</Button>
+									{isAdmin && (
+										<Button type="button" variant="ghost" size="sm" onClick={() => handleCancel(inv.id)}>
+											Cancel
+										</Button>
+									)}
 								</div>
 							</div>
 						))}

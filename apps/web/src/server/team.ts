@@ -99,12 +99,14 @@ export const inviteTeamMemberFn = createServerFn({ method: "POST" })
 		const org = await requireBrandOrganization(session.user.id, data.brandId);
 		if (!isOrgAdminRole(org.role)) throw new Error("Only a workspace admin can invite members");
 
-		await auth.api.createInvitation({
+		const created = await auth.api.createInvitation({
 			body: { email: data.email, role: data.role, organizationId: org.id },
 			headers: getRequestHeaders(),
 		});
 
-		return { success: true };
+		// No transactional email on this deployment, so the caller shares
+		// `${origin}/accept-invitation/${id}` by hand. Return the id for that.
+		return { id: (created as { id?: string })?.id ?? null, email: data.email };
 	});
 
 export const cancelInvitationFn = createServerFn({ method: "POST" })

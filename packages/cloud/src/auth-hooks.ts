@@ -103,8 +103,16 @@ export function getCloudAuthOptions(): CreateAuthOptions {
 								message: "Disposable email addresses are not supported. Please use your work or personal email.",
 							});
 						}
-						// Invite-only allowlist (fails-closed when unconfigured).
-						if (evaluateSignupAllowed(user.email, getSignupAllowlist()) === "deny") {
+						// A pending invitation is itself the authorization to register, so
+						// it bypasses CLOUD_SIGNUP_ALLOWLIST. Team leads can then invite
+						// straight from the UI without touching the env.
+						const invitedEmail = user.email.trim().toLowerCase();
+						const invited = await db
+							.select({ id: invitation.id })
+							.from(invitation)
+							.where(and(sql`lower(${invitation.email}) = ${invitedEmail}`, eq(invitation.status, "pending")))
+							.limit(1);
+						if (invited.length === 0 && evaluateSignupAllowed(user.email, getSignupAllowlist()) === "deny") {
 							throw new APIError("FORBIDDEN", {
 								message: "Sign-ups are invite-only right now.",
 							});
