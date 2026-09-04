@@ -82,7 +82,7 @@ function TeamSettingsPage() {
 	const isAdmin = isOrgAdminRole(members.find((m) => m.userId === currentUserId)?.role ?? "");
 	const router = useRouter();
 	const [inviteEmail, setInviteEmail] = useState("");
-	const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
+	const [inviteRole, setInviteRole] = useState<"viewer" | "member" | "admin">("member");
 	const [inviteExpiry, setInviteExpiry] = useState("30");
 	const [inviting, setInviting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -215,15 +215,16 @@ function TeamSettingsPage() {
 					<div className="flex flex-col gap-2">
 						<Label htmlFor="invite-role">Role</Label>
 						<Select
-							items={{ member: "Member", admin: "Admin" }}
+							items={{ viewer: "Viewer", member: "Member", admin: "Admin" }}
 							value={inviteRole}
-							onValueChange={(value) => setInviteRole(value as "member" | "admin")}
+							onValueChange={(value) => setInviteRole(value as "viewer" | "member" | "admin")}
 							disabled={!isAdmin}
 						>
 							<SelectTrigger id="invite-role" className="w-32">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
+								<SelectItem value="viewer">Viewer</SelectItem>
 								<SelectItem value="member">Member</SelectItem>
 								<SelectItem value="admin">Admin</SelectItem>
 							</SelectContent>
