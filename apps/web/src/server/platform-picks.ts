@@ -25,6 +25,7 @@ import {
 	canEditPlatformPicks,
 	requireAuthSession,
 	requireBrandAccess,
+	requireBrandWriteAccess,
 	requireOrgAccess,
 	requirePlatformPicksEditable,
 } from "@/lib/auth/helpers";
@@ -279,7 +280,7 @@ export const updateEnabledModelsFn = createServerFn({ method: "POST" })
 	)
 	.handler(async ({ data }) => {
 		const session = await requireAuthSession();
-		await requireBrandAccess(session.user.id, data.brandId);
+		await requireBrandWriteAccess(session.user.id, data.brandId);
 
 		requirePlatformPicksEditable();
 

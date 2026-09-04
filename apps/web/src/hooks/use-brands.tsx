@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import type { BrandWithPrompts, Competitor } from "@workspace/lib/db/schema";
 import type { TrackedTarget } from "@/lib/model-filter";
-import { getBrand, getBrands, getCompetitors } from "@/server/brands";
+import { getBrand, getBrands, getCompetitors, getMyBrandRoleFn } from "@/server/brands";
 
 export type BrandWithPromptsAndDataInfo = BrandWithPrompts & {
 	earliestDataDate?: string | null;
@@ -81,6 +81,25 @@ export function useBrand(brandId?: string) {
 		isError: query.error,
 		revalidate,
 	};
+}
+
+/**
+ * The current user's role in the active brand's workspace. `isViewer` gates
+ * every write / paid action in the UI (server fns enforce it independently).
+ */
+export function useBrandRole(brandId?: string) {
+	const params = useParams({ strict: false }) as { brand?: string };
+	const resolvedBrandId = brandId || params.brand;
+
+	const query = useQuery({
+		queryKey: [...brandKeys.detail(resolvedBrandId || ""), "role"],
+		queryFn: () => getMyBrandRoleFn({ data: { brandId: resolvedBrandId! } }),
+		enabled: !!resolvedBrandId,
+		staleTime: 5 * 60 * 1000,
+	});
+
+	const role = query.data?.role ?? null;
+	return { role, isViewer: role === "viewer", isAdmin: role === "admin" || role === "owner", isLoading: query.isLoading };
 }
 
 /**

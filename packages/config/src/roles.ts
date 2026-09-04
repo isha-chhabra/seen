@@ -18,3 +18,13 @@ export const ORG_ADMIN_ROLES: readonly string[] = ["admin", "owner"];
 export function isOrgAdminRole(role: string | null | undefined): boolean {
 	return role != null && ORG_ADMIN_ROLES.includes(role);
 }
+
+/** The read-only role: may navigate and view, may not write or run paid actions. */
+export function isViewerRole(role: string | null | undefined): boolean {
+	return role === "viewer";
+}
+
+/** True for any role permitted to make changes (everyone except a viewer). */
+export function canWrite(role: string | null | undefined): boolean {
+	return !isViewerRole(role);
+}

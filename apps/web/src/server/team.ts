@@ -90,7 +90,7 @@ export const inviteTeamMemberFn = createServerFn({ method: "POST" })
 		z.object({
 			brandId: z.string(),
 			email: z.string().email(),
-			role: z.enum(["member", "admin"]),
+			role: z.enum(["viewer", "member", "admin"]),
 			expiresInDays: z.number().int().min(1).max(36_500).optional(),
 		}),
 	)

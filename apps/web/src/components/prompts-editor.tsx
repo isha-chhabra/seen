@@ -3,6 +3,7 @@ import { type EditablePrompt, type PremiumAllowance, PromptsListEditor } from "@
 import { UnsavedChangesBar } from "@/components/unsaved-changes-bar";
 import { useInvalidatePromptsSummary } from "@/hooks/use-prompts-summary";
 import { trackEvent } from "@/lib/posthog";
+import { useBrandRole } from "@/hooks/use-brands";
 import { updatePromptsFn } from "@/server/prompts";
 
 interface PromptRow {
@@ -62,6 +63,7 @@ export function PromptsEditor({ initialPrompts, brandId, pageTitle, pageDescript
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const saveInProgress = useRef(false);
+	const { isViewer } = useBrandRole(brandId);
 	const invalidatePromptsSummary = useInvalidatePromptsSummary();
 
 	const { changedKeys, removedCount, addedCount, editedCount } = useMemo(() => {
@@ -116,7 +118,7 @@ export function PromptsEditor({ initialPrompts, brandId, pageTitle, pageDescript
 		.join(" · ");
 
 	const savePrompts = async () => {
-		if (saveInProgress.current) return;
+		if (saveInProgress.current || isViewer) return;
 
 		saveInProgress.current = true;
 		setIsSaving(true);
@@ -168,7 +170,9 @@ export function PromptsEditor({ initialPrompts, brandId, pageTitle, pageDescript
 				</div>
 			</div>
 
-			<PromptsListEditor prompts={prompts} onChange={setPrompts} changedKeys={changedKeys} premium={premium} />
+			<fieldset disabled={isViewer} className="m-0 min-w-0 border-0 p-0">
+				<PromptsListEditor prompts={prompts} onChange={setPrompts} changedKeys={changedKeys} premium={premium} />
+			</fieldset>
 
 			<UnsavedChangesBar
 				isDirty={isDirty}

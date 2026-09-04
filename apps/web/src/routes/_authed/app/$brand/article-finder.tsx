@@ -17,7 +17,7 @@ import type { DateRange } from "react-day-picker";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { SectionHeading } from "@/components/section-heading";
-import { useBrand } from "@/hooks/use-brands";
+import { useBrand, useBrandRole } from "@/hooks/use-brands";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
 import {
 	type ArticleResult,
@@ -116,6 +116,7 @@ function ArticleRow({ r, brandName }: { r: ArticleResult; brandName?: string }) 
 function ArticleFinderPage() {
 	const { brand: brandId } = Route.useParams();
 	const { brand } = useBrand(brandId);
+	const { isViewer } = useBrandRole(brandId);
 
 	const [direction, setDirection] = useState("");
 	const [range, setRange] = useState<DateRange | undefined>(() => {
@@ -161,7 +162,7 @@ function ArticleFinderPage() {
 
 	const selected = queries.filter((q) => q.on);
 	const totalResults = high.length + niche.length;
-	const canBuild = !busy && direction.trim().length >= 3 && !!range?.from && !!range?.to;
+	const canBuild = !isViewer && !busy && direction.trim().length >= 3 && !!range?.from && !!range?.to;
 
 	async function genQueries() {
 		if (!canBuild || !range?.from || !range?.to) return;
@@ -272,7 +273,7 @@ function ArticleFinderPage() {
 								Queries
 							</Button>
 						)}
-						<Button variant="ghost" size="sm" onClick={exportCsv} disabled={totalResults === 0}>
+						<Button variant="ghost" size="sm" onClick={exportCsv} disabled={totalResults === 0 || isViewer}>
 							Export
 						</Button>
 						<Button variant="outline" size="sm" onClick={newSearch}>
@@ -346,7 +347,7 @@ function ArticleFinderPage() {
 						<div className="flex items-center justify-between">
 							<span className="text-sm font-medium">Review queries</span>
 							<div className="flex gap-4 text-xs text-muted-foreground">
-								<button type="button" onClick={genQueries} disabled={busy} className="transition-colors hover:text-foreground">
+								<button type="button" onClick={genQueries} disabled={busy || isViewer} className="transition-colors hover:text-foreground">
 									Regenerate
 								</button>
 								<button
@@ -374,7 +375,7 @@ function ArticleFinderPage() {
 								</li>
 							))}
 						</ul>
-						<Button onClick={run} disabled={busy || selected.length === 0} className="gap-2">
+						<Button onClick={run} disabled={busy || selected.length === 0 || isViewer} className="gap-2">
 							{phase === "searching" ? (
 								<IconLoader2 className="size-4 animate-spin" />
 							) : (

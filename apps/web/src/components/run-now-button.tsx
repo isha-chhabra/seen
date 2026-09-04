@@ -2,6 +2,7 @@ import { IconBolt, IconLoader2 } from "@tabler/icons-react";
 import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
 import { useEffect, useState } from "react";
+import { useBrandRole } from "@/hooks/use-brands";
 import { runBrandPromptsNowFn } from "@/server/prompts";
 
 type RunState =
@@ -27,6 +28,7 @@ export function RunNowButton({
 }) {
 	const [state, setState] = useState<RunState>({ kind: "idle" });
 	const [now, setNow] = useState(() => Date.now());
+	const { isViewer } = useBrandRole(brandId);
 
 	useEffect(() => {
 		if (state.kind !== "cooldown" && state.kind !== "queued") return;
@@ -67,7 +69,7 @@ export function RunNowButton({
 	} else if (state.kind === "error") label = state.message;
 
 	const busy = state.kind === "running";
-	const disabled = busy || state.kind === "cooldown";
+	const disabled = busy || state.kind === "cooldown" || isViewer;
 
 	return (
 		<Button

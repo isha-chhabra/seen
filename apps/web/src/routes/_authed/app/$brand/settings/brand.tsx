@@ -56,13 +56,18 @@ function BrandSettingsPage() {
 	const [deleteOpen, setDeleteOpen] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [canDelete, setCanDelete] = useState(false);
+	const [isViewer, setIsViewer] = useState(false);
 
 	// Only a workspace admin/owner may remove a brand.
 	useEffect(() => {
 		if (!brand?.id) return;
 		let cancelled = false;
 		getMyBrandRoleFn({ data: { brandId: brand.id } })
-			.then((r) => !cancelled && setCanDelete(r.role === "admin" || r.role === "owner"))
+			.then((r) => {
+				if (cancelled) return;
+				setCanDelete(r.role === "admin" || r.role === "owner");
+				setIsViewer(r.role === "viewer");
+			})
 			.catch(() => !cancelled && setCanDelete(false));
 		return () => {
 			cancelled = true;
@@ -235,7 +240,7 @@ function BrandSettingsPage() {
 					<div className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">{success}</div>
 				)}
 
-				<Button type="submit" disabled={isSubmitting}>
+				<Button type="submit" disabled={isSubmitting || isViewer}>
 					{isSubmitting ? "Saving..." : "Save Changes"}
 				</Button>
 			</form>
