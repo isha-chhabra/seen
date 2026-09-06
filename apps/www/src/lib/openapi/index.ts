@@ -1,9 +1,0 @@
-import spec from "@workspace/api-spec";
-import type { OpenAPIV3_2 } from "fumadocs-openapi";
-import { createOpenAPI } from "fumadocs-openapi/server";
-
-export const openapi = createOpenAPI({
-	// fumadocs-openapi v11 replaced the `() => SchemaMap` factory with a record
-	// of `name -> string | Document | (() => Awaitable<...>)`.
-	input: { "elmo-api": spec as OpenAPIV3_2.Document },
-});
