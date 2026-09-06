@@ -1,6 +1,7 @@
-# Host-side checks: format and lint, type check, unit tests, and a real build.
+# Formatting, lint, and import order, repo-wide. The Docker image build in
+# build-images.yml is the build that produces the deployed artifact.
 
-name: Build
+name: Lint
 
 on:
   push:
@@ -17,10 +18,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -38,19 +39,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      # Formatting, lint and import order in one pass, repo-wide. Runs first
-      # because it is the cheapest thing that can fail.
       - name: Format and lint
         run: pnpm lint
-
-      # Redundant with `pnpm build` (turbo's build depends on check-types), but
-      # it fails in a minute instead of after the whole build, and turbo caches
-      # the result so the build step doesn't repeat it.
-      - name: Type check
-        run: pnpm turbo check-types
-
-      - name: Unit tests
-        run: pnpm turbo test
-
-      - name: Build
-        run: pnpm build

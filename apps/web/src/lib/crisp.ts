@@ -15,6 +15,7 @@ declare global {
 const CRISP_SCRIPT_URL = "https://client.crisp.chat/l.js";
 
 const SELF_HOST_DOCS_URL = "https://www.example.com/docs/getting-started";
+const DEMO_WALKTHROUGH_URL = "https://cal.com";
 
 const DEMO_GREETING =
 	"👋 You're in the Seen demo — it's read-only sample data, so click around freely. Ask me anything as you go.";
