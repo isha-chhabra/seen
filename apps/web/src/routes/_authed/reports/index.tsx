@@ -20,8 +20,8 @@ import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
+import { trackEvent } from "@/lib/analytics/posthog";
 import { hasReportAccess, isAdmin, requireAuthSession } from "@/lib/auth/helpers";
-import { trackEvent } from "@/lib/posthog";
 import { getAppName } from "@/lib/route-head";
 import { createReportFn, getReportsFn } from "@/server/reports";
 

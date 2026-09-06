@@ -32,10 +32,10 @@ import { usePromptRunsOnly } from "@/hooks/use-prompt-runs-only";
 import { usePromptStats } from "@/hooks/use-prompt-stats";
 import { useQueryFanout } from "@/hooks/use-query-fanout";
 import { useSiteIcons } from "@/hooks/use-site-icons";
-import { getDaysFromLookback } from "@/lib/chart-utils";
-import { promptKeywords } from "@/lib/fanout-analysis";
+import { getDaysFromLookback } from "@/lib/charts/chart-utils";
+import { promptKeywords } from "@/lib/charts/fanout-analysis";
+import { skeletonRows } from "@/lib/charts/skeleton-rows";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
-import { skeletonRows } from "@/lib/skeleton-rows";
 import { getModelDisplayName } from "@/lib/utils";
 import { getPromptMetadataFn } from "@/server/prompts";
 

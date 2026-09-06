@@ -1,7 +1,7 @@
 /**
  * Server functions for AI-visibility analysis: Share of Voice. Read-only —
  * derived entirely from existing prompt_runs data via the postgres read layer
- * plus the pure stats in `@/lib/visibility-stats`. No schema changes.
+ * plus the pure stats in `@/lib/charts/visibility-stats`. No schema changes.
  *
  * Filters are resolved server-side (tags/search -> prompt IDs) via
  * `resolveFilteredPrompts`, and the lookback window is computed in the user's
@@ -16,14 +16,18 @@ import { brands } from "@workspace/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuthSession, requireBrandAccess } from "@/lib/auth/helpers";
-import { generateDateRange, type LookbackPeriod } from "@/lib/chart-utils";
+import { generateDateRange, type LookbackPeriod } from "@/lib/charts/chart-utils";
+import {
+	computeShareOfVoice,
+	shareOfVoiceLeaderboardLVCF,
+	shareOfVoiceTimeSeriesLVCF,
+} from "@/lib/charts/visibility-stats";
 import {
 	getBrandMentionTotals,
 	getPerPromptDailyCompetitorMentions,
 	getPerPromptDailyMentions,
 } from "@/lib/postgres-read";
 import { getTimezoneLookbackRange, resolveTimezone } from "@/lib/timezone-utils";
-import { computeShareOfVoice, shareOfVoiceLeaderboardLVCF, shareOfVoiceTimeSeriesLVCF } from "@/lib/visibility-stats";
 import { resolveFilteredPrompts } from "@/server/prompt-resolution";
 
 export const LOOKBACK = z.enum(["1w", "1m", "3m", "6m", "1y", "all"]);

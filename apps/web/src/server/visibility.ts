@@ -6,7 +6,7 @@ import { getEffectiveBrandedStatus } from "@workspace/lib/tag-utils";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuthSession, requireBrandAccess } from "@/lib/auth/helpers";
-import type { LookbackPeriod } from "@/lib/chart-utils";
+import type { LookbackPeriod } from "@/lib/charts/chart-utils";
 import {
 	getBatchChartData,
 	getCitationsTotalCount,

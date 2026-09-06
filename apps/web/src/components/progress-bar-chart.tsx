@@ -166,7 +166,7 @@ export function ProgressBarChart({
 	);
 }
 
-export { DOMAIN_CATEGORY_COLORS } from "@/lib/domain-categories";
+export { DOMAIN_CATEGORY_COLORS } from "@/lib/citations/domain-categories";
 
 // Colors are keyed by the provider family (iconId from `getModelMeta`), so a
 // deployment that adds any google-flavored model, anthropic-flavored model,

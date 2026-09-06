@@ -1,8 +1,8 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useCallback, useMemo } from "react";
 import { useBrand } from "@/hooks/use-brands";
-import { getDefaultLookbackPeriod, type LookbackPeriod } from "@/lib/chart-utils";
-import { ALL_MODELS_VALUE } from "@/lib/model-filter";
+import { getDefaultLookbackPeriod, type LookbackPeriod } from "@/lib/charts/chart-utils";
+import { ALL_MODELS_VALUE } from "@/lib/prompts/model-filter";
 
 /** The shared dashboard filter params. Validated once at the `$brand` layout
  *  route (`validateSearch: validateBrandFilterSearch`) so every child route

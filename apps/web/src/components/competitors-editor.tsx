@@ -18,7 +18,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { SiteIcon } from "@/components/site-icon";
-import { cleanAndValidateDomain } from "@/lib/domain-categories";
+import { cleanAndValidateDomain } from "@/lib/citations/domain-categories";
 
 export interface CompetitorEntry {
 	_key: string;

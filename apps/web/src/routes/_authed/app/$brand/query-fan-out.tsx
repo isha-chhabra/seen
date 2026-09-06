@@ -29,7 +29,7 @@ import { useBrand } from "@/hooks/use-brands";
 import { useListFilters } from "@/hooks/use-list-filters";
 import { usePromptsSummary } from "@/hooks/use-prompts-summary";
 import { useQueryFanout } from "@/hooks/use-query-fanout";
-import { type PromptFanoutStat, promptKeywords, type TopQueryStat } from "@/lib/fanout-analysis";
+import { type PromptFanoutStat, promptKeywords, type TopQueryStat } from "@/lib/charts/fanout-analysis";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
 import { getModelDisplayName } from "@/lib/utils";
 

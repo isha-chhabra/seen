@@ -1,6 +1,6 @@
 import { db } from "@workspace/lib/db/db";
 import { sql } from "drizzle-orm";
-import { createMultiplePromptJobSchedulers } from "@/lib/job-scheduler";
+import { createMultiplePromptJobSchedulers } from "@/lib/queue/job-scheduler";
 
 /**
  * Bring prompts' next cycle forward after a configuration change — platforms

@@ -16,7 +16,7 @@ import { Label } from "@workspace/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
 import { cn } from "@workspace/ui/lib/utils";
 import { useState } from "react";
-import { trackEvent } from "@/lib/posthog";
+import { trackEvent } from "@/lib/analytics/posthog";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
 import {
 	cancelInvitationFn,

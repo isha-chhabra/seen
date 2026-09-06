@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlatformOption } from "@/components/platform-picker";
-import { groupPlatformOptions } from "@/lib/platform-groups";
+import { groupPlatformOptions } from "@/lib/prompts/platform-groups";
 
 function option(partial: Partial<PlatformOption> & { model: string }): PlatformOption {
 	return { webSearch: false, access: "api", costPerRunUsd: null, ...partial };

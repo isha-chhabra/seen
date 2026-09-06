@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import type { LookbackPeriod } from "@/lib/chart-utils";
+import type { LookbackPeriod } from "@/lib/charts/chart-utils";
 import { getQueryFanoutFn } from "@/server/query-fanout";
 
 export interface QueryFanoutFilters {

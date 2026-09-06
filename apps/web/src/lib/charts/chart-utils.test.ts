@@ -6,8 +6,8 @@ import {
 	getDaysFromLookback,
 	getDefaultLookbackPeriod,
 	type LookbackPeriod,
-} from "@/lib/chart-utils";
-import { toRoundedPercentages } from "@/lib/domain-categories";
+} from "@/lib/charts/chart-utils";
+import { toRoundedPercentages } from "@/lib/citations/domain-categories";
 
 describe("getDaysFromLookback", () => {
 	it.each<[LookbackPeriod, number]>([

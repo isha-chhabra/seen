@@ -10,8 +10,8 @@ import {
 	isAffiliateRedirectHost,
 	isAffiliateUrl,
 	isForumDomain,
-} from "./domain-categories";
-import { EDITORIAL_DOMAINS } from "./editorial-domains";
+} from "@/lib/citations/domain-categories";
+import { EDITORIAL_DOMAINS } from "@/lib/citations/editorial-domains";
 
 const SOCIAL_MEDIA_DOMAINS = new Set([
 	"facebook.com",

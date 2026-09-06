@@ -17,9 +17,9 @@ import { ChevronDown, Clock, Search, Tag as TagIcon, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { MdSelectAll } from "react-icons/md";
 import { useBrand } from "@/hooks/use-brands";
-import { getDefaultLookbackPeriod, type LookbackPeriod } from "@/lib/chart-utils";
+import { getDefaultLookbackPeriod, type LookbackPeriod } from "@/lib/charts/chart-utils";
 
-export { ALL_MODELS_VALUE, getAvailableModels } from "@/lib/model-filter";
+export { ALL_MODELS_VALUE, getAvailableModels } from "@/lib/prompts/model-filter";
 
 // Filter state lives in the URL, validated by the `$brand` layout route's
 // search schema (see `validateBrandFilterSearch`). The widgets here keep
@@ -35,7 +35,7 @@ import {
 	iconIdForModelFilter,
 	labelForModelFilter,
 	type TrackedTarget,
-} from "@/lib/model-filter";
+} from "@/lib/prompts/model-filter";
 
 /** "all" is the no-filter sentinel; any other string is a concrete model id
  *  from the deployment's `SCRAPE_TARGETS`. Deployments can configure arbitrary

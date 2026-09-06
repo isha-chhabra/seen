@@ -6,7 +6,7 @@ import { cleanOnboardingUrl } from "@workspace/lib/onboarding";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { hasReportAccess, requireAuthSession } from "@/lib/auth/helpers";
-import { sendReportJob } from "@/lib/job-scheduler";
+import { sendReportJob } from "@/lib/queue/job-scheduler";
 
 async function requireReportAccess() {
 	const session = await requireAuthSession();

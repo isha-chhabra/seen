@@ -1,8 +1,8 @@
 import { DEFAULT_APP_ICON, DEFAULT_APP_NAME } from "@workspace/config/constants";
 import type { Brand, Competitor } from "@workspace/lib/db/schema";
 import { Badge } from "@workspace/ui/components/badge";
-import type { ChartDataPoint, LookbackPeriod } from "@/lib/chart-utils";
-import { getBadgeClassName, getBadgeVariant } from "@/lib/chart-utils";
+import type { ChartDataPoint, LookbackPeriod } from "@/lib/charts/chart-utils";
+import { getBadgeClassName, getBadgeVariant } from "@/lib/charts/chart-utils";
 import { BaseChart } from "./base-chart";
 
 export interface ChartExportBranding {

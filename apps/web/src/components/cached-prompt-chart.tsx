@@ -6,7 +6,7 @@ import { memo, useCallback, useMemo } from "react";
 import { useOptionalChartDataContext } from "@/contexts/chart-data-context";
 import { useChartExport } from "@/hooks/use-chart-export";
 import type { LookbackPeriod } from "@/hooks/use-prompt-chart-data";
-import { getBadgeClassName, getBadgeVariant } from "@/lib/chart-utils";
+import { getBadgeClassName, getBadgeVariant } from "@/lib/charts/chart-utils";
 import { BaseChart } from "./base-chart";
 import { ChartActionsFooter } from "./chart-actions-footer";
 import { TextHighlighter } from "./text-highlighter";

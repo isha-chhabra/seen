@@ -8,7 +8,12 @@ import {
 } from "@workspace/ui/components/dropdown-menu";
 import { ArrowUpDown } from "lucide-react";
 import { FilterTriggerButton } from "@/components/filter-bar";
-import { coercePromptOrder, DEFAULT_PROMPT_ORDER, PROMPT_ORDER_OPTIONS, type PromptOrder } from "@/lib/prompt-order";
+import {
+	coercePromptOrder,
+	DEFAULT_PROMPT_ORDER,
+	PROMPT_ORDER_OPTIONS,
+	type PromptOrder,
+} from "@/lib/prompts/prompt-order";
 
 /** Sort control for the prompts list (#60). Reads/writes the `order` URL key
  *  the visibility route declares in its `validateSearch`. Like the filter-bar

@@ -13,8 +13,8 @@ import {
 	type FanoutModelTotalRow,
 	type FanoutPromptTotalRow,
 	UNAVAILABLE_SENTINEL,
-} from "@/lib/fanout-analysis";
-import { parseModelFilter } from "@/lib/model-filter";
+} from "@/lib/charts/fanout-analysis";
+import { parseModelFilter } from "@/lib/prompts/model-filter";
 
 const db = drizzle(process.env.DATABASE_URL!);
 

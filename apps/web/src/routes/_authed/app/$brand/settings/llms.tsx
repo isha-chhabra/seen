@@ -27,7 +27,7 @@ import { type ReactNode, useState } from "react";
 import { formatUsd, PlatformList, PlatformPicker, projectSelectionCostUsd } from "@/components/platform-picker";
 import { UnsavedChangesBar } from "@/components/unsaved-changes-bar";
 import { useBrandRole } from "@/hooks/use-brands";
-import { groupPlatformOptions, type PlatformGroup, platformGroupCopy } from "@/lib/platform-groups";
+import { groupPlatformOptions, type PlatformGroup, platformGroupCopy } from "@/lib/prompts/platform-groups";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
 import { getModelPickerStateFn, type ModelPickerState, updateEnabledModelsFn } from "@/server/platform-picks";
 import { getPremiumPoolFn, type PremiumPool } from "@/server/premium-tracking";

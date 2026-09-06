@@ -16,7 +16,7 @@ import { brandKeys, useBrand } from "@/hooks/use-brands";
 import { useCitations } from "@/hooks/use-citations";
 import { dashboardKeys } from "@/hooks/use-dashboard-summary";
 import { useListFilters } from "@/hooks/use-list-filters";
-import { getDaysFromLookback } from "@/lib/chart-utils";
+import { getDaysFromLookback } from "@/lib/charts/chart-utils";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
 
 export const Route = createFileRoute("/_authed/app/$brand/citations")({

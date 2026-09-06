@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { VisibilityBar, VisibilityBarEmpty, VisibilityBarSkeleton } from "@/components/visibility-bar";
 import { useFilteredVisibility } from "@/hooks/use-filtered-visibility";
 import { useListFilters } from "@/hooks/use-list-filters";
-import { ALL_MODELS_VALUE } from "@/lib/model-filter";
+import { ALL_MODELS_VALUE } from "@/lib/prompts/model-filter";
 
 /**
  * Self-contained visibility bar. Subscribes directly to the filter URL

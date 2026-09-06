@@ -24,8 +24,8 @@ import { Client } from "pg";
 import { z } from "zod";
 import { isAdmin, requireAuthSession } from "@/lib/auth/helpers";
 import { getDeployment } from "@/lib/config/server";
-import { sendImmediatePromptJob } from "@/lib/job-scheduler";
 import { getAdminActiveBrandsOverTime, getAdminBrandRunStats, getAdminRunsOverTime } from "@/lib/postgres-read";
+import { sendImmediatePromptJob } from "@/lib/queue/job-scheduler";
 
 // ============================================================================
 // Admin guard helper

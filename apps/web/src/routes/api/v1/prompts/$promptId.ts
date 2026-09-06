@@ -15,7 +15,7 @@ import { computeSystemTags, sanitizeUserTags } from "@workspace/lib/tag-utils";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { ApiError, createApiHandler } from "@/lib/api/handler";
-import { createPromptJobScheduler, removePromptJobScheduler } from "@/lib/job-scheduler";
+import { createPromptJobScheduler, removePromptJobScheduler } from "@/lib/queue/job-scheduler";
 
 // z.guid(), not z.uuid(): matches the loose 8-4-4-4-12 hex check this API has
 // always used; z.uuid() enforces RFC version bits and rejects existing IDs.

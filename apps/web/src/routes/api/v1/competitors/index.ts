@@ -13,7 +13,7 @@ import { assertCompetitorCap } from "@workspace/lib/entitlements";
 import { count, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ApiError, createApiHandler } from "@/lib/api/handler";
-import { dedupeAliases, dedupeDomains } from "@/lib/domain-categories";
+import { dedupeAliases, dedupeDomains } from "@/lib/citations/domain-categories";
 
 const createCompetitorBody = z.object({
 	brandId: z.string().trim().min(1, "brandId is required"),

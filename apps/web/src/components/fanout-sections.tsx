@@ -21,7 +21,7 @@ import {
 	type TermStat,
 	type WordChangeStat,
 	type WordChanges,
-} from "@/lib/fanout-analysis";
+} from "@/lib/charts/fanout-analysis";
 import { getModelDisplayName } from "@/lib/utils";
 
 export const FANOUT_PURPLE = "#8b5cf6";

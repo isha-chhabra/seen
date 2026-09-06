@@ -14,7 +14,7 @@ import {
 	isExtendedDataPoint,
 	type LookbackPeriod,
 	selectCompetitorsToDisplay,
-} from "@/lib/chart-utils";
+} from "@/lib/charts/chart-utils";
 
 /** The brand's own line is the one people are looking for, so it carries more
  *  weight than the competitors it's plotted against. */

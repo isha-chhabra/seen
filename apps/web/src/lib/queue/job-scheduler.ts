@@ -2,7 +2,7 @@ import { getDefaultDelayHours } from "@workspace/lib/constants";
 import { db } from "@workspace/lib/db/db";
 import { brands, prompts } from "@workspace/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { getBoss } from "@/lib/boss-client";
+import { getBoss } from "@/lib/queue/boss-client";
 
 export function hoursToMs(hours: number): number {
 	return hours * 60 * 60 * 1000;

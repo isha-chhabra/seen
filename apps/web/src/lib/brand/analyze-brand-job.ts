@@ -16,8 +16,8 @@
 import { db } from "@workspace/lib/db/db";
 import { cleanOnboardingUrl, type OnboardingSuggestion } from "@workspace/lib/onboarding";
 import { sql } from "drizzle-orm";
-import { getBoss } from "@/lib/boss-client";
-import { extractDomain } from "@/lib/domain-categories";
+import { extractDomain } from "@/lib/citations/domain-categories";
+import { getBoss } from "@/lib/queue/boss-client";
 
 const ANALYZE_BRAND_QUEUE = "analyze-brand";
 

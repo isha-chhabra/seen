@@ -17,8 +17,8 @@ import { generateReportNarrative } from "@workspace/lib/report/narrative";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuthSession, requireBrandAccess, requireBrandWriteAccess } from "@/lib/auth/helpers";
-import { extractDomain } from "@/lib/domain-categories";
-import { categorizeDomain } from "@/lib/domain-categories.server";
+import { extractDomain } from "@/lib/citations/domain-categories";
+import { categorizeDomain } from "@/lib/citations/domain-categories.server";
 import { getCitationDomainStats } from "@/lib/postgres-read";
 import { resolveTimezone } from "@/lib/timezone-utils";
 

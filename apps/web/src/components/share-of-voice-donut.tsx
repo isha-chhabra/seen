@@ -6,7 +6,7 @@
 import { ChartContainer } from "@workspace/ui/components/chart";
 import { Cell, Pie, PieChart, Tooltip } from "recharts";
 import { SiteIcon } from "@/components/site-icon";
-import { BRAND_COLOR, OTHERS_COLOR, COMPETITOR_PALETTE as PALETTE } from "@/lib/share-of-voice-palette";
+import { BRAND_COLOR, OTHERS_COLOR, COMPETITOR_PALETTE as PALETTE } from "@/lib/charts/share-of-voice-palette";
 import type { ShareOfVoiceEntry } from "@/server/analysis";
 
 interface Slice {

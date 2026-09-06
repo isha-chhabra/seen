@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateWebsiteUrl } from "@/lib/brand-website";
+import { validateWebsiteUrl } from "@/lib/brand/brand-website";
 
 describe("validateWebsiteUrl", () => {
 	it("rejects empty input", () => {

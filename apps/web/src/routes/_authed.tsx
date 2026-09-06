@@ -7,9 +7,9 @@
 import { createFileRoute, Outlet, redirect, useRouteContext } from "@tanstack/react-router";
 import type { ClientConfig } from "@workspace/config/types";
 import { useEffect, useRef } from "react";
+import { identifyCrispUser } from "@/lib/analytics/crisp";
+import { identifyUser, setPersonProperties } from "@/lib/analytics/posthog";
 import { getSession } from "@/lib/auth/session";
-import { identifyCrispUser } from "@/lib/crisp";
-import { identifyUser, setPersonProperties } from "@/lib/posthog";
 
 export const Route = createFileRoute("/_authed")({
 	beforeLoad: async ({ location }) => {

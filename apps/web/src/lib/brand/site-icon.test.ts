@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildBrandDomainIndex, domainForName, faviconUrl } from "@/lib/site-icon";
+import { buildBrandDomainIndex, domainForName, faviconUrl } from "@/lib/brand/site-icon";
 
 describe("faviconUrl", () => {
 	it("asks the icon service for the site behind a bare domain", () => {

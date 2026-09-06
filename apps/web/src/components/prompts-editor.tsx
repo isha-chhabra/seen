@@ -3,7 +3,7 @@ import { type EditablePrompt, type PremiumAllowance, PromptsListEditor } from "@
 import { UnsavedChangesBar } from "@/components/unsaved-changes-bar";
 import { useBrandRole } from "@/hooks/use-brands";
 import { useInvalidatePromptsSummary } from "@/hooks/use-prompts-summary";
-import { trackEvent } from "@/lib/posthog";
+import { trackEvent } from "@/lib/analytics/posthog";
 import { updatePromptsFn } from "@/server/prompts";
 
 interface PromptRow {

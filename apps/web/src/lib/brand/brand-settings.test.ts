@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeBrandUpdate } from "@/lib/brand-settings";
+import { normalizeBrandUpdate } from "@/lib/brand/brand-settings";
 
 describe("normalizeBrandUpdate", () => {
 	it("returns an empty update set when no fields are provided", () => {

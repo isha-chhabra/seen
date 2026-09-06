@@ -23,8 +23,9 @@ import { runStructuredCompletionPrompt } from "@workspace/lib/onboarding";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuthSession, requireBrandAccess } from "@/lib/auth/helpers";
-import { type CitationCategory, extractDomain } from "@/lib/domain-categories";
-import { categorizeDomain } from "@/lib/domain-categories.server";
+import { computeVolatility, type DailyDomainCount, stabilityScore } from "@/lib/charts/visibility-stats";
+import { type CitationCategory, extractDomain } from "@/lib/citations/domain-categories";
+import { categorizeDomain } from "@/lib/citations/domain-categories.server";
 import {
 	getBrandMentionRateByModel,
 	getPerPromptCitationPages,
@@ -34,9 +35,8 @@ import {
 	type PerPromptDailyCompetitorRow,
 	type PerPromptRunStats,
 } from "@/lib/postgres-read";
-import { isBrandedPrompt } from "@/lib/prompt-tags";
+import { isBrandedPrompt } from "@/lib/prompts/prompt-tags";
 import { getTimezoneLookbackRange, resolveTimezone } from "@/lib/timezone-utils";
-import { computeVolatility, type DailyDomainCount, stabilityScore } from "@/lib/visibility-stats";
 import { normalizeText, withoutRepeats } from "@/server/opportunities-dedupe";
 import { resolveFilteredPrompts } from "@/server/prompt-resolution";
 

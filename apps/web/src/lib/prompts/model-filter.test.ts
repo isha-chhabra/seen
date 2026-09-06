@@ -6,7 +6,7 @@ import {
 	parseModelFilter,
 	type TrackedTarget,
 	targetFilterValue,
-} from "@/lib/model-filter";
+} from "@/lib/prompts/model-filter";
 
 const target = (model: string, premium = false): TrackedTarget => ({
 	value: targetFilterValue(model, premium),

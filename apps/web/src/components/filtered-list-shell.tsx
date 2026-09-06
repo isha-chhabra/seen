@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { FilterBar } from "@/components/filter-bar";
 import { FilterSection } from "@/components/page-header";
 import type { ListFilterState } from "@/hooks/use-list-filters";
-import type { TrackedTarget } from "@/lib/model-filter";
+import type { TrackedTarget } from "@/lib/prompts/model-filter";
 
 interface FilteredListShellProps {
 	/** The page's `useListFilters()` result. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addedPlatforms, promptsGainingPremium } from "@/lib/run-config-changes";
+import { addedPlatforms, promptsGainingPremium } from "@/lib/prompts/run-config-changes";
 
 const CONFIGURED = ["chatgpt", "perplexity", "gemini"];
 

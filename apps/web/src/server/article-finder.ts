@@ -36,8 +36,12 @@ import { getWebsiteExcerpt } from "@workspace/lib/website-excerpt";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuthSession, requireBrandAccess, requireBrandWriteAccess } from "@/lib/auth/helpers";
-import { extractDomain, isAffiliateRedirectHost, isAffiliateUrl } from "@/lib/domain-categories";
-import { isAffiliatePublisherDomain, isEcommerceDomain, isPrWireDomain } from "@/lib/domain-categories.server";
+import { extractDomain, isAffiliateRedirectHost, isAffiliateUrl } from "@/lib/citations/domain-categories";
+import {
+	isAffiliatePublisherDomain,
+	isEcommerceDomain,
+	isPrWireDomain,
+} from "@/lib/citations/domain-categories.server";
 
 const MAX_QUERIES = 8;
 const MAX_PAGES = 5;

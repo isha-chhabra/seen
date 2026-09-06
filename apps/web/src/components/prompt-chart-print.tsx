@@ -11,7 +11,7 @@ import {
 	getBadgeVariant,
 	type LookbackPeriod,
 	selectCompetitorsToDisplay,
-} from "@/lib/chart-utils";
+} from "@/lib/charts/chart-utils";
 import { BaseChartPrint } from "./base-chart-print";
 import { ChartDownloadFooter } from "./chart-download-footer";
 

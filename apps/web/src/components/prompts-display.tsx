@@ -19,9 +19,9 @@ import { useBatchChartData } from "@/hooks/use-batch-chart-data";
 import { useBrand } from "@/hooks/use-brands";
 import { useListFilters } from "@/hooks/use-list-filters";
 import { usePromptsSummary } from "@/hooks/use-prompts-summary";
-import type { LookbackPeriod } from "@/lib/chart-utils";
-import { coercePromptOrder, orderPrompts } from "@/lib/prompt-order";
-import { skeletonRows } from "@/lib/skeleton-rows";
+import type { LookbackPeriod } from "@/lib/charts/chart-utils";
+import { skeletonRows } from "@/lib/charts/skeleton-rows";
+import { coercePromptOrder, orderPrompts } from "@/lib/prompts/prompt-order";
 
 interface PromptsDisplayProps {
 	pageTitle: string;

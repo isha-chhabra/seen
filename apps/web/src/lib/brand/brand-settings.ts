@@ -1,5 +1,5 @@
-import { validateWebsiteUrl } from "@/lib/brand-website";
-import { cleanAndValidateDomain } from "@/lib/domain-categories";
+import { validateWebsiteUrl } from "@/lib/brand/brand-website";
+import { cleanAndValidateDomain } from "@/lib/citations/domain-categories";
 
 /**
  * Pure normalization/validation for the "edit brand settings" flow, extracted

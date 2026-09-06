@@ -10,7 +10,7 @@ import { brands, competitors, prompts } from "@workspace/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { ApiError, createApiHandler } from "@/lib/api/handler";
-import { extractDomain, normalizeUrl } from "@/lib/domain-categories";
+import { extractDomain, normalizeUrl } from "@/lib/citations/domain-categories";
 import {
 	getPromptCitationUrlStats,
 	getPromptMentionSummary,

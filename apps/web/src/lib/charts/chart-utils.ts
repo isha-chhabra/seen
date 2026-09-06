@@ -1,5 +1,5 @@
 import { getDefaultDelayHours } from "@workspace/lib/constants";
-import { CITATION_CATEGORIES, type CitationCategory } from "@/lib/domain-categories";
+import { CITATION_CATEGORIES, type CitationCategory } from "@/lib/citations/domain-categories";
 import type { PerPromptDailyCitationStats, PerPromptVisibilityPoint } from "@/lib/postgres-read";
 
 export type LookbackPeriod = "1w" | "1m" | "3m" | "6m" | "1y" | "all";

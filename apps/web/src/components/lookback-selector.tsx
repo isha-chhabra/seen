@@ -2,7 +2,7 @@ import { useSearch } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useBrand } from "@/hooks/use-brands";
 import { coerceLookback, useFilterNavigate } from "@/hooks/use-list-filters";
-import { getDefaultLookbackPeriod, type LookbackPeriod } from "@/lib/chart-utils";
+import { getDefaultLookbackPeriod, type LookbackPeriod } from "@/lib/charts/chart-utils";
 
 function getLookbackLabel(lookback: LookbackPeriod): string {
 	switch (lookback) {

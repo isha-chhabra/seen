@@ -5,8 +5,8 @@ import { Label } from "@workspace/ui/components/label";
 import { useState } from "react";
 import FullPageCard from "@/components/full-page-card";
 import { PlatformSelectionStep } from "@/components/platform-selection-step";
-import { validateWebsiteUrl } from "@/lib/brand-website";
-import { trackEvent } from "@/lib/posthog";
+import { trackEvent } from "@/lib/analytics/posthog";
+import { validateWebsiteUrl } from "@/lib/brand/brand-website";
 import { createBrandFn } from "@/server/brands";
 import type { OnboardingPlatformState } from "@/server/platform-picks";
 

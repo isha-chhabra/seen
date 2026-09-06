@@ -7,7 +7,7 @@
  */
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PromptsDisplay } from "@/components/prompts-display";
-import { coercePromptOrder, DEFAULT_PROMPT_ORDER, type PromptOrder } from "@/lib/prompt-order";
+import { coercePromptOrder, DEFAULT_PROMPT_ORDER, type PromptOrder } from "@/lib/prompts/prompt-order";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
 
 export const Route = createFileRoute("/_authed/app/$brand/visibility")({

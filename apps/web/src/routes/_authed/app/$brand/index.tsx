@@ -41,8 +41,8 @@ import { TrendChart, type TrendPoint } from "@/components/trend-chart";
 import { useBrand } from "@/hooks/use-brands";
 import { useDashboardSummary } from "@/hooks/use-dashboard-summary";
 import { useShareOfVoice } from "@/hooks/use-share-of-voice";
-import { describeTargetSchedule, labelForModelFilter, type TrackedTarget } from "@/lib/model-filter";
-import { setPersonProperties } from "@/lib/posthog";
+import { setPersonProperties } from "@/lib/analytics/posthog";
+import { describeTargetSchedule, labelForModelFilter, type TrackedTarget } from "@/lib/prompts/model-filter";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
 
 function getVisibilityBgColor(value: number): string {

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // after the first talking to an already-initialised module.
 async function loadCrisp() {
 	vi.resetModules();
-	return import("../crisp");
+	return import("@/lib/analytics/crisp");
 }
 
 // The unit project runs in Node, so the two browser globals need standing up.

@@ -26,7 +26,7 @@ import { useCallback, useEffect, useState } from "react";
 import { brandKeys, useBrand } from "@/hooks/use-brands";
 import { citationKeys } from "@/hooks/use-citations";
 import { dashboardKeys } from "@/hooks/use-dashboard-summary";
-import { cleanAndValidateDomain } from "@/lib/domain-categories";
+import { cleanAndValidateDomain } from "@/lib/citations/domain-categories";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
 import { deleteBrandFn, getMyBrandRoleFn, updateBrandFn } from "@/server/brands";
 

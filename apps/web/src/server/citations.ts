@@ -6,14 +6,14 @@ import { getEffectiveBrandedStatus } from "@workspace/lib/tag-utils";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuthSession, requireBrandAccess } from "@/lib/auth/helpers";
-import { applyPerPromptKeyedLVCF, citationDateWindow } from "@/lib/chart-utils";
+import { applyPerPromptKeyedLVCF, citationDateWindow } from "@/lib/charts/chart-utils";
 import {
 	type CitationDomain,
 	type CitationUrl,
 	rollUpCitationDomains,
 	rollUpCitationUrls,
 	tallyCitations,
-} from "@/lib/citation-rollup";
+} from "@/lib/citations/citation-rollup";
 import {
 	CITATION_CATEGORIES,
 	CITATION_PAGE_TYPES,
@@ -26,11 +26,11 @@ import {
 	normalizeUrl,
 	resolvePageType,
 	toRoundedPercentages,
-} from "@/lib/domain-categories";
+} from "@/lib/citations/domain-categories";
 import {
 	categorizeDomain as categorizeDomainShared,
 	classifyUrl as classifyUrlShared,
-} from "@/lib/domain-categories.server";
+} from "@/lib/citations/domain-categories.server";
 import { buildGoogleModule, emptyGoogleModule, type GoogleModule } from "@/lib/google-module";
 import {
 	type CitationUrlStats,

@@ -15,8 +15,8 @@ import { assertCanAddPrompts, assertCompetitorCap, getBrandOrganizationId } from
 import { computeSystemTags, sanitizeUserTags } from "@workspace/lib/tag-utils";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { dedupeAliases, dedupeDomains } from "@/lib/domain-categories";
-import { createMultiplePromptJobSchedulers } from "@/lib/job-scheduler";
+import { dedupeAliases, dedupeDomains } from "@/lib/citations/domain-categories";
+import { createMultiplePromptJobSchedulers } from "@/lib/queue/job-scheduler";
 
 // ============================================================================
 // Errors

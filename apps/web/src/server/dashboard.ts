@@ -11,14 +11,14 @@ import {
 	applyPerPromptLVCF,
 	generateDateRange,
 	type LookbackPeriod,
-} from "@/lib/chart-utils";
+} from "@/lib/charts/chart-utils";
 import {
 	type CitationCategory,
 	emptyCategoryCounts,
 	extractDomain,
 	toRoundedPercentages,
-} from "@/lib/domain-categories";
-import { categorizeDomain } from "@/lib/domain-categories.server";
+} from "@/lib/citations/domain-categories";
+import { categorizeDomain } from "@/lib/citations/domain-categories.server";
 import {
 	getDashboardSummary,
 	getPerPromptDailyCitationStats,

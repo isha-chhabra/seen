@@ -8,7 +8,7 @@ import { IconWorld } from "@tabler/icons-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { cn } from "@workspace/ui/lib/utils";
 import { useState } from "react";
-import { faviconUrl } from "@/lib/site-icon";
+import { faviconUrl } from "@/lib/brand/site-icon";
 
 export type SiteIconSize = "xs" | "sm" | "md" | "lg";
 

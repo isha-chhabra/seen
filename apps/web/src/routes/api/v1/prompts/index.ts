@@ -10,7 +10,7 @@ import { computeSystemTags, sanitizeUserTags } from "@workspace/lib/tag-utils";
 import { count, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ApiError, createApiHandler } from "@/lib/api/handler";
-import { createPromptJobScheduler } from "@/lib/job-scheduler";
+import { createPromptJobScheduler } from "@/lib/queue/job-scheduler";
 
 const createPromptBody = z.object({
 	brandId: z.string().trim().min(1, "brandId is required"),

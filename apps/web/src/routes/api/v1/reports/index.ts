@@ -12,7 +12,7 @@ import { cleanOnboardingUrl } from "@workspace/lib/onboarding";
 import { count, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ApiError, createApiHandler } from "@/lib/api/handler";
-import { sendReportJob } from "@/lib/job-scheduler";
+import { sendReportJob } from "@/lib/queue/job-scheduler";
 
 const createReportBody = z.object({
 	brandName: z

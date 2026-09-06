@@ -20,7 +20,7 @@ import { brandKeys, useBrand } from "@/hooks/use-brands";
 import { citationKeys } from "@/hooks/use-citations";
 import { dashboardKeys } from "@/hooks/use-dashboard-summary";
 import { promptsSummaryKeys } from "@/hooks/use-prompts-summary";
-import { trackEvent } from "@/lib/posthog";
+import { trackEvent } from "@/lib/analytics/posthog";
 import {
 	cancelAnalyzeBrandFn,
 	getAnalyzeBrandStatusFn,

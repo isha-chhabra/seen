@@ -22,8 +22,8 @@ import { useListFilters } from "@/hooks/use-list-filters";
 import { usePromptsSummary } from "@/hooks/use-prompts-summary";
 import { useShareOfVoice } from "@/hooks/use-share-of-voice";
 import { useSiteIcons } from "@/hooks/use-site-icons";
+import { shareOfVoiceColorMap } from "@/lib/charts/share-of-voice-palette";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
-import { shareOfVoiceColorMap } from "@/lib/share-of-voice-palette";
 
 export const Route = createFileRoute("/_authed/app/$brand/share-of-voice")({
 	head: ({ matches, match }) => {

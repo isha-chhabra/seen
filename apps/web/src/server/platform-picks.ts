@@ -30,8 +30,8 @@ import {
 	requirePlatformPicksEditable,
 } from "@/lib/auth/helpers";
 import { getDeployment } from "@/lib/config/server";
-import { expeditePromptRuns } from "@/lib/expedite-prompts";
-import { addedPlatforms } from "@/lib/run-config-changes";
+import { expeditePromptRuns } from "@/lib/prompts/expedite-prompts";
+import { addedPlatforms } from "@/lib/prompts/run-config-changes";
 
 export type PlatformOption = {
 	model: string;

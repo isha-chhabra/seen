@@ -48,11 +48,11 @@ import {
 	requirePlatformPicksEditable,
 } from "@/lib/auth/helpers";
 import { evaluateRequireCanCreateBrands, resolveBrandOrganization } from "@/lib/auth/policies";
-import { normalizeBrandUpdate } from "@/lib/brand-settings";
-import { validateWebsiteUrl } from "@/lib/brand-website";
+import { normalizeBrandUpdate } from "@/lib/brand/brand-settings";
+import { validateWebsiteUrl } from "@/lib/brand/brand-website";
+import { cleanAndValidateDomain } from "@/lib/citations/domain-categories";
 import { getDeployment } from "@/lib/config/server";
-import { cleanAndValidateDomain } from "@/lib/domain-categories";
-import { type TrackedTarget, targetFilterValue } from "@/lib/model-filter";
+import { type TrackedTarget, targetFilterValue } from "@/lib/prompts/model-filter";
 
 const BRAND_ORG_ERRORS = {
 	"no-organization": "No organization for the current user",

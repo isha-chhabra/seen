@@ -13,13 +13,13 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireAuthSession, requireBrandAccess } from "@/lib/auth/helpers";
 import {
 	type AnalyzeBrandStatus,
 	cancelAnalyzeBrand,
 	enqueueAnalyzeBrand,
 	getAnalyzeBrandStatus,
-} from "@/lib/analyze-brand-job";
-import { requireAuthSession, requireBrandAccess } from "@/lib/auth/helpers";
+} from "@/lib/brand/analyze-brand-job";
 import { saveWizardOnboarding, wizardOnboardingInputSchema } from "@/server/onboarding-core";
 
 /**

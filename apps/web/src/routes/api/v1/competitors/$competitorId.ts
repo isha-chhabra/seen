@@ -13,7 +13,7 @@ import { competitors } from "@workspace/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { ApiError, createApiHandler } from "@/lib/api/handler";
-import { dedupeAliases, dedupeDomains } from "@/lib/domain-categories";
+import { dedupeAliases, dedupeDomains } from "@/lib/citations/domain-categories";
 
 // z.guid(), not z.uuid(): matches the loose 8-4-4-4-12 hex check this API has
 // always used; z.uuid() enforces RFC version bits and rejects existing IDs.

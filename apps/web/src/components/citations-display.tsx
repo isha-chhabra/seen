@@ -15,7 +15,7 @@ import {
 	CITATION_PAGE_TYPES,
 	type CitationCategory,
 	PAGE_TYPE_CONFIG,
-} from "@/lib/domain-categories";
+} from "@/lib/citations/domain-categories";
 
 export type {
 	CitationData,

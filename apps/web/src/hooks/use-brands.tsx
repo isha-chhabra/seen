@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import type { BrandWithPrompts, Competitor } from "@workspace/lib/db/schema";
-import type { TrackedTarget } from "@/lib/model-filter";
+import type { TrackedTarget } from "@/lib/prompts/model-filter";
 import { getBrand, getBrands, getCompetitors, getMyBrandRoleFn } from "@/server/brands";
 
 export type BrandWithPromptsAndDataInfo = BrandWithPrompts & {
