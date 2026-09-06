@@ -220,8 +220,8 @@ function BrandSettingsPage() {
 							<Tooltip>
 								<TooltipTrigger render={<IconInfoCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />} />
 								<TooltipContent className="max-w-xs text-xs font-normal">
-									Alternative names for your brand (sub-brands, product lines, abbreviations). Used for mention detection
-									in <strong>future</strong> prompt runs only, does not apply retroactively to past results.
+									Alternative names for your brand (sub-brands, product lines, abbreviations). Used for mention
+									detection in <strong>future</strong> prompt runs only, does not apply retroactively to past results.
 								</TooltipContent>
 							</Tooltip>
 						</Label>
@@ -237,7 +237,9 @@ function BrandSettingsPage() {
 
 				{error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 				{success && (
-					<div className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">{success}</div>
+					<div className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">
+						{success}
+					</div>
 				)}
 
 				<Button type="submit" disabled={isSubmitting || isViewer}>

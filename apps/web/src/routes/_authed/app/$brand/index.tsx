@@ -36,6 +36,7 @@ function LastRunLine({ by, at }: { by: string | null; at: string | null }) {
 		</p>
 	);
 }
+
 import { TrendChart, type TrendPoint } from "@/components/trend-chart";
 import { useBrand } from "@/hooks/use-brands";
 import { useDashboardSummary } from "@/hooks/use-dashboard-summary";

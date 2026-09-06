@@ -3,8 +3,9 @@
  * US affiliate articles to pitch this brand to, split by publisher authority.
  * The latest run per brand is persisted, so opening the tab shows it for free.
  */
-import { createFileRoute } from "@tanstack/react-router";
+
 import { IconBolt, IconCalendar, IconLoader2, IconMail, IconSearch } from "@tabler/icons-react";
+import { createFileRoute } from "@tanstack/react-router";
 import { Button } from "@workspace/ui/components/button";
 import { Calendar } from "@workspace/ui/components/calendar";
 import { Checkbox } from "@workspace/ui/components/checkbox";
@@ -105,7 +106,9 @@ function ArticleRow({ r, brandName }: { r: ArticleResult; brandName?: string }) 
 			{(r.linksCompetitor || r.brandAlreadyMentioned || r.relevance === "weak") && (
 				<div className="mt-1.5 flex gap-3 pl-[38px] text-[11px]">
 					{r.linksCompetitor && <span className="font-medium text-primary">Links a competitor</span>}
-					{r.brandAlreadyMentioned && <span className="text-muted-foreground">Mentions {brandName ?? "the brand"}</span>}
+					{r.brandAlreadyMentioned && (
+						<span className="text-muted-foreground">Mentions {brandName ?? "the brand"}</span>
+					)}
 					{r.relevance === "weak" && <span className="text-muted-foreground">Loose fit</span>}
 				</div>
 			)}
@@ -220,14 +223,32 @@ function ArticleFinderPage() {
 	function exportCsv() {
 		const esc = (v: string | number) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 		const rows = [
-			["category", "fit score", "article name", "article link", "published", "links competitor", "fit reasoning", "contact"]
+			[
+				"category",
+				"fit score",
+				"article name",
+				"article link",
+				"published",
+				"links competitor",
+				"fit reasoning",
+				"contact",
+			]
 				.map(esc)
 				.join(","),
 		];
 		const add = (label: string, list: ArticleResult[]) => {
 			for (const r of list)
 				rows.push(
-					[label, r.fitScore, r.title, r.url, r.publishedDate ?? "", r.linksCompetitor ? "yes" : "", r.verdict, r.contactHint ?? ""]
+					[
+						label,
+						r.fitScore,
+						r.title,
+						r.url,
+						r.publishedDate ?? "",
+						r.linksCompetitor ? "yes" : "",
+						r.verdict,
+						r.contactHint ?? "",
+					]
 						.map(esc)
 						.join(","),
 				);
@@ -238,7 +259,10 @@ function ArticleFinderPage() {
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
 		a.href = url;
-		a.download = `article-finder-${(brand?.name ?? "brand").replace(/[^\w.\- ]+/g, "").trim().replace(/\s+/g, "-")}-${ymd(new Date())}.csv`;
+		a.download = `article-finder-${(brand?.name ?? "brand")
+			.replace(/[^\w.\- ]+/g, "")
+			.trim()
+			.replace(/\s+/g, "-")}-${ymd(new Date())}.csv`;
 		document.body.appendChild(a);
 		a.click();
 		a.remove();
@@ -330,7 +354,9 @@ function ArticleFinderPage() {
 								<span>Strict: only outlets with confirmed affiliate links</span>
 								<Switch checked={strict} onCheckedChange={setStrict} disabled={busy} />
 							</label>
-							<p className="text-xs text-muted-foreground">More depth means more results and a higher cost per search.</p>
+							<p className="text-xs text-muted-foreground">
+								More depth means more results and a higher cost per search.
+							</p>
 						</div>
 
 						{error && <p className="text-sm text-destructive">{error}</p>}
@@ -347,7 +373,12 @@ function ArticleFinderPage() {
 						<div className="flex items-center justify-between">
 							<span className="text-sm font-medium">Review queries</span>
 							<div className="flex gap-4 text-xs text-muted-foreground">
-								<button type="button" onClick={genQueries} disabled={busy || isViewer} className="transition-colors hover:text-foreground">
+								<button
+									type="button"
+									onClick={genQueries}
+									disabled={busy || isViewer}
+									className="transition-colors hover:text-foreground"
+								>
 									Regenerate
 								</button>
 								<button
@@ -362,11 +393,13 @@ function ArticleFinderPage() {
 						</div>
 						<ul className="-mx-2">
 							{queries.map((q, i) => (
-								<li key={`${q.query}-${i}`}>
+								<li key={q.query}>
 									<label className="flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 hover:bg-accent">
 										<Checkbox
 											checked={q.on}
-											onCheckedChange={(v) => setQueries((qs) => qs.map((x, j) => (j === i ? { ...x, on: v === true } : x)))}
+											onCheckedChange={(v) =>
+												setQueries((qs) => qs.map((x, j) => (j === i ? { ...x, on: v === true } : x)))
+											}
 											disabled={busy}
 											className="mt-0.5"
 										/>

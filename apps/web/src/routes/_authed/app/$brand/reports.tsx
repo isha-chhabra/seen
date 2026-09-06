@@ -2,6 +2,8 @@
  * /app/$brand/reports, build a two-page AI-visibility report and download it as PDF.
  * One report per brand per rolling 7 days (enforced server-side).
  */
+
+import { IconCalendar, IconLoader2, IconReport } from "@tabler/icons-react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Button } from "@workspace/ui/components/button";
 import { Calendar } from "@workspace/ui/components/calendar";
@@ -10,11 +12,10 @@ import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover";
 import { Switch } from "@workspace/ui/components/switch";
-import { IconCalendar, IconReport, IconLoader2 } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { PageHeader } from "@/components/page-header";
-import { ReportDocument, type ReportDocProps } from "@/components/report/report-document";
+import { type ReportDocProps, ReportDocument } from "@/components/report/report-document";
 import { useBrand, useBrandRole } from "@/hooks/use-brands";
 import { downloadReportPdf } from "@/lib/report-pdf";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
@@ -45,7 +46,15 @@ function prettyAt(iso: string): string {
 	});
 }
 
-function RangeField({ value, onChange, label }: { value?: DateRange; onChange: (r?: DateRange) => void; label: string }) {
+function RangeField({
+	value,
+	onChange,
+	label,
+}: {
+	value?: DateRange;
+	onChange: (r?: DateRange) => void;
+	label: string;
+}) {
 	return (
 		<div className="space-y-1.5">
 			<Label>{label}</Label>
@@ -78,7 +87,9 @@ function ReportsPage() {
 	const [name, setName] = useState("");
 	const [status, setStatus] = useState<"idle" | "working" | "error">("idle");
 	const [error, setError] = useState<string | null>(null);
-	const [availability, setAvailability] = useState<{ canGenerate: boolean; nextAvailableAt: string | null } | null>(null);
+	const [availability, setAvailability] = useState<{ canGenerate: boolean; nextAvailableAt: string | null } | null>(
+		null,
+	);
 	const [doc, setDoc] = useState<(ReportDocProps & { fileName: string }) | null>(null);
 	const [lastReport, setLastReport] = useState<(ReportDocProps & { createdAt: string; name: string }) | null>(null);
 	const docRef = useRef<HTMLDivElement>(null);
@@ -198,11 +209,21 @@ function ReportsPage() {
 						{error && <p className="text-sm text-destructive">{error}</p>}
 
 						<Button onClick={generate} disabled={!canSubmit} className="h-11 w-full gap-2 font-semibold">
-							{status === "working" ? <IconLoader2 className="size-4 animate-spin" /> : <IconReport className="size-4" />}
-							{status === "working" ? "Generating…" : inCooldown ? `Next available ${nextLabel ?? "soon"}` : "Generate report"}
+							{status === "working" ? (
+								<IconLoader2 className="size-4 animate-spin" />
+							) : (
+								<IconReport className="size-4" />
+							)}
+							{status === "working"
+								? "Generating…"
+								: inCooldown
+									? `Next available ${nextLabel ?? "soon"}`
+									: "Generate report"}
 						</Button>
 
-						<p className="text-xs text-muted-foreground">One report per brand per week. The PDF downloads automatically.</p>
+						<p className="text-xs text-muted-foreground">
+							One report per brand per week. The PDF downloads automatically.
+						</p>
 					</CardContent>
 				</Card>
 

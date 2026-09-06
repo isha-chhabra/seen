@@ -1,4 +1,4 @@
-import { DEFAULT_APP_NAME, BRAND_ACCENT_COLOR } from "@workspace/config/constants";
+import { BRAND_ACCENT_COLOR, DEFAULT_APP_NAME } from "@workspace/config/constants";
 import { createElement } from "react";
 
 export const ACCENT_COLORS = ["#2563eb", "#f4d35e", "#ee964b", "#f95738"];

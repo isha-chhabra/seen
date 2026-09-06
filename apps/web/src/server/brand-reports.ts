@@ -31,8 +31,8 @@ const ENGINE_LABEL: Record<string, string> = {
 	perplexity: "Perplexity",
 	"google-ai-mode": "Google AI Mode",
 	"google-ai-overview": "Google AI Overview",
-	"claude": "Claude",
-	"copilot": "Microsoft Copilot",
+	claude: "Claude",
+	copilot: "Microsoft Copilot",
 };
 const CATEGORY_LABEL: Record<string, string> = {
 	affiliate: "Affiliate / roundup",
@@ -126,7 +126,10 @@ async function periodStats(
 	for (const r of competitorRows) {
 		competitorTotals.set(r.name, (competitorTotals.get(r.name) ?? 0) + r.mentions);
 		const cur = perPromptTopCompetitor.get(r.prompt_id);
-		if (!cur || r.mentions > (competitorRows.find((x) => x.prompt_id === r.prompt_id && x.name === cur)?.mentions ?? 0)) {
+		if (
+			!cur ||
+			r.mentions > (competitorRows.find((x) => x.prompt_id === r.prompt_id && x.name === cur)?.mentions ?? 0)
+		) {
 			perPromptTopCompetitor.set(r.prompt_id, r.name);
 		}
 	}
@@ -159,9 +162,15 @@ async function periodStats(
 		totalPrompts: totals.total_prompts ?? 0,
 		visibility: totals.visibility,
 		sovPct: sovDenom > 0 ? Math.round((totals.brand_mentions * 100) / sovDenom) : null,
-		perPrompt: perPrompt.map(({ prompt_id, runs, mention_rate }) => ({ promptId: prompt_id, runs, mentionRate: mention_rate })),
+		perPrompt: perPrompt.map(({ prompt_id, runs, mention_rate }) => ({
+			promptId: prompt_id,
+			runs,
+			mentionRate: mention_rate,
+		})),
 		perPromptTopCompetitor,
-		competitorOnlyPromptIds: perPrompt.filter((p) => p.runs >= 3 && p.comp_only / p.runs >= 0.5).map((p) => p.prompt_id),
+		competitorOnlyPromptIds: perPrompt
+			.filter((p) => p.runs >= 3 && p.comp_only / p.runs >= 0.5)
+			.map((p) => p.prompt_id),
 		perEngine,
 		competitors,
 		dailyVisibility,
@@ -197,7 +206,11 @@ function buildDigest(args: {
 
 	const engines = main.perEngine
 		.filter((e) => e.runs >= 3)
-		.map((e) => ({ assistant: ENGINE_LABEL[e.engine] ?? e.engine, recommendedRate: `${pct(e.mentionRate)}%`, answersChecked: e.runs }))
+		.map((e) => ({
+			assistant: ENGINE_LABEL[e.engine] ?? e.engine,
+			recommendedRate: `${pct(e.mentionRate)}%`,
+			answersChecked: e.runs,
+		}))
 		.sort((a, b) => Number.parseInt(b.recommendedRate) - Number.parseInt(a.recommendedRate));
 
 	const sourceTotal = main.sources.reduce((s, d) => s + d.count, 0) || 1;
@@ -326,8 +339,14 @@ export const generateBrandReportFn = createServerFn({ method: "POST" })
 			name: z.string().trim().min(1).max(120),
 			periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 			periodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-			compareStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-			compareEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+			compareStart: z
+				.string()
+				.regex(/^\d{4}-\d{2}-\d{2}$/)
+				.optional(),
+			compareEnd: z
+				.string()
+				.regex(/^\d{4}-\d{2}-\d{2}$/)
+				.optional(),
 		}),
 	)
 	.handler(async ({ data }) => {
@@ -395,12 +414,17 @@ export const generateBrandReportFn = createServerFn({ method: "POST" })
 				narrative,
 			};
 		} catch (err) {
-			await db.update(brands).set({ lastReportGeneratedAt: last ?? null }).where(eq(brands.id, data.brandId));
+			await db
+				.update(brands)
+				.set({ lastReportGeneratedAt: last ?? null })
+				.where(eq(brands.id, data.brandId));
 			await db
 				.update(brandReports)
 				.set({ status: "failed", error: err instanceof Error ? err.message : "narrative generation failed" })
 				.where(eq(brandReports.id, report.id));
-			throw new Error("The report's written analysis could not be generated. Your weekly allowance was not used — try again.");
+			throw new Error(
+				"The report's written analysis could not be generated. Your weekly allowance was not used — try again.",
+			);
 		}
 	});
 

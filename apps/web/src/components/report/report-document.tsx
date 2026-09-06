@@ -41,13 +41,33 @@ const page: React.CSSProperties = {
 	position: "relative",
 };
 const h2: React.CSSProperties = { fontSize: 16, fontWeight: 700, margin: "0 0 10px" };
-const label: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: MUTE, textTransform: "uppercase" };
+const label: React.CSSProperties = {
+	fontSize: 10,
+	fontWeight: 700,
+	letterSpacing: 0.6,
+	color: MUTE,
+	textTransform: "uppercase",
+};
 const note: React.CSSProperties = { color: MUTE };
 
 function Head({ brandName, periodLabel, compareLabel, n }: ReportDocProps & { n: number }) {
-	const titles = ["Where you stand", "Which questions you win and lose", "Which sites the AI trusts", "What to do next"];
+	const titles = [
+		"Where you stand",
+		"Which questions you win and lose",
+		"Which sites the AI trusts",
+		"What to do next",
+	];
 	return (
-		<div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: `2px solid ${PINK}`, paddingBottom: 10, marginBottom: 18 }}>
+		<div
+			style={{
+				display: "flex",
+				justifyContent: "space-between",
+				alignItems: "flex-start",
+				borderBottom: `2px solid ${PINK}`,
+				paddingBottom: 10,
+				marginBottom: 18,
+			}}
+		>
 			<div>
 				<span style={{ fontFamily: "'Titan One', system-ui", fontSize: 24, color: PINK, lineHeight: 1 }}>seen</span>
 				<div style={{ fontSize: 19, fontWeight: 700, marginTop: 8 }}>{brandName} AI Visibility Report</div>
@@ -67,7 +87,20 @@ function Head({ brandName, periodLabel, compareLabel, n }: ReportDocProps & { n:
 
 function Foot({ periodLabel }: { periodLabel: string }) {
 	return (
-		<div style={{ position: "absolute", left: 60, right: 60, bottom: 34, borderTop: `1px solid ${LINE}`, paddingTop: 8, fontSize: 9, color: MUTE, display: "flex", justifyContent: "space-between" }}>
+		<div
+			style={{
+				position: "absolute",
+				left: 60,
+				right: 60,
+				bottom: 34,
+				borderTop: `1px solid ${LINE}`,
+				paddingTop: 8,
+				fontSize: 9,
+				color: MUTE,
+				display: "flex",
+				justifyContent: "space-between",
+			}}
+		>
 			<span>Seen AI Visibility Report</span>
 			<span>{periodLabel}</span>
 		</div>
@@ -76,7 +109,16 @@ function Foot({ periodLabel }: { periodLabel: string }) {
 
 function Callout({ children }: { children: React.ReactNode }) {
 	return (
-		<div style={{ background: "#fdf2f8", border: `1px solid #fbcfe8`, borderRadius: 10, padding: "14px 16px", fontSize: 12, lineHeight: 1.6 }}>
+		<div
+			style={{
+				background: "#fdf2f8",
+				border: `1px solid #fbcfe8`,
+				borderRadius: 10,
+				padding: "14px 16px",
+				fontSize: 12,
+				lineHeight: 1.6,
+			}}
+		>
 			{children}
 		</div>
 	);
@@ -98,8 +140,8 @@ function Page1(p: ReportDocProps) {
 				{o.headline}
 			</Callout>
 			<div style={{ display: "flex", gap: 12, margin: "22px 0 24px" }}>
-				{o.keyNumbers.map((k, i) => (
-					<div key={i} style={{ flex: 1, border: `1px solid ${LINE}`, borderRadius: 10, padding: "14px 16px" }}>
+				{o.keyNumbers.map((k) => (
+					<div key={k.label} style={{ flex: 1, border: `1px solid ${LINE}`, borderRadius: 10, padding: "14px 16px" }}>
 						<div style={label}>{k.label}</div>
 						<div style={{ fontSize: 26, fontWeight: 700, margin: "6px 0 4px", color: PINK }}>{k.value}</div>
 						<div style={{ ...note, fontSize: 11 }}>{k.whatItMeans}</div>
@@ -122,13 +164,21 @@ function Page1(p: ReportDocProps) {
 }
 
 // ── Page 2 ────────────────────────────────────────────────────────────
-function QList({ items, kind }: { items: { question: string; detail: string; recommendedInstead?: string }[]; kind: "win" | "lose" }) {
+function QList({
+	items,
+	kind,
+}: {
+	items: { question: string; detail: string; recommendedInstead?: string }[];
+	kind: "win" | "lose";
+}) {
 	return (
 		<div>
 			{items.map((it, i) => (
-				<div key={i} style={{ padding: "6px 0", borderTop: i ? `1px solid #f1f5f9` : "none" }}>
+				<div key={it.question} style={{ padding: "6px 0", borderTop: i ? `1px solid #f1f5f9` : "none" }}>
 					<div style={{ fontWeight: 600, fontSize: 12 }}>
-						<span style={{ color: kind === "win" ? "#059669" : "#dc2626", marginRight: 6 }}>{kind === "win" ? "▲" : "▼"}</span>
+						<span style={{ color: kind === "win" ? "#059669" : "#dc2626", marginRight: 6 }}>
+							{kind === "win" ? "▲" : "▼"}
+						</span>
 						“{it.question}”
 					</div>
 					<div style={{ ...note, fontSize: 11, marginTop: 2 }}>{it.detail}</div>
@@ -157,7 +207,14 @@ function Page2(p: ReportDocProps) {
 				</div>
 				<div style={{ flex: 1 }}>
 					<div style={h2}>AI leaves you out here</div>
-					<QList items={b.losing.map((l) => ({ question: l.question, detail: l.detail, recommendedInstead: l.recommendedInstead }))} kind="lose" />
+					<QList
+						items={b.losing.map((l) => ({
+							question: l.question,
+							detail: l.detail,
+							recommendedInstead: l.recommendedInstead,
+						}))}
+						kind="lose"
+					/>
 				</div>
 			</div>
 			<div style={{ marginTop: 24 }}>
@@ -209,7 +266,7 @@ function Page3(p: ReportDocProps) {
 					<div style={label}>The sites AI relied on most</div>
 					<div style={{ marginTop: 8 }}>
 						{s.keySources.map((k, i) => (
-							<div key={i} style={{ padding: "7px 0", borderTop: i ? `1px solid #f1f5f9` : "none" }}>
+							<div key={k.site} style={{ padding: "7px 0", borderTop: i ? `1px solid #f1f5f9` : "none" }}>
 								<div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5 }}>
 									<strong>{k.site}</strong>
 									<span style={{ ...note, fontSize: 10 }}>{k.type}</span>
@@ -230,6 +287,7 @@ function Page3(p: ReportDocProps) {
 }
 
 // ── Page 4 ────────────────────────────────────────────────────────────
+const PAGE_KEYS = ["summary", "questions", "sources", "actions"];
 const PRI: Record<string, string> = { high: "#dc2626", medium: "#d97706", low: "#0891b2" };
 function Page4(p: ReportDocProps) {
 	return (
@@ -238,8 +296,23 @@ function Page4(p: ReportDocProps) {
 			<div style={h2}>Your action plan</div>
 			<div style={{ marginBottom: 16 }}>
 				{p.narrative.actionPlan.map((a, i) => (
-					<div key={i} style={{ display: "flex", gap: 10, padding: "7px 0", borderTop: i ? `1px solid #f1f5f9` : "none" }}>
-						<span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", color: "#fff", background: PRI[a.priority] ?? MUTE, borderRadius: 5, padding: "3px 6px", height: "fit-content", whiteSpace: "nowrap" }}>
+					<div
+						key={a.action}
+						style={{ display: "flex", gap: 10, padding: "7px 0", borderTop: i ? `1px solid #f1f5f9` : "none" }}
+					>
+						<span
+							style={{
+								fontSize: 9,
+								fontWeight: 700,
+								textTransform: "uppercase",
+								color: "#fff",
+								background: PRI[a.priority] ?? MUTE,
+								borderRadius: 5,
+								padding: "3px 6px",
+								height: "fit-content",
+								whiteSpace: "nowrap",
+							}}
+						>
 							{a.priority}
 						</span>
 						<div>
@@ -251,8 +324,8 @@ function Page4(p: ReportDocProps) {
 			</div>
 			<div style={h2}>How to read this report</div>
 			<div>
-				{p.narrative.glossary.map((g, i) => (
-					<div key={i} style={{ fontSize: 11, marginBottom: 4 }}>
+				{p.narrative.glossary.map((g) => (
+					<div key={g.term} style={{ fontSize: 11, marginBottom: 4 }}>
 						<strong>{g.term}. </strong>
 						<span style={note}>{g.definition}</span>
 					</div>
@@ -282,7 +355,7 @@ export const ReportDocument = forwardRef<HTMLDivElement, ReportDocProps>(functio
 		>
 			<div style={{ fontSize: 13, fontWeight: 600, color: PINK }}>Preparing your PDF…</div>
 			{[Page1, Page2, Page3, Page4].map((P, i) => (
-				<div key={i} style={{ position: "relative", boxShadow: "0 4px 24px rgba(0,0,0,0.1)" }}>
+				<div key={PAGE_KEYS[i]} style={{ position: "relative", boxShadow: "0 4px 24px rgba(0,0,0,0.1)" }}>
 					<P {...props} />
 				</div>
 			))}

@@ -6,7 +6,7 @@ import titanOneFont from "@fontsource/titan-one/files/titan-one-latin-400-normal
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Outlet, ScriptOnce, Scripts } from "@tanstack/react-router";
-import { DEFAULT_APP_ICON, BRAND_THEME_COLOR } from "@workspace/config/constants";
+import { BRAND_THEME_COLOR, DEFAULT_APP_ICON } from "@workspace/config/constants";
 import type { MissingEnvVar } from "@workspace/config/env";
 import type { DeploymentMode } from "@workspace/config/types";
 import { useEffect } from "react";

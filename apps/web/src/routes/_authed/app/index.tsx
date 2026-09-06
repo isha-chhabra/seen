@@ -176,10 +176,7 @@ function BrandSwitcherPage() {
 					{canCreateBrands && (
 						<Link
 							to="/app/new"
-							className={cn(
-								tile,
-								"border-dashed bg-transparent text-muted-foreground shadow-none hover:text-primary",
-							)}
+							className={cn(tile, "border-dashed bg-transparent text-muted-foreground shadow-none hover:text-primary")}
 						>
 							<span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-dashed">
 								<IconPlus className="size-4" />

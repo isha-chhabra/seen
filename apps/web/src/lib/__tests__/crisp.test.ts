@@ -83,10 +83,7 @@ describe("the demo next steps", () => {
 
 		const [, nextSteps] = (shown[1]?.[2] ?? []) as [string, string];
 		const linked = [...String(nextSteps).matchAll(/\]\((https?:[^)]+)\)/g)].map((match) => match[1]);
-		expect(linked).toEqual([
-			CLOUD_SIGNUP_URL,
-			"https://www.example.com/docs/getting-started",
-		]);
+		expect(linked).toEqual([CLOUD_SIGNUP_URL, "https://www.example.com/docs/getting-started"]);
 	});
 
 	it("is not offered on cloud, which shares the same chatbox", async () => {

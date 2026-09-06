@@ -126,7 +126,12 @@ function TeamSettingsPage() {
 		const email = inviteEmail;
 		try {
 			const res = await inviteTeamMemberFn({
-				data: { brandId, email, role: inviteRole, expiresInDays: inviteExpiry === "never" ? 36_500 : Number(inviteExpiry) },
+				data: {
+					brandId,
+					email,
+					role: inviteRole,
+					expiresInDays: inviteExpiry === "never" ? 36_500 : Number(inviteExpiry),
+				},
 			});
 			trackEvent("team_member_invited", { role: inviteRole });
 			setInviteEmail("");
@@ -197,9 +202,7 @@ function TeamSettingsPage() {
 
 			<div className="space-y-2">
 				<h2 className="text-lg font-semibold">Invite a teammate</h2>
-				{!isAdmin && (
-					<p className="text-sm text-muted-foreground">Contact an admin to invite more members.</p>
-				)}
+				{!isAdmin && <p className="text-sm text-muted-foreground">Contact an admin to invite more members.</p>}
 				<form
 					onSubmit={handleInvite}
 					className={cn("flex flex-wrap items-end gap-3", !isAdmin && "pointer-events-none opacity-50")}
@@ -266,7 +269,13 @@ function TeamSettingsPage() {
 						<code className="min-w-0 flex-1 truncate rounded bg-background px-1.5 py-0.5 text-xs">
 							{inviteLink(lastInvite.id)}
 						</code>
-						<Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => copyInviteLink(lastInvite.id)}>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							className="gap-1.5"
+							onClick={() => copyInviteLink(lastInvite.id)}
+						>
 							{copiedId === lastInvite.id ? <IconCheck className="size-3.5" /> : <IconCopy className="size-3.5" />}
 							{copiedId === lastInvite.id ? "Copied" : "Copy"}
 						</Button>

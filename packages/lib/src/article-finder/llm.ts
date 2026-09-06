@@ -16,7 +16,9 @@ export const searchQueriesSchema = z.object({
 		.array(
 			z.object({
 				query: z.string().describe("A natural Google search string. No quotes, no site: operators, no brand name."),
-				angle: z.string().describe("Short label for what makes this variation distinct, e.g. 'budget picks' or 'holiday gifting'."),
+				angle: z
+					.string()
+					.describe("Short label for what makes this variation distinct, e.g. 'budget picks' or 'holiday gifting'."),
 			}),
 		)
 		.min(4)
@@ -108,7 +110,7 @@ export const articleJudgementSchema = z.object({
 				affiliateEditorial: z
 					.enum(["yes", "unclear", "no"])
 					.describe(
-						'yes ONLY if this is an independent editorial outlet that (a) publishes product roundups/guides chosen by its editors, (b) monetizes with affiliate links (Amazon Associates, Skimlinks, retailer partner links, "we may earn a commission", rel=sponsored outbound links), and (c) would plausibly consider adding a brand if pitched. no = the brand\'s own site or another brand\'s store, a pure retailer/DTC site with its own checkout, a site with no affiliate monetization, a press release, or syndicated newswire copy. unclear = genuinely cannot tell.',
+						"yes ONLY if this is an independent editorial outlet that (a) publishes product roundups/guides chosen by its editors, (b) monetizes with affiliate links (Amazon Associates, Skimlinks, retailer partner links, \"we may earn a commission\", rel=sponsored outbound links), and (c) would plausibly consider adding a brand if pitched. no = the brand's own site or another brand's store, a pure retailer/DTC site with its own checkout, a site with no affiliate monetization, a press release, or syndicated newswire copy. unclear = genuinely cannot tell.",
 					),
 				tier: z
 					.enum(["high_authority", "niche_blog"])

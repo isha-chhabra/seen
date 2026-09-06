@@ -9,7 +9,7 @@
  * so they stay in sync with the rest of the app.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { DEFAULT_APP_ICON, BRAND_BACKGROUND_COLOR, BRAND_THEME_COLOR } from "@workspace/config/constants";
+import { BRAND_BACKGROUND_COLOR, BRAND_THEME_COLOR, DEFAULT_APP_ICON } from "@workspace/config/constants";
 import { getDeployment } from "@/lib/config/server";
 
 interface ManifestIcon {

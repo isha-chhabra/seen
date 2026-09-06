@@ -7,10 +7,10 @@ import { computeSystemTags, getEffectiveBrandedStatus } from "@workspace/lib/tag
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuthSession, requireBrandAccess, requireBrandWriteAccess } from "@/lib/auth/helpers";
+import { getBoss } from "@/lib/boss-client";
 import type { LookbackPeriod } from "@/lib/chart-utils";
 import { generateDateRange } from "@/lib/chart-utils";
 import { rollUpCitationDomains, rollUpCitationUrls, tallyCitations } from "@/lib/citation-rollup";
-import { getBoss } from "@/lib/boss-client";
 import { extractDomain } from "@/lib/domain-categories";
 import { classifyUrl } from "@/lib/domain-categories.server";
 import { expeditePromptRuns } from "@/lib/expedite-prompts";
@@ -719,7 +719,6 @@ export const getPromptWebQueryFn = createServerFn({ method: "GET" })
 		return { webQuery };
 	});
 
-
 /**
  * Manual "run all prompts now" for a brand: enqueue a forced cycle for every
  * enabled prompt so all engines re-scrape immediately, bypassing the 24h
@@ -729,22 +728,23 @@ const RUN_NOW_COOLDOWN_MS = 10 * 60 * 1000;
 
 export const runBrandPromptsNowFn = createServerFn({ method: "POST" })
 	.validator(z.object({ brandId: z.string().min(1) }))
-	.handler(async ({ data }): Promise<{ queued: number; cooldownMs: number; triggeredBy?: string; triggeredAt?: string }> => {
-		const session = await requireAuthSession();
-		await requireBrandWriteAccess(session.user.id, data.brandId);
+	.handler(
+		async ({ data }): Promise<{ queued: number; cooldownMs: number; triggeredBy?: string; triggeredAt?: string }> => {
+			const session = await requireAuthSession();
+			await requireBrandWriteAccess(session.user.id, data.brandId);
 
-		const enabled = await db
-			.select({ id: prompts.id })
-			.from(prompts)
-			.innerJoin(brands, eq(prompts.brandId, brands.id))
-			.where(and(eq(brands.id, data.brandId), eq(prompts.enabled, true)));
-		if (enabled.length === 0) return { queued: 0, cooldownMs: 0 };
+			const enabled = await db
+				.select({ id: prompts.id })
+				.from(prompts)
+				.innerJoin(brands, eq(prompts.brandId, brands.id))
+				.where(and(eq(brands.id, data.brandId), eq(prompts.enabled, true)));
+			if (enabled.length === 0) return { queued: 0, cooldownMs: 0 };
 
-		const idList = sql.join(
-			enabled.map((p) => sql`${p.id}`),
-			sql`, `,
-		);
-		const recent = await db.execute(sql`
+			const idList = sql.join(
+				enabled.map((p) => sql`${p.id}`),
+				sql`, `,
+			);
+			const recent = await db.execute(sql`
 			SELECT max(created_on) AS last
 			FROM pgboss.job
 			WHERE name = 'process-prompt'
@@ -752,23 +752,29 @@ export const runBrandPromptsNowFn = createServerFn({ method: "POST" })
 			  AND (data->>'promptId') IN (${idList})
 			  AND created_on > now() - interval '10 minutes'
 		`);
-		const last = (recent.rows[0] as { last: string | null } | undefined)?.last ?? null;
-		if (last) {
-			const remaining = RUN_NOW_COOLDOWN_MS - (Date.now() - new Date(last).getTime());
-			return { queued: 0, cooldownMs: Math.max(0, remaining) };
-		}
+			const last = (recent.rows[0] as { last: string | null } | undefined)?.last ?? null;
+			if (last) {
+				const remaining = RUN_NOW_COOLDOWN_MS - (Date.now() - new Date(last).getTime());
+				return { queued: 0, cooldownMs: Math.max(0, remaining) };
+			}
 
-		const boss = await getBoss();
-		for (const p of enabled) {
-			await boss.send("process-prompt", { promptId: p.id, force: true, consecutiveFailures: 0 });
-		}
+			const boss = await getBoss();
+			for (const p of enabled) {
+				await boss.send("process-prompt", { promptId: p.id, force: true, consecutiveFailures: 0 });
+			}
 
-		const triggeredBy = session.user.name?.trim() || session.user.email || "a teammate";
-		const triggeredAt = new Date();
-		await db
-			.update(brands)
-			.set({ lastRunTriggeredBy: triggeredBy, lastRunTriggeredAt: triggeredAt })
-			.where(eq(brands.id, data.brandId));
+			const triggeredBy = session.user.name?.trim() || session.user.email || "a teammate";
+			const triggeredAt = new Date();
+			await db
+				.update(brands)
+				.set({ lastRunTriggeredBy: triggeredBy, lastRunTriggeredAt: triggeredAt })
+				.where(eq(brands.id, data.brandId));
 
-		return { queued: enabled.length, cooldownMs: RUN_NOW_COOLDOWN_MS, triggeredBy, triggeredAt: triggeredAt.toISOString() };
-	});
+			return {
+				queued: enabled.length,
+				cooldownMs: RUN_NOW_COOLDOWN_MS,
+				triggeredBy,
+				triggeredAt: triggeredAt.toISOString(),
+			};
+		},
+	);

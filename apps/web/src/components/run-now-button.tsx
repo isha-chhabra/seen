@@ -51,8 +51,7 @@ export function RunNowButton({
 			if (res.queued > 0) {
 				if (res.triggeredBy && res.triggeredAt) onQueued?.({ by: res.triggeredBy, at: res.triggeredAt });
 				setState({ kind: "queued", count: res.queued, until: Date.now() + 6000 });
-			}
-			else if (res.cooldownMs > 0) setState({ kind: "cooldown", until });
+			} else if (res.cooldownMs > 0) setState({ kind: "cooldown", until });
 			else setState({ kind: "error", message: "No enabled prompts to run" });
 		} catch (e) {
 			setState({ kind: "error", message: e instanceof Error ? e.message : "Something went wrong" });

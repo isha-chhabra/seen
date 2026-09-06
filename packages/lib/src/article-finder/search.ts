@@ -188,9 +188,8 @@ export function scanHtmlForAffiliateSignals(html: string): AffiliateHtmlSignals 
 	const taggedHosts = new Set<string>();
 	const taggedLinks: string[] = [];
 	const hrefRe = /href=["']([^"']+)["']/gi;
-	let m: RegExpExecArray | null;
 	let scanned = 0;
-	while ((m = hrefRe.exec(html)) !== null && scanned < 800 && taggedLinks.length < 24) {
+	for (let m = hrefRe.exec(html); m !== null && scanned < 800 && taggedLinks.length < 24; m = hrefRe.exec(html)) {
 		scanned++;
 		const href = m[1] ?? "";
 		if (!/^https?:\/\//i.test(href)) continue;
@@ -268,9 +267,8 @@ export function extractContactHint(html: string, baseUrl: string): string | unde
 	if (mailtos[0]) return mailtos[0].slice(7).toLowerCase();
 
 	const anchorRe = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-	let m: RegExpExecArray | null;
 	let scanned = 0;
-	while ((m = anchorRe.exec(html)) !== null && scanned < 600) {
+	for (let m = anchorRe.exec(html); m !== null && scanned < 600; m = anchorRe.exec(html)) {
 		scanned++;
 		const href = m[1] ?? "";
 		const textAndHref = `${m[2]?.replace(/<[^>]+>/g, " ") ?? ""} ${href}`;

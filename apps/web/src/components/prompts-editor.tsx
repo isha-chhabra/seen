@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from "react";
 import { type EditablePrompt, type PremiumAllowance, PromptsListEditor } from "@/components/prompts-list-editor";
 import { UnsavedChangesBar } from "@/components/unsaved-changes-bar";
+import { useBrandRole } from "@/hooks/use-brands";
 import { useInvalidatePromptsSummary } from "@/hooks/use-prompts-summary";
 import { trackEvent } from "@/lib/posthog";
-import { useBrandRole } from "@/hooks/use-brands";
 import { updatePromptsFn } from "@/server/prompts";
 
 interface PromptRow {

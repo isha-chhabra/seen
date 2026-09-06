@@ -26,10 +26,12 @@
 		"enabled": true,
 		"rules": {
 			"recommended": true,
-			"complexity": {
-				"noExcessiveCognitiveComplexity": {
+			"a11y": {
+				"noLabelWithoutControl": {
 					"level": "error",
-					"options": { "maxAllowedComplexity": 20 }
+					"options": {
+						"inputComponents": ["Switch", "Checkbox"]
+					}
 				}
 			}
 		}

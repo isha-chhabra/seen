@@ -926,8 +926,7 @@ function CallToActionPage({ branding }: { branding?: ClientConfig["branding"] })
 					<div className="pt-6 border-t border-blue-200">
 						<p className="text-slate-800 font-medium mb-2">Get started with {branding?.name || "Seen"} today</p>
 						<p className="text-slate-600 text-sm text-balance">
-							Visit <strong>{branding?.url || ""}</strong> to learn more about our AI visibility platform and
-							services.
+							Visit <strong>{branding?.url || ""}</strong> to learn more about our AI visibility platform and services.
 						</p>
 					</div>
 				</div>

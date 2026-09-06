@@ -138,7 +138,12 @@ async function snapshotPage(el: HTMLElement): Promise<ImgPage> {
 	} catch {
 		throw new Error("could not read the rendered page (canvas tainted)");
 	}
-	return { bytes: b64ToBytes(dataUrl.slice(dataUrl.indexOf(",") + 1)), filter: "DCTDecode", wPx: canvas.width, hPx: canvas.height };
+	return {
+		bytes: b64ToBytes(dataUrl.slice(dataUrl.indexOf(",") + 1)),
+		filter: "DCTDecode",
+		wPx: canvas.width,
+		hPx: canvas.height,
+	};
 }
 
 /** Snapshot each element, assemble a PDF, trigger a download named `<fileName>.pdf`. */
@@ -153,7 +158,11 @@ export async function downloadReportPdf(pageEls: HTMLElement[], fileName: string
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement("a");
 	a.href = url;
-	a.download = `${String(fileName || "report").replace(/[^\w.\- ]+/g, "").trim() || "report"}.pdf`;
+	a.download = `${
+		String(fileName || "report")
+			.replace(/[^\w.\- ]+/g, "")
+			.trim() || "report"
+	}.pdf`;
 	document.body.appendChild(a);
 	a.click();
 	a.remove();

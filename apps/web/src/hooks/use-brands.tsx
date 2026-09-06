@@ -99,7 +99,12 @@ export function useBrandRole(brandId?: string) {
 	});
 
 	const role = query.data?.role ?? null;
-	return { role, isViewer: role === "viewer", isAdmin: role === "admin" || role === "owner", isLoading: query.isLoading };
+	return {
+		role,
+		isViewer: role === "viewer",
+		isAdmin: role === "admin" || role === "owner",
+		isLoading: query.isLoading,
+	};
 }
 
 /**

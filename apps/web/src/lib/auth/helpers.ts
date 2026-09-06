@@ -2,10 +2,10 @@
  * Server-side auth helpers backed by better-auth.
  */
 import { getRequestHeaders } from "@tanstack/react-start/server";
+import { isViewerRole } from "@workspace/config/roles";
 import { db } from "@workspace/lib/db/db";
 import { brands, member, organization } from "@workspace/lib/db/schema";
 import { and, eq } from "drizzle-orm";
-import { isViewerRole } from "@workspace/config/roles";
 import { getDeployment } from "@/lib/config/server";
 import { auth } from "./server";
 

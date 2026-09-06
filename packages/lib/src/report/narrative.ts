@@ -25,7 +25,9 @@ export const reportNarrativeSchema = z.object({
 				z.object({
 					label: z.string().describe("Plain label, e.g. 'AI recommendation rate', not 'visibility %'."),
 					value: z.string().describe("The figure with unit, e.g. '42%' or '+9 points'."),
-					whatItMeans: z.string().describe("One plain sentence: what this number tells the client about their business."),
+					whatItMeans: z
+						.string()
+						.describe("One plain sentence: what this number tells the client about their business."),
 				}),
 			)
 			.length(3),
@@ -74,7 +76,11 @@ export const reportNarrativeSchema = z.object({
 			.array(
 				z.object({
 					site: z.string().describe("Domain, e.g. 'goodhousekeeping.com'."),
-					type: z.string().describe("One of: Affiliate / roundup, Editorial, Retailer, Community, Reference, from the digest category."),
+					type: z
+						.string()
+						.describe(
+							"One of: Affiliate / roundup, Editorial, Retailer, Community, Reference, from the digest category.",
+						),
 					note: z.string().describe("Plain: what AI uses this site for and whether the brand appears there."),
 				}),
 			)
@@ -100,7 +106,9 @@ export const reportNarrativeSchema = z.object({
 		.min(5)
 		.max(8),
 	glossary: z
-		.array(z.object({ term: z.string(), definition: z.string().describe("One plain sentence, no other jargon inside it.") }))
+		.array(
+			z.object({ term: z.string(), definition: z.string().describe("One plain sentence, no other jargon inside it.") }),
+		)
 		.min(4)
 		.max(7),
 });
