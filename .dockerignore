@@ -71,8 +71,6 @@ docker/init-scripts
 
 # Directories not needed in Docker builds
 e2e
-.elmo
-**/.elmo
 apps/cli
 
 # pnpm config (use-node-version breaks Alpine/MUSL Docker builds)

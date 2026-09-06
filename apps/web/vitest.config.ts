@@ -1,7 +1,5 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
-import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 import pkg from "./package.json" with { type: "json" };
 
@@ -23,19 +21,6 @@ export default defineConfig({
 				test: {
 					name: "unit",
 					include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
-				},
-			},
-			{
-				extends: true,
-				plugins: [storybookTest({ configDir: path.join(dirname, ".storybook") })],
-				test: {
-					name: "storybook",
-					browser: {
-						enabled: true,
-						headless: true,
-						provider: playwright({}),
-						instances: [{ browser: "chromium" }],
-					},
 				},
 			},
 		],

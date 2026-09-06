@@ -53,7 +53,7 @@ export const ENV_REGISTRY: EnvVarSpec[] = [
 		scope: "server",
 		requiredBy: ["cloud"],
 		description:
-			"Public base URL of the web app. Required in cloud (used for auth, email links, and Stripe redirects); written by `elmo init` for local.",
+			"Public base URL of the web app. Required in cloud (used for auth, email links, and Stripe redirects); written by the setup CLI for local.",
 	},
 	{
 		name: "BETTER_AUTH_SECRET",
@@ -210,9 +210,9 @@ export const ENV_REGISTRY: EnvVarSpec[] = [
 			"Optional Jina Reader API key for website-excerpt fetching. When set, requests are authenticated (tracked by key, not IP), which raises the rate limit and avoids the anonymous 'bad network reputation' 401 block.",
 	},
 	{
-		name: "ELMO_ENCRYPTION_KEY",
+		name: "SEEN_ENCRYPTION_KEY",
 		scope: "server",
-		// Local only: `elmo init` generates it and the CLI backfills it on
+		// Local only: the setup CLI generates it and backfills it on
 		// upgrade, so every self-hosted deployment has one. The hosted modes are
 		// provisioned out of band and store no credentials of their own.
 		requiredBy: ["local"],
@@ -220,11 +220,11 @@ export const ENV_REGISTRY: EnvVarSpec[] = [
 			"Base64-encoded 32-byte key used to encrypt provider credentials stored in the database. Generate one with: openssl rand -base64 32",
 	},
 	{
-		name: "ELMO_ENCRYPTION_KEY_OLD",
+		name: "SEEN_ENCRYPTION_KEY_OLD",
 		scope: "server",
 		requiredBy: "optional",
 		description:
-			"Previous ELMO_ENCRYPTION_KEY values, comma-separated, kept readable while rotating. Set only during a rotation.",
+			"Previous SEEN_ENCRYPTION_KEY values, comma-separated, kept readable while rotating. Set only during a rotation.",
 	},
 	{
 		name: "DEPLOYMENT_MODE",
@@ -436,7 +436,7 @@ export const ENV_REGISTRY: EnvVarSpec[] = [
 		scope: "server",
 		requiredBy: "optional",
 		description:
-			"Sender address for transactional email, in the form: Elmo <notifications@updates.example.com>. The domain must be verified in Resend.",
+			"Sender address for transactional email, in the form: Seen <notifications@updates.example.com>. The domain must be verified in Resend.",
 	},
 ];
 

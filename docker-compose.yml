@@ -3,13 +3,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: elmo
+      POSTGRES_USER: seen
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: elmo
+      POSTGRES_DB: seen
     volumes:
-      - elmo_postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U elmo"]
+      test: ["CMD-SHELL", "pg_isready -U seen"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -21,7 +21,7 @@ services:
   migrate:
     image: ghcr.io/isha-chhabra/seen-migrate:main
     environment:
-      DATABASE_URL: postgres://elmo:${POSTGRES_PASSWORD}@postgres:5432/elmo
+      DATABASE_URL: postgres://seen:${POSTGRES_PASSWORD}@postgres:5432/seen
     depends_on:
       postgres:
         condition: service_healthy
@@ -32,7 +32,7 @@ services:
     ports:
       - "1515:3000"
     environment:
-      DATABASE_URL: postgres://elmo:${POSTGRES_PASSWORD}@postgres:5432/elmo
+      DATABASE_URL: postgres://seen:${POSTGRES_PASSWORD}@postgres:5432/seen
       DEPLOYMENT_MODE: cloud
       # Fork-local: run cloud mode without Stripe (no paywall, unlimited entitlements)
       DISABLE_BILLING: "true"
@@ -59,7 +59,7 @@ services:
     image: ghcr.io/isha-chhabra/seen-worker:main
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://elmo:${POSTGRES_PASSWORD}@postgres:5432/elmo
+      DATABASE_URL: postgres://seen:${POSTGRES_PASSWORD}@postgres:5432/seen
       DEPLOYMENT_MODE: cloud
       DISABLE_BILLING: "true"
       # LLM key for onboarding auto-suggest + Opportunities (gpt-5-mini, cheapest effective)
@@ -78,4 +78,5 @@ services:
         condition: service_completed_successfully
 
 volumes:
-  elmo_postgres_data:
+  pgdata:
+    name: seen_pgdata

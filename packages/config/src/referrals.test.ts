@@ -20,10 +20,10 @@ describe("referral links", () => {
 	});
 
 	it("points each destination at its own page", () => {
-		expect(marketingUrl("/docs", "cloud-signin")).toBe("https://www.elmohq.com/docs?ref=cloud-signin");
-		expect(cloudSignupUrl("cloud-signin")).toBe("https://app.elmohq.com/auth/register?ref=cloud-signin");
-		expect(cloudPricingUrl("cloud-signin")).toBe("https://www.elmohq.com/pricing?ref=cloud-signin");
-		expect(bookDemoUrl("cloud-signin")).toBe("https://cal.com/jrhizor/elmo?ref=cloud-signin");
-		expect(demoSiteUrl("cloud-signin")).toBe("https://demo.elmohq.com/?ref=cloud-signin");
+		expect(marketingUrl("/docs", "cloud-signin")).toBe("https://www.example.com/docs?ref=cloud-signin");
+		expect(cloudSignupUrl("cloud-signin")).toBe("https://app.example.com/auth/register?ref=cloud-signin");
+		expect(cloudPricingUrl("cloud-signin")).toBe("https://www.example.com/pricing?ref=cloud-signin");
+		expect(bookDemoUrl("cloud-signin")).toBe("https://cal.com?ref=cloud-signin");
+		expect(demoSiteUrl("cloud-signin")).toBe("https://demo.example.com/?ref=cloud-signin");
 	});
 });

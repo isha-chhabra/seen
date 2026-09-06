@@ -3,7 +3,7 @@ import { getCredential } from "../../secrets";
 import { type Citation, cloroAnswer, extractCitationsFromCloro, extractTextFromCloro } from "../../text-extraction";
 import type { ModelConfig, Provider, ScrapeResult } from "../types";
 
-// Cloro monitors live AI answer engines. Each Elmo model maps to a Cloro task
+// Cloro monitors live AI answer engines. Each Seen model maps to a Cloro task
 // type: the chatbots (ChatGPT, Perplexity, Copilot, Gemini) and Google AI Mode
 // send a `prompt`, while Google AI Overview rides on the Google Search task and
 // sends a `query` with the AI Overview block requested. ChatGPT is the only

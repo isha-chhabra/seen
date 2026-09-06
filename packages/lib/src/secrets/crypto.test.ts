@@ -151,13 +151,13 @@ describe("key rotation", () => {
 describe("getKeyring", () => {
 	it("returns null when unset or blank", () => {
 		expect(getKeyring({})).toBeNull();
-		expect(getKeyring({ ELMO_ENCRYPTION_KEY: "" })).toBeNull();
-		expect(getKeyring({ ELMO_ENCRYPTION_KEY: "   " })).toBeNull();
+		expect(getKeyring({ SEEN_ENCRYPTION_KEY: "" })).toBeNull();
+		expect(getKeyring({ SEEN_ENCRYPTION_KEY: "   " })).toBeNull();
 	});
 
 	it("decodes a valid 32-byte base64 key as the primary", () => {
 		const key = randomBytes(32);
-		const keyring = getKeyring({ ELMO_ENCRYPTION_KEY: key.toString("base64") });
+		const keyring = getKeyring({ SEEN_ENCRYPTION_KEY: key.toString("base64") });
 		expect(keyring).not.toBeNull();
 		expect(keyring?.primary.equals(key)).toBe(true);
 		expect([...(keyring?.byId.keys() ?? [])]).toEqual([keyId(key)]);
@@ -167,8 +167,8 @@ describe("getKeyring", () => {
 		const current = randomBytes(32);
 		const retired = [randomBytes(32), randomBytes(32)];
 		const keyring = getKeyring({
-			ELMO_ENCRYPTION_KEY: current.toString("base64"),
-			ELMO_ENCRYPTION_KEY_OLD: ` ${retired[0].toString("base64")} , ${retired[1].toString("base64")} `,
+			SEEN_ENCRYPTION_KEY: current.toString("base64"),
+			SEEN_ENCRYPTION_KEY_OLD: ` ${retired[0].toString("base64")} , ${retired[1].toString("base64")} `,
 		});
 		expect(keyring?.primary.equals(current)).toBe(true);
 		expect(keyring?.byId.size).toBe(3);
@@ -177,23 +177,23 @@ describe("getKeyring", () => {
 
 	it("tolerates a retired key that is still the current one", () => {
 		const key = randomBytes(32).toString("base64");
-		const keyring = getKeyring({ ELMO_ENCRYPTION_KEY: key, ELMO_ENCRYPTION_KEY_OLD: key });
+		const keyring = getKeyring({ SEEN_ENCRYPTION_KEY: key, SEEN_ENCRYPTION_KEY_OLD: key });
 		expect(keyring?.byId.size).toBe(1);
 	});
 
 	it("refuses retired keys with no current key, rather than looking rotated", () => {
-		expect(() => getKeyring({ ELMO_ENCRYPTION_KEY_OLD: randomBytes(32).toString("base64") })).toThrow(
+		expect(() => getKeyring({ SEEN_ENCRYPTION_KEY_OLD: randomBytes(32).toString("base64") })).toThrow(
 			EncryptionKeyError,
 		);
 	});
 
 	it("throws EncryptionKeyError for the wrong decoded length", () => {
-		expect(() => getKeyring({ ELMO_ENCRYPTION_KEY: randomBytes(16).toString("base64") })).toThrow(EncryptionKeyError);
-		expect(() => getKeyring({ ELMO_ENCRYPTION_KEY: randomBytes(64).toString("base64") })).toThrow(EncryptionKeyError);
+		expect(() => getKeyring({ SEEN_ENCRYPTION_KEY: randomBytes(16).toString("base64") })).toThrow(EncryptionKeyError);
+		expect(() => getKeyring({ SEEN_ENCRYPTION_KEY: randomBytes(64).toString("base64") })).toThrow(EncryptionKeyError);
 		expect(() =>
 			getKeyring({
-				ELMO_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
-				ELMO_ENCRYPTION_KEY_OLD: randomBytes(16).toString("base64"),
+				SEEN_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
+				SEEN_ENCRYPTION_KEY_OLD: randomBytes(16).toString("base64"),
 			}),
 		).toThrow(EncryptionKeyError);
 	});

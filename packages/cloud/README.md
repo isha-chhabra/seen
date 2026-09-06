@@ -1,6 +1,6 @@
 # @workspace/cloud
 
-Deployment factory and auth/email integrations for the managed Elmo Cloud offering (`DEPLOYMENT_MODE=cloud`).
+Deployment factory and auth/email integrations for the managed Seen Cloud offering (`DEPLOYMENT_MODE=cloud`).
 
 ## Required environment variables
 
@@ -9,7 +9,7 @@ The auth and email features in this package need:
 | Variable | Purpose |
 | --- | --- |
 | `RESEND_API_KEY` | Resend API key for transactional email |
-| `RESEND_FROM_EMAIL` | Sender address, e.g. `Elmo <notifications@updates.example.com>` |
+| `RESEND_FROM_EMAIL` | Sender address, e.g. `Seen <notifications@updates.example.com>` |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID for social sign-in |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 
@@ -19,7 +19,7 @@ The canonical list of every cloud-required variable (Stripe, database, etc.) liv
 
 1. Create an API key in the [Resend dashboard](https://resend.com) and set it as `RESEND_API_KEY`.
 2. Verify the sending domain: add the SPF and DKIM DNS records Resend shows for the domain (e.g. `updates.example.com`).
-3. Set `RESEND_FROM_EMAIL` to a display-name form on that verified domain, e.g. `Elmo <notifications@updates.example.com>`.
+3. Set `RESEND_FROM_EMAIL` to a display-name form on that verified domain, e.g. `Seen <notifications@updates.example.com>`.
 
 Email templates are code — `packages/cloud/src/email-templates.ts` — not Resend-hosted templates; there is nothing to configure template-side in Resend.
 

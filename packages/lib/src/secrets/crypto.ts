@@ -3,8 +3,8 @@ import { CompactEncrypt, compactDecrypt, decodeProtectedHeader } from "jose";
 
 const KEY_BYTES = 32; // 256-bit
 
-export const ENCRYPTION_KEY_ENV = "ELMO_ENCRYPTION_KEY";
-export const RETIRED_KEYS_ENV = "ELMO_ENCRYPTION_KEY_OLD";
+export const ENCRYPTION_KEY_ENV = "SEEN_ENCRYPTION_KEY";
+export const RETIRED_KEYS_ENV = "SEEN_ENCRYPTION_KEY_OLD";
 
 /** Compact JWE using direct symmetric encryption (`dir`) and AES-256-GCM. */
 export type EncryptedPayload = string;
@@ -48,7 +48,7 @@ export interface Keyring {
  *  rotation can be completed without re-entering every secret. Domain-separated
  *  so it can never double as a plain hash of the key in another context. */
 export function keyId(key: Uint8Array): string {
-	return createHash("sha256").update("elmo-secret-key-id\0").update(key).digest("hex").slice(0, 16);
+	return createHash("sha256").update("seen-secret-key-id\0").update(key).digest("hex").slice(0, 16);
 }
 
 export async function encryptSecret(
@@ -103,8 +103,8 @@ function decodeKey(raw: string, source: string): Buffer {
 	return key;
 }
 
-/** Resolve the keyring from the environment: ELMO_ENCRYPTION_KEY encrypts, and
- *  the comma-separated ELMO_ENCRYPTION_KEY_OLD keys stay readable so a rotation
+/** Resolve the keyring from the environment: SEEN_ENCRYPTION_KEY encrypts, and
+ *  the comma-separated SEEN_ENCRYPTION_KEY_OLD keys stay readable so a rotation
  *  doesn't strand existing rows. Returns null when no key is set at all
  *  (storage disabled, environment credentials unaffected); throws
  *  EncryptionKeyError when a key is set but unusable. */

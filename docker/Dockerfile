@@ -1,4 +1,4 @@
-# Elmo
+# Seen
 # Supports: web app (Nitro server) and worker
 
 # Base stage with Node.js
@@ -25,7 +25,7 @@ COPY packages/og/package.json ./packages/og/
 COPY packages/api-spec/package.json ./packages/api-spec/
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # Builder stage
 FROM base AS builder
@@ -75,16 +75,16 @@ ENV NODE_ENV=production
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 elmo
+RUN adduser --system --uid 1001 seen
 
 # Copy entrypoint script
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Copy Nitro output - this is the entire server bundle
-COPY --from=builder --chown=elmo:nodejs /app/apps/web/.output ./.output
+COPY --from=builder --chown=seen:nodejs /app/apps/web/.output ./.output
 
-USER elmo
+USER seen
 
 EXPOSE 3000
 ENV PORT=3000

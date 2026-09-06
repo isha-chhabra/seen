@@ -51,7 +51,7 @@ describe("getCredential", () => {
 	});
 
 	it("a stored value beats process.env, and clearing restores the env fallback", async () => {
-		vi.stubEnv("ELMO_ENCRYPTION_KEY", KEY_B64);
+		vi.stubEnv("SEEN_ENCRYPTION_KEY", KEY_B64);
 		vi.stubEnv("OPENAI_API_KEY", "env-value");
 		dbState.rows = [await encryptedRow("OPENAI_API_KEY", "db-value")];
 
@@ -64,7 +64,7 @@ describe("getCredential", () => {
 });
 
 describe("refreshCredentialOverlay", () => {
-	beforeEach(() => vi.stubEnv("ELMO_ENCRYPTION_KEY", KEY_B64));
+	beforeEach(() => vi.stubEnv("SEEN_ENCRYPTION_KEY", KEY_B64));
 
 	it("overrides each credential independently", async () => {
 		vi.stubEnv("OXYLABS_PASSWORD", "env-password");
@@ -123,7 +123,7 @@ describe("refreshCredentialOverlay", () => {
 
 	it("keeps serving rows written under a retired key mid-rotation", async () => {
 		const retired = Buffer.alloc(32, 4);
-		vi.stubEnv("ELMO_ENCRYPTION_KEY_OLD", retired.toString("base64"));
+		vi.stubEnv("SEEN_ENCRYPTION_KEY_OLD", retired.toString("base64"));
 		dbState.rows = [await encryptedRow("OPENAI_API_KEY", "written-before-rotation", retired)];
 
 		await refreshCredentialOverlay();
@@ -139,7 +139,7 @@ describe("refreshCredentialOverlay", () => {
 		await refreshCredentialOverlay();
 
 		expect(getCredential("OPENAI_API_KEY")).toBeUndefined();
-		expect(console.error).toHaveBeenCalledWith(expect.stringContaining("ELMO_ENCRYPTION_KEY_OLD"));
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining("SEEN_ENCRYPTION_KEY_OLD"));
 	});
 
 	it("leaves the overlay untouched when the query fails", async () => {
@@ -152,8 +152,8 @@ describe("refreshCredentialOverlay", () => {
 		expect(getCredential("OPENAI_API_KEY")).toBe("current");
 	});
 
-	it("degrades to env-only (never throws) when ELMO_ENCRYPTION_KEY is the wrong length", async () => {
-		vi.stubEnv("ELMO_ENCRYPTION_KEY", Buffer.alloc(16).toString("base64"));
+	it("degrades to env-only (never throws) when SEEN_ENCRYPTION_KEY is the wrong length", async () => {
+		vi.stubEnv("SEEN_ENCRYPTION_KEY", Buffer.alloc(16).toString("base64"));
 		vi.stubEnv("OPENAI_API_KEY", "env-value");
 		dbState.rows = [await encryptedRow("OPENAI_API_KEY", "db-value")];
 
@@ -167,7 +167,7 @@ describe("refreshCredentialOverlay", () => {
 // exactly as it did before.
 describe("deployments with nothing stored", () => {
 	it("is a no-op: env credentials win, the table is never queried, and nothing is logged", async () => {
-		vi.stubEnv("ELMO_ENCRYPTION_KEY", undefined);
+		vi.stubEnv("SEEN_ENCRYPTION_KEY", undefined);
 		vi.stubEnv("OPENAI_API_KEY", "env-value");
 		vi.stubEnv("OXYLABS_USERNAME", "env-user");
 
@@ -182,7 +182,7 @@ describe("deployments with nothing stored", () => {
 
 describe("encryptCredential", () => {
 	it("produces a payload that round-trips through the overlay", async () => {
-		vi.stubEnv("ELMO_ENCRYPTION_KEY", KEY_B64);
+		vi.stubEnv("SEEN_ENCRYPTION_KEY", KEY_B64);
 		const encryptedValue = await encryptCredential("OXYLABS_PASSWORD", "longer-secret");
 
 		dbState.rows = [{ name: "OXYLABS_PASSWORD", encryptedValue }];
@@ -191,12 +191,12 @@ describe("encryptCredential", () => {
 	});
 
 	it("rejects a name that is not an overridable credential", async () => {
-		vi.stubEnv("ELMO_ENCRYPTION_KEY", KEY_B64);
+		vi.stubEnv("SEEN_ENCRYPTION_KEY", KEY_B64);
 		await expect(encryptCredential("DATABASE_URL", "postgres://")).rejects.toThrow(/not an overridable credential/);
 	});
 
 	it("throws EncryptionKeyError when no encryption key is set", async () => {
-		vi.stubEnv("ELMO_ENCRYPTION_KEY", undefined);
+		vi.stubEnv("SEEN_ENCRYPTION_KEY", undefined);
 		await expect(encryptCredential("OPENAI_API_KEY", "x")).rejects.toThrow(EncryptionKeyError);
 	});
 });

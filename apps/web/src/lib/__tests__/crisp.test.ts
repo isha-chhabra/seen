@@ -84,9 +84,8 @@ describe("the demo next steps", () => {
 		const [, nextSteps] = (shown[1]?.[2] ?? []) as [string, string];
 		const linked = [...String(nextSteps).matchAll(/\]\((https?:[^)]+)\)/g)].map((match) => match[1]);
 		expect(linked).toEqual([
-			"https://cal.com/jrhizor/elmo",
 			CLOUD_SIGNUP_URL,
-			"https://www.elmohq.com/docs/getting-started",
+			"https://www.example.com/docs/getting-started",
 		]);
 	});
 
@@ -133,7 +132,7 @@ describe("session identity", () => {
 		["identified before load", true],
 	])("leaves demo visitors anonymous (%s)", async (_label, identifyFirst) => {
 		const { initCrisp, identifyCrispUser } = await loadCrisp();
-		const demoUser = { id: "demo", email: "demo@elmohq.com", name: "Demo User" };
+		const demoUser = { id: "demo", email: "demo@example.com", name: "Demo User" };
 
 		if (identifyFirst) {
 			identifyCrispUser(demoUser);

@@ -6,7 +6,7 @@
  *   2. factory resolution — getDeployment() returns the expected mode
  *   3. auth initialization — createAuth() constructs with the mode's options
  *
- * This guards the elmo-cloud build-out: open-source, demo, and whitelabel
+ * This guards the cloud build-out: open-source, demo, and whitelabel
  * deployments must keep booting unchanged while cloud lands (issue #8).
  *
  * Runs the real shared-package boot path via tsx — no build, no live DB.
@@ -55,7 +55,7 @@ const MINIMAL_ENV: Record<SmokeMode, Record<string, string>> = {
 		...SHARED_ENV,
 		DEPLOYMENT_MODE: "local",
 		APP_URL: "http://localhost:3000",
-		ELMO_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
+		SEEN_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
 	},
 	demo: {
 		...SHARED_ENV,

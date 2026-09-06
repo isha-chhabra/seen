@@ -1,8 +1,8 @@
 /**
- * @workspace/cloud - Elmo Cloud deployment package
+ * @workspace/cloud - Seen Cloud deployment package
  *
  * Provides the cloud-mode implementation:
- * - createCloudDeployment() factory (Elmo branding, self-serve signup,
+ * - createCloudDeployment() factory (Seen branding, self-serve signup,
  *   multi-org, Stripe billing on, report generation off)
  *
  * Auth is handled by better-auth; this only provides static config. The

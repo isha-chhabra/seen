@@ -52,8 +52,6 @@ test-results/
 test-results-*/
 blob-report/
 
-# e2e generated config (created by `elmo init --dev --defaults`)
-e2e/.elmo/
 e2e/.auth/
 
 # vercel
@@ -64,7 +62,6 @@ e2e/.auth/
 next-env.d.ts
 
 # brand kit (generated assets)
-elmo-brand-kit.zip
 og-default.png
 
 # to remove
@@ -73,7 +70,6 @@ prompt_runs_rows.csv
 prompt_runs.meta.json
 
 # docker
-elmo.yaml
 e2e/artifacts
 
 # retroactive cleanup

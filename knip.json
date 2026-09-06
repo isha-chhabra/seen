@@ -1,15 +1,24 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "ignoreWorkspaces": ["packages/ui"],
+  "ignoreWorkspaces": [
+    "packages/ui"
+  ],
   "workspaces": {
     ".": {
-      "entry": ["turbo.json"],
-      "ignoreBinaries": ["playwright"]
+      "entry": [
+        "turbo.json"
+      ]
     },
     "apps/web": {
-      "entry": ["src/routes/**/*.{ts,tsx}!", "src/server.ts", "scripts/*.ts"],
-      "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts"],
-      "ignore": ["src/stories/_mocks/**"],
+      "entry": [
+        "src/routes/**/*.{ts,tsx}!",
+        "src/server.ts",
+        "scripts/*.ts"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}",
+        "scripts/**/*.ts"
+      ],
       "ignoreDependencies": [
         "tailwindcss",
         "tw-animate-css",
@@ -18,17 +27,10 @@
         "@base-ui/react"
       ]
     },
-    "apps/www": {
-      "entry": ["src/server.ts", "scripts/**"],
-      "ignore": [".source/**"],
-      "ignoreDependencies": ["shiki", "@base-ui/react"]
-    },
     "apps/worker": {
-      "entry": ["scripts/test-provider.ts"]
-    },
-    "e2e": {
-      "entry": ["*.ts", "tests/**/*.setup.ts"],
-      "project": ["**/*.ts"]
+      "entry": [
+        "scripts/test-provider.ts"
+      ]
     }
   }
 }

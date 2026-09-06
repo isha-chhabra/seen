@@ -1,4 +1,4 @@
-import { DEFAULT_APP_NAME, ELMO_BRAND_COLOR } from "@workspace/config/constants";
+import { DEFAULT_APP_NAME, BRAND_ACCENT_COLOR } from "@workspace/config/constants";
 import { createElement } from "react";
 
 export const ACCENT_COLORS = ["#2563eb", "#f4d35e", "#ee964b", "#f95738"];
@@ -15,7 +15,7 @@ export interface OgImageOptions {
 
 export function renderOgImage({ appName, title, description, accentColors, iconDataUri }: OgImageOptions) {
 	const isDefaultBrand = appName === DEFAULT_APP_NAME;
-	const brandColor = isDefaultBrand ? ELMO_BRAND_COLOR : (accentColors?.[0] ?? "#1e293b");
+	const brandColor = isDefaultBrand ? BRAND_ACCENT_COLOR : (accentColors?.[0] ?? "#1e293b");
 	const desc = description || DEFAULT_DESCRIPTION;
 	const watermarkColor = isDefaultBrand ? "rgba(236,72,153,0.05)" : "rgba(0,0,0,0.03)";
 	const gradientColors = isDefaultBrand
@@ -72,7 +72,7 @@ export function renderOgImage({ appName, title, description, accentColors, iconD
 							style: {
 								fontFamily: "Titan One",
 								fontSize: 140,
-								color: ELMO_BRAND_COLOR,
+								color: BRAND_ACCENT_COLOR,
 								lineHeight: 1,
 								marginBottom: 40,
 							},

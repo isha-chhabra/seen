@@ -22,7 +22,7 @@ describe("createCloudDeployment", () => {
 		expect(features.reportGeneration).toBe(false);
 	});
 
-	it("uses Elmo branding defaults without VITE_APP_* overrides", () => {
+	it("uses Seen branding defaults without VITE_APP_* overrides", () => {
 		const { branding } = createCloudDeployment({
 			VITE_APP_NAME: "Should Be Ignored",
 			VITE_APP_ICON: "https://cdn.example.com/ignored.png",
@@ -32,7 +32,7 @@ describe("createCloudDeployment", () => {
 	});
 
 	it("reads the public app URL from APP_URL", () => {
-		expect(createCloudDeployment({ APP_URL: "https://app.elmo.com/" }).branding.url).toBe("https://app.elmo.com/");
+		expect(createCloudDeployment({ APP_URL: "https://app.example.com/" }).branding.url).toBe("https://app.example.com/");
 	});
 
 	it("falls back to the default app URL when APP_URL is absent (env validation reports it)", () => {

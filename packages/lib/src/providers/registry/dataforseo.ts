@@ -27,7 +27,7 @@ const SERP_MODELS = new Set(["google-ai-mode"]);
 
 /**
  * Models served via the AI Optimization "LLM Responses" API
- * (chat_gpt / perplexity / gemini), mapping each Elmo model id to the
+ * (chat_gpt / perplexity / gemini), mapping each Seen model id to the
  * AiOptimizationApi live method plus a sensible default DataForSEO model_name.
  *
  * ChatGPT and Gemini only take this route when a target pins a model_name via
@@ -99,7 +99,7 @@ interface DataForSeoLlmRequest {
 	web_search: boolean;
 }
 
-/** Live LLM Responses call dispatch, keyed by Elmo model id. */
+/** Live LLM Responses call dispatch, keyed by Seen model id. */
 const LLM_CALLS = {
 	chatgpt: (api: client.AiOptimizationApi, body: DataForSeoLlmRequest[]) =>
 		api.chatGptLlmResponsesLive(body.map((b) => new client.AiOptimizationChatGptLlmResponsesLiveRequestInfo(b))),
