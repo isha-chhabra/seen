@@ -1,11 +1,9 @@
 /**
  * Auth page shell (sign-in / sign-up / password reset).
  *
- * Rebranded self-host: a single centred card with the wordmark above it and a
- * soft pink glow behind. The upstream "sales panel" (marketing pitch, GitHub
- * CTA, G2 rating, customer quotes, managed-offer card) and the Docs/Pricing/
- * GitHub footer are intentionally not rendered. `pitch` / `footer` stay in the
- * props so callers are untouched.
+ * A single centred card with the wordmark above it and a soft pink glow
+ * behind. The `pitch` and `footer` slots are accepted but not rendered in
+ * this build; they stay in the props so callers are untouched.
  */
 
 import type { ReactNode } from "react";

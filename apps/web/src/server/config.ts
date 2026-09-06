@@ -25,13 +25,13 @@ export type PublicClientConfig = Omit<ClientConfig, "branding"> & {
 const POSTHOG_PUBLIC_KEY = "phc_Jhx9LnI9cTDFHpQmpOzJSDTW127qD9pFU65KRnYym6z";
 
 function resolvePosthogKey(): string | undefined {
-	// Rebranded self-host: no upstream telemetry. Only phone home to an
-	// operator-supplied PostHog project.
+	// No bundled analytics key; report only to an operator-supplied
+	// PostHog project.
 	return process.env.VITE_POSTHOG_KEY || undefined;
 }
 
 export function resolveCrispWebsiteId(): string | undefined {
-	// Rebranded self-host: never load the upstream Crisp support widget.
+	// No bundled support-widget id; operator-supplied only.
 	return process.env.VITE_CRISP_WEBSITE_ID || undefined;
 }
 

@@ -5,7 +5,7 @@
  * Google OAuth, Resend transactional email, disposable-domain blocking,
  * invite-only signup allowlist, and umbrella org provisioning on signup.
  *
- * Self-host toggles (fork-local, not upstream):
+ * Self-host toggles:
  *   - DISABLE_BILLING=true            -> drop the Stripe plugin, no paywall
  *   - RESEND_API_KEY unset            -> skip all transactional email; signup
  *                                       needs no verification, invites create a

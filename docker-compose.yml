@@ -34,7 +34,7 @@ services:
     environment:
       DATABASE_URL: postgres://seen:${POSTGRES_PASSWORD}@postgres:5432/seen
       DEPLOYMENT_MODE: cloud
-      # Fork-local: run cloud mode without Stripe (no paywall, unlimited entitlements)
+      # Cloud mode without Stripe: no paywall, unlimited entitlements
       DISABLE_BILLING: "true"
       # LLM key for onboarding auto-suggest + Opportunities (gpt-5-mini, cheapest effective)
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
