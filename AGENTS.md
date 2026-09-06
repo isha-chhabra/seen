@@ -6,7 +6,7 @@ Seen is a self-hosted AI-visibility platform: it tracks how AI answer engines
 (ChatGPT, Google AI Mode and AI Overviews, Gemini, Perplexity, Copilot) mention,
 cite and describe brands, and adds an affiliate-outreach article finder. It is a
 **pnpm + Turborepo monorepo** on **Node.js 24** (enforced via `engines`),
-**TypeScript**, and **PostgreSQL**. See `NOTICE` for the fork's provenance.
+**TypeScript**, and **PostgreSQL**.
 
 - `apps/web` — product dashboard and REST API (TanStack Start + Vite, port 3000)
 - `apps/worker` — pg-boss background jobs (prompt runs, citation tracking, reports)

@@ -8,16 +8,12 @@ into visibility scores, citation analysis, competitor comparison and
 stakeholder reports. On top of that it adds **Article Finder**, a pipeline for
 finding editorial sites worth pitching for affiliate placements.
 
-It began as a fork of [Elmo](https://github.com/elmohq/elmo) (MIT). See
-[`NOTICE`](NOTICE) for what is inherited and what this fork adds; the rest of
-this document covers the fork.
-
 **Live demo:** https://165-227-198-85.sslip.io — sign in as `demo@seen-demo.app`
 / `SeenDemo-2026` (read-only viewer).
 
 ---
 
-## What this fork adds
+## Features
 
 | Area | Summary |
 | --- | --- |
@@ -25,7 +21,7 @@ this document covers the fork.
 | **Reports** | Aspect-correct, lossless PDF export; narrative prompt tuned for short, number-led copy. |
 | **Viewer role** | Read-only workspace role, enforced server-side and reflected across the UI. |
 | **Team invites** | Self-serve, admin-only, selectable link expiry, no email round-trip. |
-| **Design system** | Reworked palette and shared components (page headers, stat cards, empty states, callouts). |
+| **Design system** | Palette and shared components (page headers, stat cards, empty states, callouts). |
 | **Self-hosting** | CI builds images to GHCR; the host only pulls and runs them. Cloud mode with billing disabled. Public HTTPS demo behind Caddy. |
 
 ## Architecture
@@ -74,5 +70,4 @@ pnpm build
 
 ## License
 
-MIT — see [`LICENSE.md`](LICENSE.md). Inherited code is under the upstream MIT
-license held by Blue Whale Software, LLC; see [`NOTICE`](NOTICE).
+MIT — see [`LICENSE.md`](LICENSE.md).
