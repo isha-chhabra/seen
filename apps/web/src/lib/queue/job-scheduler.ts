@@ -70,10 +70,11 @@ export async function createPromptJobScheduler(promptId: string, options: Schedu
 				{
 					singletonKey: `prompt-${promptId}`,
 					singletonSeconds: 60 * 60, // 1 hour - prevent duplicate jobs
-					retryLimit: 3,
-					retryDelay: 60,
-					retryBackoff: true,
-					expireInSeconds: 60 * 15, // 15 minute timeout
+					// process-prompt runs a paid multi-engine fan-out; a queue-level
+					// retry re-pays for the whole thing (see PROMPT_JOB_OPTIONS in the
+					// worker). Never auto-retry; 2h ceiling then give up.
+					retryLimit: 0,
+					expireInSeconds: 60 * 120,
 				},
 			);
 		} else {
@@ -85,10 +86,9 @@ export async function createPromptJobScheduler(promptId: string, options: Schedu
 					singletonKey: `prompt-${promptId}`,
 					singletonSeconds: startAfterSeconds, // Prevent duplicates for the cadence period
 					startAfter: startAfterSeconds,
-					retryLimit: 3,
-					retryDelay: 60,
-					retryBackoff: true,
-					expireInSeconds: 60 * 15,
+					// No auto-retry on a paid fan-out; 2h ceiling then give up.
+					retryLimit: 0,
+					expireInSeconds: 60 * 120,
 				},
 			);
 		}
@@ -157,10 +157,9 @@ export async function sendImmediatePromptJob(promptId: string): Promise<boolean>
 			"process-prompt",
 			{ promptId, cadenceHours },
 			{
-				retryLimit: 3,
-				retryDelay: 60,
-				retryBackoff: true,
-				expireInSeconds: 60 * 15,
+				// No auto-retry on a paid fan-out; 2h ceiling then give up.
+				retryLimit: 0,
+				expireInSeconds: 60 * 120,
 			},
 		);
 
@@ -184,10 +183,9 @@ export async function scheduleNextPromptRun(promptId: string, cadenceHours: numb
 				singletonKey: `prompt-${promptId}`,
 				singletonSeconds: startAfterSeconds, // Prevent duplicates for the cadence period
 				startAfter: startAfterSeconds,
-				retryLimit: 3,
-				retryDelay: 60,
-				retryBackoff: true,
-				expireInSeconds: 60 * 15,
+				// No auto-retry on a paid fan-out; 2h ceiling then give up.
+				retryLimit: 0,
+				expireInSeconds: 60 * 120,
 			},
 		);
 

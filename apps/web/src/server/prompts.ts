@@ -727,7 +727,7 @@ export const getPromptWebQueryFn = createServerFn({ method: "GET" })
 const RUN_NOW_COOLDOWN_MS = 10 * 60 * 1000;
 
 export const runBrandPromptsNowFn = createServerFn({ method: "POST" })
-	.validator(z.object({ brandId: z.string().min(1) }))
+	.validator(z.object({ brandId: z.string().min(1), bypassCooldown: z.boolean().optional() }))
 	.handler(
 		async ({ data }): Promise<{ queued: number; cooldownMs: number; triggeredBy?: string; triggeredAt?: string }> => {
 			const session = await requireAuthSession();
@@ -753,14 +753,25 @@ export const runBrandPromptsNowFn = createServerFn({ method: "POST" })
 			  AND created_on > now() - interval '10 minutes'
 		`);
 			const last = (recent.rows[0] as { last: string | null } | undefined)?.last ?? null;
-			if (last) {
+			if (last && !data.bypassCooldown) {
 				const remaining = RUN_NOW_COOLDOWN_MS - (Date.now() - new Date(last).getTime());
 				return { queued: 0, cooldownMs: Math.max(0, remaining) };
 			}
 
 			const boss = await getBoss();
 			for (const p of enabled) {
-				await boss.send("process-prompt", { promptId: p.id, force: true, consecutiveFailures: 0 });
+				await boss.send(
+					"process-prompt",
+					{ promptId: p.id, force: true, consecutiveFailures: 0 },
+					{
+						// A forced run is a paid multi-engine fan-out. Never let pg-boss
+						// auto-retry it (a retry re-pays for the whole fan-out); the
+						// button polls status and offers the user wait/retry instead.
+						// 2h hard ceiling, then the job is abandoned.
+						retryLimit: 0,
+						expireInSeconds: 60 * 120,
+					},
+				);
 			}
 
 			const triggeredBy = session.user.name?.trim() || session.user.email || "a teammate";
@@ -778,3 +789,68 @@ export const runBrandPromptsNowFn = createServerFn({ method: "POST" })
 			};
 		},
 	);
+
+/**
+ * Status of the most recent manual "run now" for a brand, so the button can
+ * track progress and, if it stalls or fails, prompt the user to keep waiting or
+ * retry. Looks only at forced `process-prompt` jobs from the last 3 hours.
+ */
+export type BrandRunStatus = {
+	state: "running" | "done" | "failed" | "empty";
+	total: number;
+	done: number;
+	failed: number;
+	running: number;
+	oldestStartedAtMs: number | null;
+};
+
+export const getBrandRunStatusFn = createServerFn({ method: "GET" })
+	.validator(z.object({ brandId: z.string().min(1) }))
+	.handler(async ({ data }): Promise<BrandRunStatus> => {
+		const session = await requireAuthSession();
+		await requireBrandAccess(session.user.id, data.brandId);
+
+		const enabled = await db
+			.select({ id: prompts.id })
+			.from(prompts)
+			.innerJoin(brands, eq(prompts.brandId, brands.id))
+			.where(and(eq(brands.id, data.brandId), eq(prompts.enabled, true)));
+		if (enabled.length === 0) {
+			return { state: "empty", total: 0, done: 0, failed: 0, running: 0, oldestStartedAtMs: null };
+		}
+
+		const idList = sql.join(
+			enabled.map((p) => sql`${p.id}`),
+			sql`, `,
+		);
+		const rows = await db.execute(sql`
+			SELECT state, count(*)::int AS n, min(created_on) AS oldest
+			FROM pgboss.job
+			WHERE name = 'process-prompt'
+			  AND (data->>'force') = 'true'
+			  AND (data->>'promptId') IN (${idList})
+			  AND created_on > now() - interval '3 hours'
+			GROUP BY state
+		`);
+
+		let done = 0;
+		let failed = 0;
+		let running = 0;
+		let oldest: number | null = null;
+		for (const r of rows.rows as { state: string; n: number; oldest: string }[]) {
+			const ts = new Date(r.oldest).getTime();
+			oldest = oldest === null ? ts : Math.min(oldest, ts);
+			if (r.state === "completed") done += r.n;
+			else if (r.state === "failed" || r.state === "cancelled") failed += r.n;
+			else running += r.n; // created | active | retry
+		}
+
+		const total = done + failed + running;
+		let state: BrandRunStatus["state"];
+		if (total === 0) state = "empty";
+		else if (running > 0) state = "running";
+		else if (failed > 0) state = "failed";
+		else state = "done";
+
+		return { state, total, done, failed, running, oldestStartedAtMs: oldest };
+	});
