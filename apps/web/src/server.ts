@@ -43,17 +43,30 @@ const SECURITY_HEADERS: Record<string, string> = {
 };
 
 function addSecurityHeaders(response: Response): Response {
+	// Redirect and error responses can carry immutable headers, so mutating them
+	// in place throws `TypeError: immutable`. Copy into a fresh Headers instead and
+	// rebuild the response around the same body/status.
+	const headers = new Headers(response.headers);
 	for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
-		response.headers.set(key, value);
+		headers.set(key, value);
 	}
-	return response;
+	return new Response(response.body, {
+		status: response.status,
+		statusText: response.statusText,
+		headers,
+	});
 }
 
 export default createServerEntry(
 	wrapFetchWithSentry({
 		async fetch(request: Request) {
 			const response = await handler.fetch(request);
-			return addSecurityHeaders(response);
+			try {
+				return addSecurityHeaders(response);
+			} catch {
+				// Never let header decoration turn a good response into a 500.
+				return response;
+			}
 		},
 	}),
 );

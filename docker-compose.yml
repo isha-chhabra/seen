@@ -49,6 +49,8 @@ services:
       APP_URL: ${APP_URL}
       BRIGHTDATA_API_TOKEN: ${BRIGHTDATA_API_TOKEN}
       SCRAPE_TARGETS: ${SCRAPE_TARGETS}
+      # Auto-refresh cadence per prompt, in hours (168 = weekly). Unset falls back to 24h.
+      DEFAULT_DELAY_HOURS: ${DEFAULT_DELAY_HOURS:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,6 +73,8 @@ services:
       APP_URL: ${APP_URL}
       BRIGHTDATA_API_TOKEN: ${BRIGHTDATA_API_TOKEN}
       SCRAPE_TARGETS: ${SCRAPE_TARGETS}
+      # Auto-refresh cadence per prompt, in hours (168 = weekly). Unset falls back to 24h.
+      DEFAULT_DELAY_HOURS: ${DEFAULT_DELAY_HOURS:-}
     depends_on:
       postgres:
         condition: service_healthy
