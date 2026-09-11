@@ -71,6 +71,40 @@ async function brightdataRaw(
 	return null;
 }
 
+// Google now wraps organic result links in its own click-tracking redirect
+// (`google.com/goto?url=<opaque token>`) instead of the destination URL. A
+// plain request carrying a real browser User-Agent gets a genuine 302 back to
+// the article; without one Google serves an HTML interstitial that only
+// redirects via JS (which is what a bare fetch would otherwise see). This is a
+// direct request to Google, not through BrightData — a single cheap redirect
+// lookup, not a page fetch, so it costs nothing extra.
+const GOOGLE_UA =
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
+
+function isGoogleTrackingLink(url: string): boolean {
+	try {
+		const u = new URL(url);
+		return u.hostname === "www.google.com" && u.pathname === "/goto";
+	} catch {
+		return false;
+	}
+}
+
+async function resolveGoogleRedirect(url: string): Promise<string | null> {
+	try {
+		const res = await fetch(url, {
+			method: "GET",
+			redirect: "manual",
+			headers: { "User-Agent": GOOGLE_UA },
+			signal: AbortSignal.timeout(8_000),
+		});
+		const location = res.headers.get("location");
+		return location && location.startsWith("http") ? location : null;
+	} catch {
+		return null;
+	}
+}
+
 export async function googleSerp(
 	query: string,
 	page: number,
@@ -89,7 +123,7 @@ export async function googleSerp(
 		: Array.isArray(parsed?.organic_results)
 			? parsed.organic_results
 			: [];
-	return organic
+	const mapped = organic
 		.map((o, i) => ({
 			title: String(o?.title ?? o?.name ?? "").trim(),
 			url: String(o?.link ?? o?.url ?? "").trim(),
@@ -102,6 +136,17 @@ export async function googleSerp(
 						: i + 1 + page * 100,
 		}))
 		.filter((o) => o.url.startsWith("http") && o.title.length > 0);
+
+	const resolved = await Promise.all(
+		mapped.map(async (o) => {
+			if (!isGoogleTrackingLink(o.url)) return o;
+			const real = await resolveGoogleRedirect(o.url);
+			// Unresolvable tracking link: drop it rather than surface a candidate
+			// whose "URL" is just google.com — nothing downstream can use that.
+			return real ? { ...o, url: real } : null;
+		}),
+	);
+	return resolved.filter((o): o is SerpOrganicResult => o !== null);
 }
 
 export async function unlockerFetchHtml(url: string, render = false): Promise<string | null> {
