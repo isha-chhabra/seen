@@ -326,3 +326,46 @@ export function extractContactHint(html: string, baseUrl: string): string | unde
 	}
 	return undefined;
 }
+
+// ── outward crawl: other roundup pages on a publisher we already like ────────
+
+const ROUNDUP_PATH_RE = /\b(best|top|gift|guide|guides|roundup|round-up|picks|review|reviews|vs)\b/i;
+
+/**
+ * Same-domain links on a page we already fetched that look like other
+ * roundup/list/review pages. A publisher who ran one relevant roundup often
+ * runs several ("best X for dad" sits next to "best X for grads") — this is
+ * the free half of the outward crawl, since we already have the HTML.
+ */
+export function extractInternalLinks(html: string, baseUrl: string, max = 8): { url: string; text: string }[] {
+	let baseHost: string;
+	try {
+		baseHost = new URL(baseUrl).hostname.replace(/^www\./, "");
+	} catch {
+		return [];
+	}
+	const out: { url: string; text: string }[] = [];
+	const seen = new Set<string>();
+	const anchorRe = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+	let scanned = 0;
+	for (let m = anchorRe.exec(html); m !== null && scanned < 1500 && out.length < max; m = anchorRe.exec(html)) {
+		scanned++;
+		const href = m[1] ?? "";
+		const text = (m[2]?.replace(/<[^>]+>/g, " ") ?? "").replace(/\s+/g, " ").trim();
+		let abs: URL;
+		try {
+			abs = new URL(href, baseUrl);
+		} catch {
+			continue;
+		}
+		if (abs.hostname.replace(/^www\./, "") !== baseHost) continue;
+		const path = abs.pathname.toLowerCase();
+		if (path.length < 6 || path === "/") continue;
+		if (!ROUNDUP_PATH_RE.test(path) && !ROUNDUP_PATH_RE.test(text)) continue;
+		const key = `${abs.hostname}${abs.pathname}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		out.push({ url: abs.toString(), text: text.slice(0, 140) });
+	}
+	return out;
+}

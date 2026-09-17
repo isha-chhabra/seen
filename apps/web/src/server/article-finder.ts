@@ -2,28 +2,33 @@
  * Article Finder, stateless per-search server functions.
  *
  * 1. generateArticleQueriesFn, LLM expands a free-text direction into concrete
- *    US-editorial Google queries, grounded in an excerpt of the brand's own site.
+ *    US-editorial Google queries, branched across audience/occasion/sub-category
+ *    and grounded in an excerpt of the brand's own site.
  *    Returned to the UI for review before anything runs.
  * 2. findArticlesFn, runs the chosen queries through BrightData SERP, then:
  *      dedupe -> drop junk / aggregators / foreign ccTLDs / the brand's own site
  *      -> collapse syndicated (same headline across domains)
- *      -> cheap LLM triage on title+snippet
- *      -> fetch survivors, scan page HTML for affiliate signals, drop pure
- *         retailers and disclosure-only pages
+ *      -> fetch every survivor (no cheap title/snippet pre-cut), scan page HTML
+ *         for affiliate signals, drop pure retailers
  *      -> LLM vetting pass: relevance, affiliate-editorial fit, authority tier,
  *         US focus, and a one-line "would the editor feature us" verdict
- *      -> split into high-authority vs niche/blog.
+ *      -> outward crawl: for the best hits, check that same publisher for other
+ *         roundup pages (a site: search + internal links already on the fetched
+ *         page) and run those through the same fetch/vet pipeline
+ *      -> tag every relevant result with brandAlreadyMentioned + affiliateStatus
+ *         instead of silently dropping on either — the UI filters live.
  *
- * Hard caps keep one run bounded (~$0.15-0.35): <=8 queries, <=5 pages/query,
- * <=36 page fetches. A short in-process debounce per brand guards against
- * accidental double-runs. The latest run per brand is persisted so re-opening
- * the tab shows it for free (getLatestArticleSearchFn), a new search is a
- * deliberate click.
+ * Hard caps keep one run bounded: <=20 queries, <=8 pages/query, <=MAX_FETCHES
+ * initial page fetches plus a bounded outward-crawl pass. A short in-process
+ * debounce per brand guards against accidental double-runs. The latest run per
+ * brand is persisted so re-opening the tab shows it for free
+ * (getLatestArticleSearchFn), a new search is a deliberate click.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { generateSearchQueries, judgeArticles, triageCandidates } from "@workspace/lib/article-finder/llm";
+import { generateSearchQueries, judgeArticles } from "@workspace/lib/article-finder/llm";
 import {
 	extractContactHint,
+	extractInternalLinks,
 	extractPublishDate,
 	extractReadableText,
 	googleSerp,
@@ -43,12 +48,15 @@ import {
 	isPrWireDomain,
 } from "@/lib/citations/domain-categories.server";
 
-const MAX_QUERIES = 8;
-const MAX_PAGES = 5;
-const MAX_FETCHES = 36;
-const TRIAGE_INPUT_CAP = 120;
-const SERP_CONCURRENCY = 6;
-const FETCH_CONCURRENCY = 8;
+const MAX_QUERIES = 20;
+const MAX_PAGES = 8;
+const MAX_FETCHES = 140;
+const SERP_CONCURRENCY = 8;
+const FETCH_CONCURRENCY = 10;
+const JUDGE_BATCH_SIZE = 40;
+const CRAWL_EXPAND_DOMAINS = 12;
+const CRAWL_EXPAND_LINKS_PER_DOMAIN = 6;
+const CRAWL_EXPAND_MAX_FETCHES = 80;
 const DEBOUNCE_MS = 45_000;
 
 /** Never an editorial article we can pitch: search/social/video, marketplaces,
@@ -375,6 +383,10 @@ export interface ArticleResult {
 	fitScore: number;
 	verdict: string;
 	relevance: "strong" | "weak";
+	/** yes = the page itself shows real affiliate behaviour; no = fetched fine, no
+	 *  signal found; unsure = fetch failed, or signals are genuinely ambiguous.
+	 *  Never a drop reason anymore, the UI filters on this live. */
+	affiliateStatus: "yes" | "no" | "unsure";
 	signals: string[];
 	merchants: string[];
 	linksCompetitor: boolean;
@@ -383,6 +395,9 @@ export interface ArticleResult {
 	brandAlreadyMentioned: boolean;
 	contactHint?: string;
 	query: string;
+	/** true for results found via the outward crawl (another roundup on a
+	 *  publisher we already liked), not the original SERP fan-out. */
+	viaCrawl?: boolean;
 }
 
 export interface ArticleSearchPayload {
@@ -403,11 +418,6 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 			from: z.string().regex(ymdRe),
 			to: z.string().regex(ymdRe),
 			pagesPerSearch: z.number().int().min(1).max(MAX_PAGES),
-			// default: only surface articles that DON'T already name the brand, those are the pitch targets
-			includeAlreadyFeatured: z.boolean().optional(),
-			// default (undefined) = strict: only keep articles that themselves carry
-			// affiliate links to 2+ retailers or to a competitor. false = balanced.
-			strict: z.boolean().optional(),
 		}),
 	)
 	.handler(async ({ data }): Promise<ArticleSearchPayload> => {
@@ -470,6 +480,165 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 			.trim()
 			.slice(0, 700);
 
+		type Candidate = { title: string; url: string; snippet: string; rank: number; query: string };
+		type ArticleJudgement = Awaited<ReturnType<typeof judgeArticles>>[number];
+		interface Survivor {
+			url: string;
+			title: string;
+			query: string;
+			domain: string;
+			excerpt: string;
+			signals: string[];
+			merchants: string[];
+			linksCompetitor: boolean;
+			publishedDate?: string;
+			competitorsMentioned: string[];
+			brandAlreadyMentioned: boolean;
+			contactHint?: string;
+			rank: number;
+			affiliateSignal: "yes" | "no" | "unsure";
+			internalLinks: { url: string; text: string }[];
+			viaCrawl: boolean;
+		}
+
+		const userDirection = data.direction?.trim() || data.queries.map((q) => q.query).join("; ");
+		let renderBudget = 16;
+
+		// dedupe + drop junk / non-US / brand's & competitors' own sites. Shared
+		// across the initial SERP fan-out and the later crawl-expansion pass, both
+		// write into the same `seen` set so nothing is fetched twice.
+		const seen = new Set<string>();
+		function filterCandidates(rows: Candidate[]): Candidate[] {
+			return rows.filter((row) => {
+				const key = normalizeUrlKey(row.url);
+				if (!key || seen.has(key)) return false;
+				const domain = extractDomain(row.url);
+				if (!domain) return false;
+				if (inJunkDomain(domain) || isNonUsDomain(domain) || isPrWireDomain(domain)) return false;
+				if (brandDomains.has(domain) || competitorDomains.has(domain)) return false;
+				seen.add(key);
+				return true;
+			});
+		}
+		function dropRetailers(rows: Candidate[]): Candidate[] {
+			return rows.filter((c) => {
+				const domain = extractDomain(c.url);
+				const known = isAffiliatePublisherDomain(domain) || isAffiliateRedirectHost(domain);
+				return known || !isEcommerceDomain(domain);
+			});
+		}
+
+		/** Fetch one candidate, scan for affiliate signals, and harvest same-domain
+		 *  "other roundup" links for the outward-crawl pass. No hard affiliate gate
+		 *  here anymore, everything that fetches (or is a known publisher) reaches
+		 *  the LLM judge, tagged with what we found rather than dropped for it. */
+		async function fetchOneCandidate(c: Candidate, viaCrawl: boolean): Promise<Survivor | null> {
+			const domain = extractDomain(c.url);
+			const domainKnown =
+				isAffiliatePublisherDomain(domain) || isAffiliateRedirectHost(domain) || isAffiliateUrl(c.url);
+			let html = await unlockerFetchHtml(c.url).catch(() => null);
+			if (!html) {
+				// nothing to read or scan: only worth keeping if it's a domain we
+				// already trust, otherwise there is nothing to judge.
+				if (!domainKnown) return null;
+				return {
+					url: c.url,
+					title: c.title,
+					query: c.query,
+					domain,
+					excerpt: c.snippet,
+					signals: ["known publisher"],
+					merchants: [],
+					linksCompetitor: false,
+					publishedDate: undefined,
+					competitorsMentioned: [],
+					brandAlreadyMentioned: false,
+					contactHint: undefined,
+					rank: c.rank,
+					affiliateSignal: "yes",
+					internalLinks: [],
+					viaCrawl,
+				};
+			}
+			let sig = scanHtmlForAffiliateSignals(html);
+			let linkedComp = linksACompetitor(sig.taggedLinks);
+
+			// static HTML looks affiliate-ish (disclosure) but thin on links, and it's
+			// not a known publisher, re-fetch with JS rendered so client-side link
+			// monetizers can rewrite links, then re-scan. Best-effort, budget-capped.
+			if (!domainKnown && !linkedComp && sig.taggedOutboundHosts.length < 2 && sig.disclosure && renderBudget > 0) {
+				renderBudget--;
+				const rendered = await unlockerFetchHtml(c.url, true).catch(() => null);
+				if (rendered && rendered.length > html.length * 0.8) {
+					html = rendered;
+					sig = scanHtmlForAffiliateSignals(html);
+					linkedComp = linksACompetitor(sig.taggedLinks);
+				}
+			}
+
+			const merchantCount = sig.taggedOutboundHosts.length;
+			// tag, don't drop: the LLM judge reads affiliateSignal alongside the
+			// full page text, "unsure" and "no" both still get a fair relevance
+			// judgement instead of being thrown away before anyone reads the page.
+			const affiliateSignal: "yes" | "no" | "unsure" =
+				domainKnown || linkedComp || sig.sponsoredRel || merchantCount >= 2
+					? "yes"
+					: merchantCount >= 1 || sig.disclosure
+						? "unsure"
+						: "no";
+
+			const text = extractReadableText(html) || c.snippet;
+			const haystack = `${c.title}\n${text}`;
+			return {
+				url: c.url,
+				title: c.title,
+				query: c.query,
+				domain,
+				excerpt: text.slice(0, 1500),
+				signals: dedupeLower([...(domainKnown ? ["known publisher"] : []), ...sig.labels]),
+				merchants: sig.taggedOutboundHosts.slice(0, 8),
+				linksCompetitor: linkedComp,
+				publishedDate: extractPublishDate(html),
+				competitorsMentioned: compResByName.filter((cc) => cc.res.some((re) => re.test(haystack))).map((cc) => cc.name),
+				brandAlreadyMentioned: brandRes.some((re) => re.test(haystack)),
+				contactHint: extractContactHint(html, c.url),
+				rank: c.rank,
+				affiliateSignal,
+				internalLinks: extractInternalLinks(html, c.url, CRAWL_EXPAND_LINKS_PER_DOMAIN),
+				viaCrawl,
+			};
+		}
+
+		/** Batch survivors through judgeArticles in chunks (its schema caps a single
+		 *  call at 50 articles) and merge the results into one url -> judgement map. */
+		async function judgeAll(survivors: Survivor[]): Promise<Map<string, ArticleJudgement>> {
+			if (survivors.length === 0) return new Map();
+			const chunks: Survivor[][] = [];
+			for (let i = 0; i < survivors.length; i += JUDGE_BATCH_SIZE) chunks.push(survivors.slice(i, i + JUDGE_BATCH_SIZE));
+			const chunkResults = await mapPool(chunks, 3, (chunk) =>
+				judgeArticles({
+					brandName: brand.name,
+					brandWebsite: brand.website,
+					brandSummary,
+					direction: userDirection,
+					competitors: competitorNames,
+					articles: chunk.map((s) => ({
+						url: s.url,
+						title: s.title,
+						domain: s.domain,
+						excerpt: s.excerpt,
+						competitorsMentioned: s.competitorsMentioned,
+						affiliateMerchants: s.merchants,
+						linksCompetitor: s.linksCompetitor,
+						publishedOrUpdated: s.publishedDate ?? null,
+					})),
+				}).catch(() => [] as ArticleJudgement[]),
+			);
+			const byUrl = new Map<string, ArticleJudgement>();
+			for (const arr of chunkResults) for (const j of arr) byUrl.set(j.url, j);
+			return byUrl;
+		}
+
 		// 1. SERP fan-out
 		const queries = data.queries.slice(0, MAX_QUERIES);
 		const serpTasks: { query: string; page: number }[] = [];
@@ -483,17 +652,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 		);
 
 		// 2. dedupe + drop junk / non-US / brand's & competitors' own sites
-		const seen = new Set<string>();
-		let candidates = serpBatches.flat().filter((row) => {
-			const key = normalizeUrlKey(row.url);
-			if (!key || seen.has(key)) return false;
-			const domain = extractDomain(row.url);
-			if (!domain) return false;
-			if (inJunkDomain(domain) || isNonUsDomain(domain) || isPrWireDomain(domain)) return false;
-			if (brandDomains.has(domain) || competitorDomains.has(domain)) return false;
-			seen.add(key);
-			return true;
-		});
+		let candidates = filterCandidates(serpBatches.flat());
 		const afterJunk = candidates.length;
 		candidates.sort((a, b) => a.rank - b.rank);
 
@@ -517,162 +676,90 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 		candidates = candidates.filter((c) => !syndicatedDrop.has(c.url));
 
 		// 4. drop obvious retailers before spending an LLM/fetch on them
-		candidates = candidates.filter((c) => {
-			const domain = extractDomain(c.url);
-			const known = isAffiliatePublisherDomain(domain) || isAffiliateRedirectHost(domain);
-			return known || !isEcommerceDomain(domain);
-		});
+		candidates = dropRetailers(candidates);
 		const afterRetail = candidates.length;
 
-		const userDirection = data.direction?.trim() || data.queries.map((q) => q.query).join("; ");
-
-		// 5. cheap triage on title+snippet -> keep the most on-topic
-		let triaged = candidates;
-		if (candidates.length > 24) {
-			const input = candidates.slice(0, TRIAGE_INPUT_CAP);
-			try {
-				const keepNums = await triageCandidates({
-					brandName: brand.name,
-					brandSummary,
-					direction: userDirection,
-					candidates: input.map((c) => ({ title: c.title, snippet: c.snippet, domain: extractDomain(c.url) })),
-				});
-				const keep = new Set(keepNums.filter((n) => n >= 1 && n <= input.length).map((n) => n - 1));
-				triaged = keep.size > 0 ? input.filter((_, i) => keep.has(i)) : input;
-			} catch {
-				triaged = candidates.slice(0, TRIAGE_INPUT_CAP);
-			}
-		}
-		const afterTriage = triaged.length;
-
-		// 6. rank-order, then fetch survivors + scan page HTML
-		const strict = data.strict !== false;
-		let renderBudget = 12;
-		let droppedThinAffiliate = 0;
-		const toFetch = triaged
+		// 5. fetch every survivor (rank-ordered, capped) + scan page HTML. No more
+		// cheap title/snippet pre-cut, see file header for why.
+		const toFetch = candidates
 			.slice()
 			.sort((a, b) => a.rank - b.rank)
 			.slice(0, MAX_FETCHES);
-		const fetched = await mapPool(toFetch, FETCH_CONCURRENCY, async (c) => {
-			const domain = extractDomain(c.url);
-			const domainKnown =
-				isAffiliatePublisherDomain(domain) || isAffiliateRedirectHost(domain) || isAffiliateUrl(c.url);
-			let html = await unlockerFetchHtml(c.url).catch(() => null);
-			if (!html) {
-				if (!domainKnown) return null;
-				return {
-					url: c.url,
-					title: c.title,
-					query: c.query,
-					domain,
-					excerpt: c.snippet,
-					signals: ["known publisher"],
-					merchants: [] as string[],
-					linksCompetitor: false,
-					publishedDate: undefined as string | undefined,
-					competitorsMentioned: [] as string[],
-					brandAlreadyMentioned: false,
-					contactHint: undefined as string | undefined,
-					rank: c.rank,
-				};
-			}
-			let sig = scanHtmlForAffiliateSignals(html);
-			let linkedComp = linksACompetitor(sig.taggedLinks);
+		const fetched1 = await mapPool(toFetch, FETCH_CONCURRENCY, (c) => fetchOneCandidate(c, false));
+		const survivors1 = fetched1.filter((x): x is Survivor => x !== null);
 
-			// static HTML looks affiliate-ish (disclosure) but thin on links, and it's
-			// not a known publisher, re-fetch with JS rendered so client-side link
-			// monetizers can rewrite links, then re-scan. Best-effort, budget-capped.
-			if (!domainKnown && !linkedComp && sig.taggedOutboundHosts.length < 2 && sig.disclosure && renderBudget > 0) {
-				renderBudget--;
-				const rendered = await unlockerFetchHtml(c.url, true).catch(() => null);
-				if (rendered && rendered.length > html.length * 0.8) {
-					html = rendered;
-					sig = scanHtmlForAffiliateSignals(html);
-					linkedComp = linksACompetitor(sig.taggedLinks);
-				}
-			}
+		// 6. LLM vetting pass, first wave
+		const byUrl1 = await judgeAll(survivors1);
 
-			const merchantCount = sig.taggedOutboundHosts.length;
-			// keep rule. strict: the article ITSELF must prove affiliate behaviour -
-			// links 2+ retailers, links a competitor, has rel=sponsored, or is a known
-			// affiliate publisher. balanced also allows a single disclosure + link.
-			const keep = strict
-				? domainKnown || linkedComp || sig.sponsoredRel || merchantCount >= 2
-				: domainKnown || sig.strong || linkedComp || (sig.disclosure && merchantCount >= 1 && !sig.commerceMarkers);
-			if (!keep) {
-				droppedThinAffiliate++;
-				return null;
-			}
-			if (sig.commerceMarkers && !domainKnown && !sig.strong && !linkedComp) {
-				droppedThinAffiliate++;
-				return null;
-			}
-
-			const text = extractReadableText(html) || c.snippet;
-			const haystack = `${c.title}\n${text}`;
-			return {
-				url: c.url,
-				title: c.title,
-				query: c.query,
-				domain,
-				excerpt: text.slice(0, 1500),
-				signals: dedupeLower([...(domainKnown ? ["known publisher"] : []), ...sig.labels]),
-				merchants: sig.taggedOutboundHosts.slice(0, 8),
-				linksCompetitor: linkedComp,
-				publishedDate: extractPublishDate(html),
-				competitorsMentioned: compResByName.filter((cc) => cc.res.some((re) => re.test(haystack))).map((cc) => cc.name),
-				brandAlreadyMentioned: brandRes.some((re) => re.test(haystack)),
-				contactHint: extractContactHint(html, c.url),
-				rank: c.rank,
-			};
-		});
-		const survivors = fetched.filter((x): x is NonNullable<typeof x> => x !== null);
-
-		// 7. LLM vetting pass
-		let judgements: Awaited<ReturnType<typeof judgeArticles>> = [];
-		try {
-			judgements = await judgeArticles({
-				brandName: brand.name,
-				brandWebsite: brand.website,
-				brandSummary,
-				direction: userDirection,
-				competitors: competitorNames,
-				articles: survivors.map((s) => ({
-					url: s.url,
-					title: s.title,
-					domain: s.domain,
-					excerpt: s.excerpt,
-					competitorsMentioned: s.competitorsMentioned,
-					affiliateMerchants: s.merchants,
-					linksCompetitor: s.linksCompetitor,
-					publishedOrUpdated: s.publishedDate ?? null,
-				})),
-			});
-		} catch {
-			judgements = [];
+		// 7. outward crawl: for the best hits so far, check that same publisher for
+		// other roundup pages (a scoped site: search + internal links already sitting
+		// on the page we fetched) and run those candidates through the same
+		// filter/fetch/judge pipeline. This is what finds the long tail a single
+		// round of Google queries never surfaces.
+		const ranked1 = survivors1
+			.map((s) => ({ s, score: byUrl1.get(s.url)?.fitScore ?? 50, relevance: byUrl1.get(s.url)?.relevance }))
+			.filter((r) => r.relevance !== "off_topic")
+			.sort((a, b) => b.score - a.score);
+		const expandDomains: string[] = [];
+		const seenDomains = new Set<string>();
+		for (const { s } of ranked1) {
+			if (seenDomains.has(s.domain)) continue;
+			seenDomains.add(s.domain);
+			expandDomains.push(s.domain);
+			if (expandDomains.length >= CRAWL_EXPAND_DOMAINS) break;
 		}
-		const byUrl = new Map(judgements.map((j) => [j.url, j]));
+
+		let survivors2: Survivor[] = [];
+		let byUrl2 = new Map<string, ArticleJudgement>();
+		if (expandDomains.length > 0) {
+			const siteQueryBatches = await mapPool(expandDomains, SERP_CONCURRENCY, (domain) =>
+				googleSerp(`${userDirection} site:${domain}`, 0, { from: data.from, to: data.to })
+					.then((rows) => rows.map((r) => ({ ...r, query: `site:${domain}` })))
+					.catch(() => [] as Candidate[]),
+			);
+			const internalLinkRows: Candidate[] = ranked1
+				.filter(({ s }) => expandDomains.includes(s.domain))
+				.flatMap(({ s }) =>
+					s.internalLinks.map((l) => ({
+						title: l.text || s.domain,
+						url: l.url,
+						snippet: "",
+						rank: 500,
+						query: `linked from ${s.domain}`,
+					})),
+				);
+			let expansionCandidates = filterCandidates([...siteQueryBatches.flat(), ...internalLinkRows]);
+			expansionCandidates = dropRetailers(expansionCandidates)
+				.sort((a, b) => a.rank - b.rank)
+				.slice(0, CRAWL_EXPAND_MAX_FETCHES);
+			const fetched2 = await mapPool(expansionCandidates, FETCH_CONCURRENCY, (c) => fetchOneCandidate(c, true));
+			survivors2 = fetched2.filter((x): x is Survivor => x !== null);
+			byUrl2 = await judgeAll(survivors2);
+		}
+
+		const survivors = [...survivors1, ...survivors2];
+		const byUrl = new Map<string, ArticleJudgement>([...byUrl1, ...byUrl2]);
 		const staleYear = new Date().getFullYear() - 2;
+
+		/** Combine our own page-scan evidence with the LLM's read. Hard evidence
+		 *  (2+ tagged merchants, a competitor link, rel=sponsored, a known publisher)
+		 *  always wins as "yes"; disagreement or ambiguity lands in "unsure" rather
+		 *  than being forced into yes/no. */
+		function resolveAffiliateStatus(s: Survivor, j: ArticleJudgement | undefined): ArticleResult["affiliateStatus"] {
+			if (s.affiliateSignal === "yes") return "yes";
+			if (j?.affiliateEditorial === "yes") return "yes";
+			if (j?.affiliateEditorial === "no" && s.affiliateSignal === "no") return "no";
+			return "unsure";
+		}
 
 		const highAuthority: ArticleResult[] = [];
 		const nicheBlog: ArticleResult[] = [];
-		const drop = {
-			alreadyFeatured: 0,
-			offTopic: 0,
-			notAffiliate: 0,
-			nonUs: 0,
-			unvetted: 0,
-			lowScore: 0,
-			stale: 0,
-			dupePublisher: 0,
-		};
+		const drop = { offTopic: 0, nonUs: 0, unvetted: 0, dupePublisher: 0 };
+		let affiliateYes = 0;
+		let affiliateNo = 0;
+		let affiliateUnsure = 0;
+		let mentionsBrand = 0;
 		for (const s of survivors) {
-			// the point of the tool is finding pitch targets, skip articles that
-			// already name the brand unless the caller opts to see them
-			if (s.brandAlreadyMentioned && data.includeAlreadyFeatured !== true) {
-				drop.alreadyFeatured++;
-				continue;
-			}
 			const j = byUrl.get(s.url);
 			const majorList = isMajorPublisher(s.domain, s.url);
 			const merchantCount = s.merchants.length;
@@ -687,13 +774,6 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 					drop.offTopic++;
 					continue;
 				}
-				if (
-					j.affiliateEditorial === "no" ||
-					(strict && j.affiliateEditorial === "unclear" && !s.linksCompetitor && merchantCount < 2)
-				) {
-					drop.notAffiliate++;
-					continue;
-				}
 				if (!j.usCentric && !majorList) {
 					drop.nonUs++;
 					continue;
@@ -702,7 +782,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 					j.relevance === "weak" &&
 					s.competitorsMentioned.length === 0 &&
 					!s.linksCompetitor &&
-					j.affiliateEditorial !== "yes"
+					s.affiliateSignal !== "yes"
 				) {
 					drop.offTopic++;
 					continue;
@@ -714,20 +794,16 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 			else if (merchantCount >= 3) score = Math.max(score, 72);
 			else if (merchantCount >= 2) score = Math.max(score, 62);
 
-			// staleness: an old roundup with no update signal is a weak pitch
+			// staleness: an old roundup with no update signal is a weaker pitch, so
+			// penalize the score, don't drop it, broad recall over a hard cut here
 			const year = s.publishedDate ? Number(s.publishedDate.slice(0, 4)) : null;
-			if (year && year < staleYear && !s.linksCompetitor) {
-				if (strict) {
-					drop.stale++;
-					continue;
-				}
-				score = Math.min(score, 44);
-			}
+			if (year && year < staleYear && !s.linksCompetitor) score = Math.min(score, 44);
 
-			if (strict && score < 55) {
-				drop.lowScore++;
-				continue;
-			}
+			const affiliateStatus = resolveAffiliateStatus(s, j);
+			if (affiliateStatus === "yes") affiliateYes++;
+			else if (affiliateStatus === "no") affiliateNo++;
+			else affiliateUnsure++;
+			if (s.brandAlreadyMentioned) mentionsBrand++;
 
 			const row: ArticleResult = {
 				title: s.title,
@@ -744,6 +820,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 								: `${s.domain} runs affiliate roundups in this space; worth a pitch.`),
 				),
 				relevance: j?.relevance === "weak" ? "weak" : "strong",
+				affiliateStatus,
 				signals: s.signals,
 				merchants: s.merchants,
 				linksCompetitor: s.linksCompetitor,
@@ -752,6 +829,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 				brandAlreadyMentioned: s.brandAlreadyMentioned,
 				contactHint: s.contactHint,
 				query: s.query,
+				viaCrawl: s.viaCrawl,
 			};
 			(row.tier === "high_authority" ? highAuthority : nicheBlog).push(row);
 		}
@@ -787,22 +865,27 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 				serpRequests: serpTasks.length,
 				candidates: afterJunk,
 				pagesFetched: toFetch.length,
+				expandedDomains: expandDomains.length,
+				expandedFound: survivors2.length,
 				highAuthority: highFinal.length,
 				nicheBlog: nicheFinal.length,
-				droppedAlreadyFeatured: drop.alreadyFeatured,
+				affiliateYes,
+				affiliateNo,
+				affiliateUnsure,
+				mentionsBrand,
 				droppedOffTopic: drop.offTopic,
-				droppedNotAffiliate: drop.notAffiliate,
 				droppedNonUs: drop.nonUs,
-				droppedThinAffiliate,
-				droppedLowScore: drop.lowScore,
-				droppedStale: drop.stale,
+				droppedUnvetted: drop.unvetted,
 				droppedDupePublisher: drop.dupePublisher,
 				droppedRetailer: Math.max(0, afterJunk - afterRetail),
 				droppedSyndicated: syndicatedDrop.size,
 			},
 		};
 
-		// persist the latest run so re-opening the tab is free
+		// persist the latest run so re-opening the tab is free. freshOnly/strict
+		// used to be hard server-side filters; both are now UI-side toggles over a
+		// single tagged result set, so the column is just kept true for schema
+		// continuity, nothing reads it as a filter anymore.
 		try {
 			await db.insert(brandArticleSearches).values({
 				brandId: data.brandId,
@@ -810,7 +893,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 				periodStart: data.from,
 				periodEnd: data.to,
 				pagesPerSearch: data.pagesPerSearch,
-				freshOnly: data.includeAlreadyFeatured !== true,
+				freshOnly: true,
 				queries: data.queries,
 				payload,
 				createdBy: session.user.name?.trim() || session.user.email || "a teammate",
@@ -843,6 +926,9 @@ export const getLatestArticleSearchFn = createServerFn({ method: "POST" })
 				linksCompetitor: r.linksCompetitor ?? false,
 				signals: r.signals ?? [],
 				competitorsMentioned: r.competitorsMentioned ?? [],
+				// older rows predate the affiliateStatus tag (they were pre-filtered to
+				// affiliate-only server-side), so they're all a safe "yes"
+				affiliateStatus: r.affiliateStatus ?? "yes",
 			}));
 		return {
 			createdAt: String(row.createdAt),

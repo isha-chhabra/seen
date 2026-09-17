@@ -10,7 +10,6 @@ import { Button } from "@workspace/ui/components/button";
 import { Calendar } from "@workspace/ui/components/calendar";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover";
-import { Switch } from "@workspace/ui/components/switch";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { cn } from "@workspace/ui/lib/utils";
 import { useEffect, useState } from "react";
@@ -103,15 +102,16 @@ function ArticleRow({ r, brandName }: { r: ArticleResult; brandName?: string }) 
 			</div>
 			<p className="mt-1 pl-[38px] text-xs text-muted-foreground">{meta}</p>
 			<p className="mt-1 pl-[38px] text-[13px] leading-relaxed text-foreground/80">{r.verdict}</p>
-			{(r.linksCompetitor || r.brandAlreadyMentioned || r.relevance === "weak") && (
-				<div className="mt-1.5 flex gap-3 pl-[38px] text-[11px]">
-					{r.linksCompetitor && <span className="font-medium text-primary">Links a competitor</span>}
-					{r.brandAlreadyMentioned && (
-						<span className="text-muted-foreground">Mentions {brandName ?? "the brand"}</span>
-					)}
-					{r.relevance === "weak" && <span className="text-muted-foreground">Loose fit</span>}
-				</div>
-			)}
+			<div className="mt-1.5 flex flex-wrap gap-3 pl-[38px] text-[11px]">
+				{r.affiliateStatus === "yes" && <span className="text-muted-foreground">Affiliate confirmed</span>}
+				{r.affiliateStatus === "unsure" && <span className="text-muted-foreground">Affiliate unsure</span>}
+				{r.linksCompetitor && <span className="font-medium text-primary">Links a competitor</span>}
+				{r.brandAlreadyMentioned && (
+					<span className="text-muted-foreground">Mentions {brandName ?? "the brand"}</span>
+				)}
+				{r.relevance === "weak" && <span className="text-muted-foreground">Loose fit</span>}
+				{r.viaCrawl && <span className="text-muted-foreground">Found via crawl</span>}
+			</div>
 		</div>
 	);
 }
@@ -128,9 +128,7 @@ function ArticleFinderPage() {
 		from.setMonth(from.getMonth() - 6);
 		return { from, to };
 	});
-	const [pages, setPages] = useState(2);
-	const [freshOnly, setFreshOnly] = useState(true);
-	const [strict, setStrict] = useState(true);
+	const [pages, setPages] = useState(4);
 	const [phase, setPhase] = useState<Phase>("idle");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -140,6 +138,12 @@ function ArticleFinderPage() {
 	const [stats, setStats] = useState<Record<string, number> | null>(null);
 	const [loaded, setLoaded] = useState<{ at: string; by: string } | null>(null);
 
+	// post-search filters, live over the one tagged result set, no re-run needed
+	const [mentionFilter, setMentionFilter] = useState<"all" | "unmentioned" | "mentioned">("all");
+	const [affiliateFilter, setAffiliateFilter] = useState<Set<"yes" | "unsure" | "no">>(
+		() => new Set(["yes", "unsure"]),
+	);
+
 	// on open: show the last saved search for this brand, for free
 	useEffect(() => {
 		let cancelled = false;
@@ -148,8 +152,7 @@ function ArticleFinderPage() {
 				if (cancelled || !r) return;
 				setDirection(r.direction);
 				if (r.from && r.to) setRange({ from: parseYmd(r.from), to: parseYmd(r.to) });
-				setPages(r.pagesPerSearch || 2);
-				setFreshOnly(r.freshOnly);
+				setPages(r.pagesPerSearch || 4);
 				setQueries(r.queries.map((q) => ({ query: q.query, angle: q.angle, on: true })));
 				setHigh(r.highAuthority);
 				setNiche(r.nicheBlog);
@@ -163,8 +166,26 @@ function ArticleFinderPage() {
 		};
 	}, [brandId]);
 
+	function toggleAffiliateFilter(v: "yes" | "unsure" | "no") {
+		setAffiliateFilter((prev) => {
+			const next = new Set(prev);
+			if (next.has(v)) next.delete(v);
+			else next.add(v);
+			return next;
+		});
+	}
+
+	function matchesFilters(r: ArticleResult): boolean {
+		if (mentionFilter === "mentioned" && !r.brandAlreadyMentioned) return false;
+		if (mentionFilter === "unmentioned" && r.brandAlreadyMentioned) return false;
+		return affiliateFilter.has(r.affiliateStatus);
+	}
+
 	const selected = queries.filter((q) => q.on);
+	const filteredHigh = high.filter(matchesFilters);
+	const filteredNiche = niche.filter(matchesFilters);
 	const totalResults = high.length + niche.length;
+	const filteredCount = filteredHigh.length + filteredNiche.length;
 	const canBuild = !isViewer && !busy && direction.trim().length >= 3 && !!range?.from && !!range?.to;
 
 	async function genQueries() {
@@ -198,8 +219,6 @@ function ArticleFinderPage() {
 					from: ymd(range.from),
 					to: ymd(range.to),
 					pagesPerSearch: pages,
-					includeAlreadyFeatured: !freshOnly,
-					strict,
 				},
 			});
 			setHigh(res.highAuthority);
@@ -226,6 +245,8 @@ function ArticleFinderPage() {
 			[
 				"category",
 				"fit score",
+				"affiliate",
+				"mentions brand",
 				"article name",
 				"article link",
 				"published",
@@ -242,6 +263,8 @@ function ArticleFinderPage() {
 					[
 						label,
 						r.fitScore,
+						r.affiliateStatus,
+						r.brandAlreadyMentioned ? "yes" : "",
 						r.title,
 						r.url,
 						r.publishedDate ?? "",
@@ -253,8 +276,8 @@ function ArticleFinderPage() {
 						.join(","),
 				);
 		};
-		add("High-authority", high);
-		add("Niche / blog", niche);
+		add("High-authority", filteredHigh);
+		add("Niche / blog", filteredNiche);
 		const blob = new Blob([`﻿${rows.join("\r\n")}`], { type: "text/csv;charset=utf-8" });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
@@ -272,23 +295,26 @@ function ArticleFinderPage() {
 	const dropParts = stats
 		? [
 				stats.droppedOffTopic ? `${stats.droppedOffTopic} off-topic` : "",
-				stats.droppedNotAffiliate ? `${stats.droppedNotAffiliate} not affiliate` : "",
-				stats.droppedThinAffiliate ? `${stats.droppedThinAffiliate} unconfirmed affiliate links` : "",
-				stats.droppedLowScore ? `${stats.droppedLowScore} scored low` : "",
-				stats.droppedStale ? `${stats.droppedStale} stale` : "",
 				stats.droppedNonUs ? `${stats.droppedNonUs} non-US` : "",
+				stats.droppedUnvetted ? `${stats.droppedUnvetted} unvetted` : "",
 				stats.droppedRetailer ? `${stats.droppedRetailer} retailers` : "",
 				stats.droppedSyndicated ? `${stats.droppedSyndicated} syndicated` : "",
 				stats.droppedDupePublisher ? `${stats.droppedDupePublisher} duplicate sites` : "",
-				stats.droppedAlreadyFeatured ? `${stats.droppedAlreadyFeatured} already feature the brand` : "",
+			].filter(Boolean)
+		: [];
+	const foundParts = stats
+		? [
+				stats.expandedDomains
+					? `+${stats.expandedFound ?? 0} from checking ${stats.expandedDomains} good publisher${stats.expandedDomains === 1 ? "" : "s"} for other roundups`
+					: "",
 			].filter(Boolean)
 		: [];
 
 	return (
 		<PageHeader
 			title="Article Finder"
-			subtitle="US articles to pitch this brand to, vetted for topical fit and affiliate links."
-			infoContent="We turn your direction into US Google searches, drop non-US, retailer and syndicated results, then check each page for real affiliate links and score how likely an editor is to feature the brand. The last run is saved, so reopening this tab is free."
+			subtitle="US articles to pitch this brand to, cast a wide net and vetted for topical fit."
+			infoContent="We expand your direction into many angled Google searches, drop non-US/retailer/syndicated results, fetch and read the survivors, then check the best hits for other roundups on that same publisher. Every result is tagged for whether it mentions the brand and whether it shows real affiliate links, filter either on the results screen. The last run is saved, so reopening this tab is free."
 			actions={
 				phase === "results" ? (
 					<>
@@ -327,7 +353,7 @@ function ArticleFinderPage() {
 							<div className="flex items-center gap-2">
 								<span className="text-muted-foreground">Depth</span>
 								<div className="flex overflow-hidden rounded-md border">
-									{[1, 2, 3, 4, 5].map((n) => (
+									{[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
 										<button
 											key={n}
 											type="button"
@@ -346,16 +372,11 @@ function ArticleFinderPage() {
 						</div>
 
 						<div className="space-y-2.5 border-t pt-4 text-sm">
-							<label className="flex cursor-pointer items-center justify-between gap-4">
-								<span>Hide articles that already mention {brand?.name ?? "the brand"}</span>
-								<Switch checked={freshOnly} onCheckedChange={setFreshOnly} disabled={busy} />
-							</label>
-							<label className="flex cursor-pointer items-center justify-between gap-4">
-								<span>Strict: only outlets with confirmed affiliate links</span>
-								<Switch checked={strict} onCheckedChange={setStrict} disabled={busy} />
-							</label>
 							<p className="text-xs text-muted-foreground">
-								More depth means more results and a higher cost per search.
+								We cast as wide a net as we can, dedupe and vet the results, then check the best hits for other
+								roundups on that same publisher. Whether it mentions {brand?.name ?? "the brand"} already and
+								whether it's affiliate-monetized are both filters on the results screen, not settings here, more
+								depth means a wider net and a higher cost per search.
 							</p>
 						</div>
 
@@ -430,23 +451,79 @@ function ArticleFinderPage() {
 							</p>
 						)}
 
-						<div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b pb-3 text-sm">
-							<span className="font-semibold">
-								{totalResults} article{totalResults === 1 ? "" : "s"}
-							</span>
-							{totalResults > 0 && (
-								<span className="text-muted-foreground">
-									{high.length} high-authority · {niche.length} niche
+						<div className="space-y-3 border-b pb-4">
+							<div className="flex flex-wrap items-center gap-x-6 gap-y-2.5 text-sm">
+								<div className="flex items-center gap-2">
+									<span className="text-muted-foreground">Mentions {brand?.name ?? "brand"}</span>
+									<div className="flex overflow-hidden rounded-md border">
+										{(
+											[
+												["all", "Any"],
+												["unmentioned", "No"],
+												["mentioned", "Yes"],
+											] as const
+										).map(([v, label]) => (
+											<button
+												key={v}
+												type="button"
+												onClick={() => setMentionFilter(v)}
+												className={cn(
+													"h-8 px-2.5 text-xs transition-colors",
+													mentionFilter === v ? "bg-primary text-primary-foreground" : "hover:bg-accent",
+												)}
+											>
+												{label}
+											</button>
+										))}
+									</div>
+								</div>
+								<div className="flex items-center gap-2">
+									<span className="text-muted-foreground">Affiliate</span>
+									<div className="flex overflow-hidden rounded-md border">
+										{(
+											[
+												["yes", "Confirmed"],
+												["unsure", "Unsure"],
+												["no", "Not affiliate"],
+											] as const
+										).map(([v, label]) => (
+											<button
+												key={v}
+												type="button"
+												onClick={() => toggleAffiliateFilter(v)}
+												className={cn(
+													"h-8 px-2.5 text-xs transition-colors",
+													affiliateFilter.has(v) ? "bg-primary text-primary-foreground" : "hover:bg-accent",
+												)}
+											>
+												{label}
+											</button>
+										))}
+									</div>
+								</div>
+							</div>
+
+							<div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
+								<span className="font-semibold">
+									{filteredCount} of {totalResults} article{totalResults === 1 ? "" : "s"}
 								</span>
-							)}
-							{dropParts.length > 0 && (
-								<details className="ml-auto text-xs text-muted-foreground">
-									<summary className="cursor-pointer list-none transition-colors hover:text-foreground">
-										{stats?.candidates ?? 0} checked
-									</summary>
-									<p className="mt-2 max-w-md text-right leading-relaxed">Filtered out: {dropParts.join(", ")}.</p>
-								</details>
-							)}
+								{filteredCount > 0 && (
+									<span className="text-muted-foreground">
+										{filteredHigh.length} high-authority · {filteredNiche.length} niche
+									</span>
+								)}
+								{(dropParts.length > 0 || foundParts.length > 0) && (
+									<details className="ml-auto text-xs text-muted-foreground">
+										<summary className="cursor-pointer list-none transition-colors hover:text-foreground">
+											{stats?.candidates ?? 0} checked
+										</summary>
+										<p className="mt-2 max-w-md text-right leading-relaxed">
+											{foundParts.length > 0 && <>{foundParts.join(", ")}. </>}
+											{dropParts.length > 0 && <>Filtered out: {dropParts.join(", ")}.</>}
+										</p>
+									</details>
+								)}
+							</div>
 						</div>
 
 						{totalResults === 0 ? (
@@ -455,23 +532,29 @@ function ArticleFinderPage() {
 								title="Nothing cleared vetting"
 								description="Try a broader direction, a wider date range, or more depth."
 							/>
+						) : filteredCount === 0 ? (
+							<EmptyState
+								icon={IconSearch}
+								title="Nothing matches these filters"
+								description="Loosen the mentions/affiliate filters above, the results are still there."
+							/>
 						) : (
 							<div className="space-y-7">
-								{high.length > 0 && (
+								{filteredHigh.length > 0 && (
 									<section>
-										<SectionHeading count={high.length}>High authority</SectionHeading>
+										<SectionHeading count={filteredHigh.length}>High authority</SectionHeading>
 										<div className="divide-y">
-											{high.map((r) => (
+											{filteredHigh.map((r) => (
 												<ArticleRow key={r.url} r={r} brandName={brand?.name} />
 											))}
 										</div>
 									</section>
 								)}
-								{niche.length > 0 && (
+								{filteredNiche.length > 0 && (
 									<section>
-										<SectionHeading count={niche.length}>Niche &amp; blog</SectionHeading>
+										<SectionHeading count={filteredNiche.length}>Niche &amp; blog</SectionHeading>
 										<div className="divide-y">
-											{niche.map((r) => (
+											{filteredNiche.map((r) => (
 												<ArticleRow key={r.url} r={r} brandName={brand?.name} />
 											))}
 										</div>

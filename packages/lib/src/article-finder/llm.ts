@@ -1,10 +1,15 @@
 /**
  * Article Finder, LLM steps (gpt-5-mini via the onboarding provider).
  *
- *   1. generateSearchQueries, free-text direction -> concrete US-editorial Google queries
- *   2. triageCandidates     , cheap title/snippet pass to drop obvious misfits before fetching
- *   3. judgeArticles        , full vetting of fetched pages: relevance, affiliate-editorial
+ *   1. generateSearchQueries, free-text direction -> concrete US-editorial Google queries,
+ *                              deliberately branched across audience/occasion/sub-category
+ *   2. judgeArticles        , full vetting of fetched pages: relevance, affiliate-editorial
  *                              fit, authority tier, US focus, and the outreach verdict
+ *
+ * There is no cheap pre-fetch triage anymore. Guessing relevance from a title and a
+ * one-line snippet was throwing away real candidates before anything read the actual
+ * page; we fetch everything that survives basic junk/retailer/syndication filtering
+ * and let judgeArticles decide on full content instead.
  */
 import { z } from "zod";
 import { runStructuredCompletionPrompt } from "../onboarding/llm";
@@ -18,11 +23,13 @@ export const searchQueriesSchema = z.object({
 				query: z.string().describe("A natural Google search string. No quotes, no site: operators, no brand name."),
 				angle: z
 					.string()
-					.describe("Short label for what makes this variation distinct, e.g. 'budget picks' or 'holiday gifting'."),
+					.describe(
+						"Short label for what makes this variation distinct, e.g. 'gifts for dad' vs 'gifts for husband' vs 'budget picks'.",
+					),
 			}),
 		)
-		.min(4)
-		.max(8),
+		.min(6)
+		.max(20),
 });
 export type SearchQuery = z.infer<typeof searchQueriesSchema>["queries"][number];
 
@@ -42,14 +49,15 @@ export async function generateSearchQueries(args: {
 		args.trackedTopics.length > 0
 			? `The brand is already tracked on these AI-search topics, stay in the same product territory: ${args.trackedTopics.join("; ")}.`
 			: "",
-		`The affiliate team wants US articles they could pitch ${args.brandName} into.`,
+		`The affiliate team wants a WIDE net of US articles they could pitch ${args.brandName} into, the kind of breadth a person manually clicking through Google for an hour would find, not just the first page of one search.`,
 		`Their direction, verbatim: "${args.direction}". Timeframe of interest: ${args.rangeLabel}.`,
 		``,
-		`Produce 4-8 Google searches a US shopper or editor would type to surface PUBLISHED editorial roundups, buying guides, "best of" lists and review posts in the brand's exact product category.`,
+		`Produce 10-20 Google searches a US shopper or editor would type to surface PUBLISHED editorial roundups, buying guides, "best of" lists and review posts in the brand's exact product category.`,
 		`Rules:`,
 		`- Every query must sit squarely in ${args.brandName}'s product category. Do NOT drift into adjacent categories the brand does not sell.`,
 		`- Phrase them the way US publications title this content: "best X 2026", "X we tested", "top X for <use-case>", "X gift guide", "X buying guide".`,
-		`- Vary the ANGLE across queries (occasion, audience, price band, use-case, sub-category). No two that are just reworded versions of each other.`,
+		`- Think like a category strategist, not a paraphraser: branch across genuinely different AUDIENCES (e.g. dad, husband, brother, boyfriend, coworker, self-buyer), OCCASIONS (holiday, birthday, housewarming, thank-you), PRICE TIERS (budget, splurge), and SUB-CATEGORIES. "Best gifts for dad" and "best gifts for husband" are two different articles on two different pages, not a duplicate, generate both when the direction implies gifting.`,
+		`- Weight toward the stated timeframe first (seasonal/current), but also include a few evergreen "best X" queries that fit the direction, those roundups get updated year over year and are still live pitch targets.`,
 		`- Do NOT put "${args.brandName}" or any brand/competitor name in the query, we also want articles that don't feature the brand yet.`,
 		`- No quotation marks around the whole query, no site: / intitle: operators.`,
 		`Good: best insulated water bottles 2026   Too narrow: purple 32oz bottle review   Too broad: best outdoor gear`,
@@ -61,41 +69,7 @@ export async function generateSearchQueries(args: {
 	return object.queries;
 }
 
-// ── 2. pre-fetch triage ─────────────────────────────────────────────
-
-export const triageSchema = z.object({
-	keepNumbers: z
-		.array(z.number().int())
-		.describe(
-			"The list numbers to KEEP: US editorial articles/roundups in the brand's category that could plausibly carry affiliate links. Drop retailers and brand-owned stores, forums, videos, press releases, syndicated wire stories, and anything off-category.",
-		),
-});
-
-export async function triageCandidates(args: {
-	brandName: string;
-	brandSummary: string;
-	direction: string;
-	candidates: { title: string; snippet: string; domain: string }[];
-}): Promise<number[]> {
-	if (args.candidates.length === 0) return [];
-	const list = args.candidates
-		.map((c, i) => `${i + 1}. [${c.domain}] ${c.title}${c.snippet ? `, ${c.snippet.slice(0, 160)}` : ""}`)
-		.join("\n");
-	const prompt = [
-		`Brand: ${args.brandName}. Sells: ${args.brandSummary || args.direction}.`,
-		`User is looking for: "${args.direction}".`,
-		``,
-		`Below is a numbered list of Google results. Return the numbers worth keeping, US editorial articles, roundups or buying guides in the brand's category that an outlet could add an affiliate link to.`,
-		`Drop: retailers / brand-owned online stores, marketplaces, forums (Reddit/Quora), videos, PDFs, press releases, syndicated newswire reprints, and anything about a different product category.`,
-		`Be generous at this stage, when unsure, keep it; a later step vets each page in full.`,
-		``,
-		list,
-	].join("\n");
-	const { object } = await runStructuredCompletionPrompt(prompt, triageSchema);
-	return object.keepNumbers;
-}
-
-// ── 3. full page vetting ────────────────────────────────────────────
+// ── 2. full page vetting ────────────────────────────────────────────
 
 export const articleJudgementSchema = z.object({
 	articles: z
