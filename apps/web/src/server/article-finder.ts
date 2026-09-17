@@ -2,7 +2,7 @@
  * Article Finder, stateless per-search server functions.
  *
  * 1. generateArticleQueriesFn, LLM expands a free-text direction into concrete
- *    US-editorial Google queries, branched across audience/occasion/sub-category
+ *    Western-editorial Google queries, branched across audience/occasion/sub-category
  *    and grounded in an excerpt of the brand's own site.
  *    Returned to the UI for review before anything runs.
  * 2. findArticlesFn, runs the chosen queries through BrightData SERP, then:
@@ -11,7 +11,7 @@
  *      -> fetch every survivor (no cheap title/snippet pre-cut), scan page HTML
  *         for affiliate signals, drop pure retailers
  *      -> LLM vetting pass: relevance, affiliate-editorial fit, authority tier,
- *         US focus, and a one-line "would the editor feature us" verdict
+ *         Western-market focus, and a one-line "would the editor feature us" verdict
  *      -> outward crawl: for the best hits, check that same publisher for other
  *         roundup pages (a site: search + internal links already on the fetched
  *         page) and run those through the same fetch/vet pipeline
@@ -114,16 +114,10 @@ const JUNK_DOMAINS = new Set([
 	"markets.businessinsider.com",
 ]);
 
-/** ccTLDs / editions we treat as non-US for this feature. */
-const NON_US_SUFFIXES = [
-	".co.uk",
-	".uk",
-	".com.au",
-	".au",
-	".co.nz",
-	".nz",
-	".ca",
-	".ie",
+/** ccTLDs / editions we treat as outside the target market: US, Canada, UK,
+ *  Ireland, Europe, Australia, and NZ are all in-scope, everything else here
+ *  is dropped. */
+const NON_WESTERN_SUFFIXES = [
 	".co.za",
 	".co.in",
 	".in",
@@ -133,12 +127,24 @@ const NON_US_SUFFIXES = [
 	".ph",
 	".ng",
 	".pk",
-	".eu",
-	".de",
-	".fr",
-	".es",
-	".it",
-	".nl",
+	".cn",
+	".com.cn",
+	".jp",
+	".co.jp",
+	".kr",
+	".co.kr",
+	".ae",
+	".sa",
+	".id",
+	".vn",
+	".th",
+	".tw",
+	".hk",
+	".com.hk",
+	".mx",
+	".com.mx",
+	".br",
+	".com.br",
 ];
 
 /** Large well-known US publications (and verticals) -> "high authority". Everything
@@ -248,8 +254,8 @@ function inJunkDomain(domain: string): boolean {
 	return false;
 }
 
-function isNonUsDomain(domain: string): boolean {
-	return NON_US_SUFFIXES.some((s) => domain === s.slice(1) || domain.endsWith(s));
+function isNonWesternDomain(domain: string): boolean {
+	return NON_WESTERN_SUFFIXES.some((s) => domain === s.slice(1) || domain.endsWith(s));
 }
 
 function isMajorPublisher(domain: string, url: string): boolean {
@@ -504,7 +510,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 		const userDirection = data.direction?.trim() || data.queries.map((q) => q.query).join("; ");
 		let renderBudget = 16;
 
-		// dedupe + drop junk / non-US / brand's & competitors' own sites. Shared
+		// dedupe + drop junk / non-Western / brand's & competitors' own sites. Shared
 		// across the initial SERP fan-out and the later crawl-expansion pass, both
 		// write into the same `seen` set so nothing is fetched twice.
 		const seen = new Set<string>();
@@ -514,7 +520,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 				if (!key || seen.has(key)) return false;
 				const domain = extractDomain(row.url);
 				if (!domain) return false;
-				if (inJunkDomain(domain) || isNonUsDomain(domain) || isPrWireDomain(domain)) return false;
+				if (inJunkDomain(domain) || isNonWesternDomain(domain) || isPrWireDomain(domain)) return false;
 				if (brandDomains.has(domain) || competitorDomains.has(domain)) return false;
 				seen.add(key);
 				return true;
@@ -614,7 +620,8 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 		async function judgeAll(survivors: Survivor[]): Promise<Map<string, ArticleJudgement>> {
 			if (survivors.length === 0) return new Map();
 			const chunks: Survivor[][] = [];
-			for (let i = 0; i < survivors.length; i += JUDGE_BATCH_SIZE) chunks.push(survivors.slice(i, i + JUDGE_BATCH_SIZE));
+			for (let i = 0; i < survivors.length; i += JUDGE_BATCH_SIZE)
+				chunks.push(survivors.slice(i, i + JUDGE_BATCH_SIZE));
 			const chunkResults = await mapPool(chunks, 3, (chunk) =>
 				judgeArticles({
 					brandName: brand.name,
@@ -651,7 +658,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 			),
 		);
 
-		// 2. dedupe + drop junk / non-US / brand's & competitors' own sites
+		// 2. dedupe + drop junk / non-Western / brand's & competitors' own sites
 		let candidates = filterCandidates(serpBatches.flat());
 		const afterJunk = candidates.length;
 		candidates.sort((a, b) => a.rank - b.rank);
@@ -754,7 +761,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 
 		const highAuthority: ArticleResult[] = [];
 		const nicheBlog: ArticleResult[] = [];
-		const drop = { offTopic: 0, nonUs: 0, unvetted: 0, dupePublisher: 0 };
+		const drop = { offTopic: 0, nonWestern: 0, unvetted: 0, dupePublisher: 0 };
 		let affiliateYes = 0;
 		let affiliateNo = 0;
 		let affiliateUnsure = 0;
@@ -774,8 +781,8 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 					drop.offTopic++;
 					continue;
 				}
-				if (!j.usCentric && !majorList) {
-					drop.nonUs++;
+				if (!j.westernCentric && !majorList) {
+					drop.nonWestern++;
 					continue;
 				}
 				if (
@@ -874,7 +881,7 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 				affiliateUnsure,
 				mentionsBrand,
 				droppedOffTopic: drop.offTopic,
-				droppedNonUs: drop.nonUs,
+				droppedNonWestern: drop.nonWestern,
 				droppedUnvetted: drop.unvetted,
 				droppedDupePublisher: drop.dupePublisher,
 				droppedRetailer: Math.max(0, afterJunk - afterRetail),

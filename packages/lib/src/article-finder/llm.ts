@@ -1,10 +1,10 @@
 /**
  * Article Finder, LLM steps (gpt-5-mini via the onboarding provider).
  *
- *   1. generateSearchQueries, free-text direction -> concrete US-editorial Google queries,
+ *   1. generateSearchQueries, free-text direction -> concrete Western-editorial Google queries,
  *                              deliberately branched across audience/occasion/sub-category
  *   2. judgeArticles        , full vetting of fetched pages: relevance, affiliate-editorial
- *                              fit, authority tier, US focus, and the outreach verdict
+ *                              fit, authority tier, Western-market focus, and the outreach verdict
  *
  * There is no cheap pre-fetch triage anymore. Guessing relevance from a title and a
  * one-line snippet was throwing away real candidates before anything read the actual
@@ -49,13 +49,13 @@ export async function generateSearchQueries(args: {
 		args.trackedTopics.length > 0
 			? `The brand is already tracked on these AI-search topics, stay in the same product territory: ${args.trackedTopics.join("; ")}.`
 			: "",
-		`The affiliate team wants a WIDE net of US articles they could pitch ${args.brandName} into, the kind of breadth a person manually clicking through Google for an hour would find, not just the first page of one search.`,
+		`The affiliate team wants a WIDE net of Western-market articles (US, Canada, UK/Ireland, Europe, Australia, NZ) they could pitch ${args.brandName} into, the kind of breadth a person manually clicking through Google for an hour would find, not just the first page of one search.`,
 		`Their direction, verbatim: "${args.direction}". Timeframe of interest: ${args.rangeLabel}.`,
 		``,
-		`Produce 10-20 Google searches a US shopper or editor would type to surface PUBLISHED editorial roundups, buying guides, "best of" lists and review posts in the brand's exact product category.`,
+		`Produce 10-20 Google searches a shopper or editor in the US, Canada, UK, Europe, Australia or NZ would type to surface PUBLISHED editorial roundups, buying guides, "best of" lists and review posts in the brand's exact product category.`,
 		`Rules:`,
 		`- Every query must sit squarely in ${args.brandName}'s product category. Do NOT drift into adjacent categories the brand does not sell.`,
-		`- Phrase them the way US publications title this content: "best X 2026", "X we tested", "top X for <use-case>", "X gift guide", "X buying guide".`,
+		`- Phrase them the way Western publications title this content: "best X 2026", "X we tested", "top X for <use-case>", "X gift guide", "X buying guide".`,
 		`- Think like a category strategist, not a paraphraser: branch across genuinely different AUDIENCES (e.g. dad, husband, brother, boyfriend, coworker, self-buyer), OCCASIONS (holiday, birthday, housewarming, thank-you), PRICE TIERS (budget, splurge), and SUB-CATEGORIES. "Best gifts for dad" and "best gifts for husband" are two different articles on two different pages, not a duplicate, generate both when the direction implies gifting.`,
 		`- Weight toward the stated timeframe first (seasonal/current), but also include a few evergreen "best X" queries that fit the direction, those roundups get updated year over year and are still live pitch targets.`,
 		`- Do NOT put "${args.brandName}" or any brand/competitor name in the query, we also want articles that don't feature the brand yet.`,
@@ -91,7 +91,11 @@ export const articleJudgementSchema = z.object({
 					.describe(
 						"high_authority = large well-known national publication or one of its verticals; niche_blog = smaller independent blog / niche site that still looks credible (real bylines, original testing or photography, consistent focus).",
 					),
-				usCentric: z.boolean().describe("true if this is a US publication or the US edition of one."),
+				westernCentric: z
+					.boolean()
+					.describe(
+						"true if this is a US, Canadian, UK/Irish, European, Australian or NZ publication (or the edition of one for that market).",
+					),
 				fitScore: z
 					.number()
 					.int()
@@ -140,7 +144,7 @@ export async function judgeArticles(args: {
 		`  affiliateMerchants: retailers this article links with affiliate tracking. [] = none found in static HTML (could still be client-side; judge from the excerpt). 1 = minimal. 2+ = the outlet clearly runs multi-retailer affiliate roundups → affiliateEditorial "yes", fitScore 75+.`,
 		`  linksCompetitor: true = the article already has an affiliate-tracked link to a direct competitor. Strongest possible signal → affiliateEditorial "yes", fitScore 85+ unless relevance is off_topic.`,
 		`  publishedOrUpdated: the page's date if found. Prefer recent. Older than ~2 years with no sign of updates → cap fitScore around 45 and say so.`,
-		`Judge each on: relevance, affiliateEditorial, tier, usCentric, a 0-100 fitScore, and a one-sentence outreachVerdict.`,
+		`Judge each on: relevance, affiliateEditorial, tier, westernCentric, a 0-100 fitScore, and a one-sentence outreachVerdict.`,
 		`Return one entry per input article, url copied verbatim.`,
 		`outreachVerdict: ONE sentence, at most 18 words. Lead with the concrete reason, not "This site" or "This outlet". No dashes. Vary the wording between entries, do not use a template.`,
 		``,

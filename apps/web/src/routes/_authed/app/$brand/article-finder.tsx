@@ -1,6 +1,7 @@
 /**
  * /app/$brand/article-finder: turn a free-text direction into a vetted list of
- * US affiliate articles to pitch this brand to, split by publisher authority.
+ * Western-market (US, Canada, UK/Ireland, Europe, Australia, NZ) affiliate
+ * articles to pitch this brand to, split by publisher authority.
  * The latest run per brand is persisted, so opening the tab shows it for free.
  */
 
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/_authed/app/$brand/article-finder")({
 	head: ({ matches, match }) => ({
 		meta: [
 			{ title: buildTitle("Article Finder", { appName: getAppName(match), brandName: getBrandName(matches) }) },
-			{ name: "description", content: "Find vetted US affiliate articles this brand could be pitched into." },
+			{ name: "description", content: "Find vetted Western-market affiliate articles this brand could be pitched into." },
 		],
 	}),
 	component: ArticleFinderPage,
@@ -106,9 +107,7 @@ function ArticleRow({ r, brandName }: { r: ArticleResult; brandName?: string }) 
 				{r.affiliateStatus === "yes" && <span className="text-muted-foreground">Affiliate confirmed</span>}
 				{r.affiliateStatus === "unsure" && <span className="text-muted-foreground">Affiliate unsure</span>}
 				{r.linksCompetitor && <span className="font-medium text-primary">Links a competitor</span>}
-				{r.brandAlreadyMentioned && (
-					<span className="text-muted-foreground">Mentions {brandName ?? "the brand"}</span>
-				)}
+				{r.brandAlreadyMentioned && <span className="text-muted-foreground">Mentions {brandName ?? "the brand"}</span>}
 				{r.relevance === "weak" && <span className="text-muted-foreground">Loose fit</span>}
 				{r.viaCrawl && <span className="text-muted-foreground">Found via crawl</span>}
 			</div>
@@ -295,7 +294,7 @@ function ArticleFinderPage() {
 	const dropParts = stats
 		? [
 				stats.droppedOffTopic ? `${stats.droppedOffTopic} off-topic` : "",
-				stats.droppedNonUs ? `${stats.droppedNonUs} non-US` : "",
+				stats.droppedNonWestern ? `${stats.droppedNonWestern} outside target markets` : "",
 				stats.droppedUnvetted ? `${stats.droppedUnvetted} unvetted` : "",
 				stats.droppedRetailer ? `${stats.droppedRetailer} retailers` : "",
 				stats.droppedSyndicated ? `${stats.droppedSyndicated} syndicated` : "",
@@ -313,8 +312,8 @@ function ArticleFinderPage() {
 	return (
 		<PageHeader
 			title="Article Finder"
-			subtitle="US articles to pitch this brand to, cast a wide net and vetted for topical fit."
-			infoContent="We expand your direction into many angled Google searches, drop non-US/retailer/syndicated results, fetch and read the survivors, then check the best hits for other roundups on that same publisher. Every result is tagged for whether it mentions the brand and whether it shows real affiliate links, filter either on the results screen. The last run is saved, so reopening this tab is free."
+			subtitle="Western-market articles to pitch this brand to, cast a wide net and vetted for topical fit."
+			infoContent="We expand your direction into many angled Google searches, drop results outside the US/Canada/UK/Europe/Australia/NZ and retailer/syndicated results, fetch and read the survivors, then check the best hits for other roundups on that same publisher. Every result is tagged for whether it mentions the brand and whether it shows real affiliate links, filter either on the results screen. The last run is saved, so reopening this tab is free."
 			actions={
 				phase === "results" ? (
 					<>
@@ -373,10 +372,10 @@ function ArticleFinderPage() {
 
 						<div className="space-y-2.5 border-t pt-4 text-sm">
 							<p className="text-xs text-muted-foreground">
-								We cast as wide a net as we can, dedupe and vet the results, then check the best hits for other
-								roundups on that same publisher. Whether it mentions {brand?.name ?? "the brand"} already and
-								whether it's affiliate-monetized are both filters on the results screen, not settings here, more
-								depth means a wider net and a higher cost per search.
+								We cast as wide a net as we can, dedupe and vet the results, then check the best hits for other roundups
+								on that same publisher. Whether it mentions {brand?.name ?? "the brand"} already and whether it's
+								affiliate-monetized are both filters on the results screen, not settings here, more depth means a wider
+								net and a higher cost per search.
 							</p>
 						</div>
 
