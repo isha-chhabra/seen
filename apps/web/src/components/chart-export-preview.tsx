@@ -109,7 +109,7 @@ export function ChartExportPreview({
 							{name}
 						</span>
 					) : (
-						<span className="font-bold lowercase tracking-tight text-pink-500" style={{ fontSize: 22 }}>
+						<span className="font-bold lowercase tracking-tight text-primary" style={{ fontSize: 22 }}>
 							seen
 						</span>
 					)}

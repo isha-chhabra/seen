@@ -157,9 +157,9 @@ export function RunNowButton({
 				onClick={canStart ? () => start() : undefined}
 				disabled={disabled}
 				className={cn(
-					"h-11 gap-2 rounded-xl bg-pink-500 px-5 text-sm font-semibold text-white",
-					"shadow-lg shadow-pink-500/25 ring-1 ring-inset ring-pink-400/40",
-					"hover:bg-pink-600 disabled:opacity-70",
+					"h-11 gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground",
+					"shadow-lg shadow-primary/25 ring-1 ring-inset ring-primary/30",
+					"hover:bg-primary/90 disabled:opacity-70",
 					className,
 				)}
 			>
