@@ -5,20 +5,43 @@
  * The latest run per brand is persisted, so opening the tab shows it for free.
  */
 
-import { IconBolt, IconCalendar, IconLoader2, IconMail, IconSearch } from "@tabler/icons-react";
+import {
+	IconArrowUpRight,
+	IconBolt,
+	IconCalendar,
+	IconChevronDown,
+	IconLink,
+	IconLoader2,
+	IconMail,
+	IconSearch,
+	IconX,
+} from "@tabler/icons-react";
 import { createFileRoute } from "@tanstack/react-router";
+import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Calendar } from "@workspace/ui/components/calendar";
 import { Checkbox } from "@workspace/ui/components/checkbox";
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@workspace/ui/components/input-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover";
 import { Switch } from "@workspace/ui/components/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
 import { Textarea } from "@workspace/ui/components/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
 import { useEffect, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
-import { SectionHeading } from "@/components/section-heading";
 import { useBrand, useBrandRole } from "@/hooks/use-brands";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
 import {
@@ -73,51 +96,120 @@ function RangeInline({ value, onChange }: { value?: DateRange; onChange: (r?: Da
 	);
 }
 
-function ArticleRow({ r, brandName }: { r: ArticleResult; brandName?: string }) {
+function ScoreBadge({ score }: { score: number }) {
+	return (
+		<Badge variant={score >= 80 ? "success" : score >= 55 ? "default" : "quiet"} className="tabular-nums">
+			{score}
+		</Badge>
+	);
+}
+
+function AffiliateBadge({ status }: { status: ArticleResult["affiliateStatus"] }) {
+	if (status === "yes") return <Badge variant="success">Affiliate</Badge>;
+	if (status === "unsure") return <Badge variant="quiet">Unsure</Badge>;
+	return <Badge variant="outline">Not affiliate</Badge>;
+}
+
+/** Same trigger look as the shared FilterBar's FilterTriggerButton (see
+ *  @/components/filter-bar), reimplemented locally so this toolbar doesn't
+ *  need to pass a decorative icon for every dropdown. */
+function TriggerButton({
+	label,
+	active,
+	badgeCount,
+	icon,
+	className,
+	...props
+}: { label: string; active?: boolean; badgeCount?: number; icon?: React.ReactNode } & React.ComponentProps<
+	typeof Button
+>) {
+	return (
+		<Button
+			variant="outline"
+			size="sm"
+			{...props}
+			className={cn("h-8 gap-1.5 font-normal", active && "border-foreground/30 bg-accent/50", className)}
+		>
+			{icon && <span className="flex items-center text-muted-foreground">{icon}</span>}
+			<span className="text-foreground">{label}</span>
+			{badgeCount !== undefined && badgeCount > 0 && (
+				<span className="ml-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+					{badgeCount}
+				</span>
+			)}
+			<IconChevronDown className="size-3.5 text-muted-foreground" />
+		</Button>
+	);
+}
+
+function ResultRow({ r, brandName }: { r: ArticleResult; brandName?: string }) {
 	const isEmail = r.contactHint?.includes("@") && !r.contactHint.startsWith("http");
 	const meta = [r.domain, r.publishedDate || null].filter(Boolean).join("  ·  ");
 	return (
-		<div className="py-3.5">
-			<div className="flex items-baseline gap-2.5">
-				<span
-					className={cn(
-						"w-7 shrink-0 text-right text-xs font-semibold tabular-nums",
-						r.fitScore >= 80 ? "text-primary" : r.fitScore >= 55 ? "text-foreground" : "text-muted-foreground",
-					)}
-				>
-					{r.fitScore}
-				</span>
-				<a
-					href={r.url}
-					target="_blank"
-					rel="noreferrer"
-					className="flex-1 text-sm font-medium leading-snug hover:text-primary hover:underline"
-				>
-					{r.title}
-				</a>
-				{r.contactHint && (
-					<a
-						href={isEmail ? `mailto:${r.contactHint}` : r.contactHint}
-						target={isEmail ? undefined : "_blank"}
-						rel="noreferrer"
-						title={isEmail ? r.contactHint : "Contact / submissions"}
-						className="shrink-0 text-muted-foreground/50 transition-colors hover:text-primary"
+		<TableRow>
+			<TableCell className="w-14 py-3 align-top">
+				<ScoreBadge score={r.fitScore} />
+			</TableCell>
+			<TableCell className="py-3 align-top">
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<a
+								href={r.url}
+								target="_blank"
+								rel="noreferrer"
+								className="block text-sm font-medium leading-snug hover:text-primary hover:underline"
+							/>
+						}
 					>
-						<IconMail className="size-3.5" />
+						{r.title}
+					</TooltipTrigger>
+					<TooltipContent className="max-w-sm text-left leading-relaxed">{r.verdict}</TooltipContent>
+				</Tooltip>
+				<p className="mt-0.5 text-xs text-muted-foreground">{meta}</p>
+			</TableCell>
+			<TableCell className="py-3 align-top">
+				<div className="flex flex-wrap gap-1.5">
+					<Badge variant={r.tier === "high_authority" ? "secondary" : "outline"}>
+						{r.tier === "high_authority" ? "High authority" : "Niche & blog"}
+					</Badge>
+					<AffiliateBadge status={r.affiliateStatus} />
+					{r.linksCompetitor && <Badge variant="accent">Links a competitor</Badge>}
+					{r.brandAlreadyMentioned && <Badge variant="quiet">Mentions {brandName ?? "brand"}</Badge>}
+					{r.viaCrawl && <Badge variant="quiet">Via crawl</Badge>}
+				</div>
+			</TableCell>
+			<TableCell className="w-16 py-3 text-right align-top">
+				<div className="flex items-center justify-end gap-2">
+					{r.contactHint && (
+						<Tooltip>
+							<TooltipTrigger
+								render={
+									<a
+										href={isEmail ? `mailto:${r.contactHint}` : r.contactHint}
+										target={isEmail ? undefined : "_blank"}
+										rel="noreferrer"
+										className="text-muted-foreground/60 transition-colors hover:text-primary"
+									/>
+								}
+							>
+								<IconMail className="size-4" />
+							</TooltipTrigger>
+							<TooltipContent>{isEmail ? r.contactHint : "Contact / submissions"}</TooltipContent>
+						</Tooltip>
+					)}
+					<a
+						href={r.url}
+						target="_blank"
+						rel="noreferrer"
+						title="Open article"
+						className="text-muted-foreground/60 transition-colors hover:text-primary"
+					>
+						<IconArrowUpRight className="size-4" />
 					</a>
-				)}
-			</div>
-			<p className="mt-1 pl-[38px] text-xs text-muted-foreground">{meta}</p>
-			<p className="mt-1 pl-[38px] text-[13px] leading-relaxed text-foreground/80">{r.verdict}</p>
-			<div className="mt-1.5 flex flex-wrap gap-3 pl-[38px] text-[11px]">
-				{r.affiliateStatus === "yes" && <span className="text-muted-foreground">Affiliate confirmed</span>}
-				{r.affiliateStatus === "unsure" && <span className="text-muted-foreground">Affiliate unsure</span>}
-				{r.linksCompetitor && <span className="font-medium text-primary">Links a competitor</span>}
-				{r.brandAlreadyMentioned && <span className="text-muted-foreground">Mentions {brandName ?? "the brand"}</span>}
-				{r.relevance === "weak" && <span className="text-muted-foreground">Loose fit</span>}
-				{r.viaCrawl && <span className="text-muted-foreground">Found via crawl</span>}
-			</div>
-		</div>
+				</div>
+			</TableCell>
+		</TableRow>
 	);
 }
 
@@ -146,10 +238,13 @@ function ArticleFinderPage() {
 	const [loaded, setLoaded] = useState<{ at: string; by: string } | null>(null);
 
 	// post-search filters, live over the one tagged result set, no re-run needed
+	const [searchText, setSearchText] = useState("");
+	const [tierFilter, setTierFilter] = useState<"all" | "high_authority" | "niche_blog">("all");
 	const [mentionFilter, setMentionFilter] = useState<"all" | "unmentioned" | "mentioned">("all");
 	const [affiliateFilter, setAffiliateFilter] = useState<Set<"yes" | "unsure" | "no">>(
 		() => new Set(["yes", "unsure"]),
 	);
+	const [sortBy, setSortBy] = useState<"score_desc" | "score_asc" | "date_desc" | "domain_asc">("score_desc");
 
 	// The search itself is a single long HTTP call (can run several minutes with
 	// the wider net + outward crawl) — if the connection drops (laptop sleeps,
@@ -215,16 +310,35 @@ function ArticleFinderPage() {
 	}
 
 	function matchesFilters(r: ArticleResult): boolean {
+		if (tierFilter !== "all" && r.tier !== tierFilter) return false;
 		if (mentionFilter === "mentioned" && !r.brandAlreadyMentioned) return false;
 		if (mentionFilter === "unmentioned" && r.brandAlreadyMentioned) return false;
-		return affiliateFilter.has(r.affiliateStatus);
+		if (!affiliateFilter.has(r.affiliateStatus)) return false;
+		const q = searchText.trim().toLowerCase();
+		if (q && !r.title.toLowerCase().includes(q) && !r.domain.toLowerCase().includes(q)) return false;
+		return true;
 	}
 
 	const selected = queries.filter((q) => q.on);
-	const filteredHigh = high.filter(matchesFilters);
-	const filteredNiche = niche.filter(matchesFilters);
 	const totalResults = high.length + niche.length;
-	const filteredCount = filteredHigh.length + filteredNiche.length;
+	// Plain computation, not useMemo: at most ~150 rows, re-sorting on every
+	// render is imperceptible and this stays simpler than getting the
+	// dependency list right for a closure-capturing filter function.
+	const sortedRows = [...high, ...niche].filter(matchesFilters).sort((a, b) => {
+		switch (sortBy) {
+			case "score_desc":
+				return b.fitScore - a.fitScore;
+			case "score_asc":
+				return a.fitScore - b.fitScore;
+			case "date_desc":
+				return (b.publishedDate ?? "").localeCompare(a.publishedDate ?? "");
+			case "domain_asc":
+				return a.domain.localeCompare(b.domain);
+			default:
+				return 0;
+		}
+	});
+	const filteredCount = sortedRows.length;
 	const canBuild = !isViewer && !busy && direction.trim().length >= 3 && !!range?.from && !!range?.to;
 
 	function addQuery() {
@@ -313,27 +427,23 @@ function ArticleFinderPage() {
 				.map(esc)
 				.join(","),
 		];
-		const add = (label: string, list: ArticleResult[]) => {
-			for (const r of list)
-				rows.push(
-					[
-						label,
-						r.fitScore,
-						r.affiliateStatus,
-						r.brandAlreadyMentioned ? "yes" : "",
-						r.title,
-						r.url,
-						r.publishedDate ?? "",
-						r.linksCompetitor ? "yes" : "",
-						r.verdict,
-						r.contactHint ?? "",
-					]
-						.map(esc)
-						.join(","),
-				);
-		};
-		add("High-authority", filteredHigh);
-		add("Niche / blog", filteredNiche);
+		for (const r of sortedRows)
+			rows.push(
+				[
+					r.tier === "high_authority" ? "High-authority" : "Niche / blog",
+					r.fitScore,
+					r.affiliateStatus,
+					r.brandAlreadyMentioned ? "yes" : "",
+					r.title,
+					r.url,
+					r.publishedDate ?? "",
+					r.linksCompetitor ? "yes" : "",
+					r.verdict,
+					r.contactHint ?? "",
+				]
+					.map(esc)
+					.join(","),
+			);
 		const blob = new Blob([`﻿${rows.join("\r\n")}`], { type: "text/csv;charset=utf-8" });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
@@ -389,7 +499,7 @@ function ArticleFinderPage() {
 				) : undefined
 			}
 		>
-			<div className="max-w-2xl">
+			<div className={phase === "results" ? "max-w-[1400px]" : "max-w-2xl"}>
 				{phase === "idle" && (
 					<div className="space-y-5">
 						<Textarea
@@ -542,80 +652,162 @@ function ArticleFinderPage() {
 				)}
 
 				{phase === "results" && (
-					<div className="space-y-6">
+					<div className="space-y-3">
 						{loaded && (
 							<p className="text-xs text-muted-foreground">
 								Last run by {loaded.by} · {prettyAt(loaded.at)}
 							</p>
 						)}
 
-						<div className="space-y-3 border-b pb-4">
-							<div className="flex flex-wrap items-center gap-x-6 gap-y-2.5 text-sm">
-								<div className="flex items-center gap-2">
-									<span className="text-muted-foreground">Mentions {brand?.name ?? "brand"}</span>
-									<div className="flex overflow-hidden rounded-md border">
-										{(
-											[
-												["all", "Any"],
-												["unmentioned", "No"],
-												["mentioned", "Yes"],
-											] as const
-										).map(([v, label]) => (
-											<button
-												key={v}
-												type="button"
-												onClick={() => setMentionFilter(v)}
-												className={cn(
-													"h-8 px-2.5 text-xs transition-colors",
-													mentionFilter === v ? "bg-primary text-primary-foreground" : "hover:bg-accent",
-												)}
-											>
-												{label}
-											</button>
-										))}
-									</div>
-								</div>
-								<div className="flex items-center gap-2">
-									<span className="text-muted-foreground">Affiliate</span>
-									<div className="flex overflow-hidden rounded-md border">
-										{(
-											[
-												["yes", "Confirmed"],
-												["unsure", "Unsure"],
-												["no", "Not affiliate"],
-											] as const
-										).map(([v, label]) => (
-											<button
-												key={v}
-												type="button"
-												onClick={() => toggleAffiliateFilter(v)}
-												className={cn(
-													"h-8 px-2.5 text-xs transition-colors",
-													affiliateFilter.has(v) ? "bg-primary text-primary-foreground" : "hover:bg-accent",
-												)}
-											>
-												{label}
-											</button>
-										))}
-									</div>
-								</div>
-							</div>
-
-							<div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
-								<span className="font-semibold">
-									{filteredCount} of {totalResults} article{totalResults === 1 ? "" : "s"}
-								</span>
-								{filteredCount > 0 && (
-									<span className="text-muted-foreground">
-										{filteredHigh.length} high-authority · {filteredNiche.length} niche
-									</span>
+						{/* Toolbar */}
+						<div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2">
+							<InputGroup className="h-8 w-full sm:w-64">
+								<InputGroupInput
+									value={searchText}
+									onChange={(e) => setSearchText(e.target.value)}
+									placeholder="Search title or domain…"
+									className="h-8 text-sm"
+								/>
+								<InputGroupAddon className="pl-2.5">
+									<IconSearch className="size-3.5" />
+								</InputGroupAddon>
+								{searchText && (
+									<InputGroupAddon align="inline-end" className="pr-1.5">
+										<InputGroupButton size="icon-xs" onClick={() => setSearchText("")} aria-label="Clear search">
+											<IconX className="size-3.5" />
+										</InputGroupButton>
+									</InputGroupAddon>
 								)}
+							</InputGroup>
+
+							<DropdownMenu>
+								<DropdownMenuTrigger
+									render={
+										<TriggerButton
+											label={
+												tierFilter === "all"
+													? "All tiers"
+													: tierFilter === "high_authority"
+														? "High authority"
+														: "Niche & blog"
+											}
+											active={tierFilter !== "all"}
+										/>
+									}
+								/>
+								<DropdownMenuContent align="start">
+									<DropdownMenuRadioGroup
+										value={tierFilter}
+										onValueChange={(v) => setTierFilter(v as typeof tierFilter)}
+									>
+										<DropdownMenuRadioItem value="all">All tiers</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="high_authority">High authority</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="niche_blog">Niche & blog</DropdownMenuRadioItem>
+									</DropdownMenuRadioGroup>
+								</DropdownMenuContent>
+							</DropdownMenu>
+
+							<DropdownMenu>
+								<DropdownMenuTrigger
+									render={
+										<TriggerButton
+											label={
+												mentionFilter === "all"
+													? `Mentions ${brand?.name ?? "brand"}: any`
+													: mentionFilter === "mentioned"
+														? `Mentions ${brand?.name ?? "brand"}`
+														: `Doesn't mention ${brand?.name ?? "brand"}`
+											}
+											active={mentionFilter !== "all"}
+										/>
+									}
+								/>
+								<DropdownMenuContent align="start">
+									<DropdownMenuRadioGroup
+										value={mentionFilter}
+										onValueChange={(v) => setMentionFilter(v as typeof mentionFilter)}
+									>
+										<DropdownMenuRadioItem value="all">Any</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="mentioned">Mentions {brand?.name ?? "brand"}</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="unmentioned">
+											Doesn't mention {brand?.name ?? "brand"}
+										</DropdownMenuRadioItem>
+									</DropdownMenuRadioGroup>
+								</DropdownMenuContent>
+							</DropdownMenu>
+
+							<DropdownMenu>
+								<DropdownMenuTrigger
+									render={
+										<TriggerButton
+											label="Affiliate"
+											icon={<IconLink className="size-3.5" />}
+											active={affiliateFilter.size < 3}
+											badgeCount={affiliateFilter.size}
+										/>
+									}
+								/>
+								<DropdownMenuContent align="start">
+									<DropdownMenuLabel>Affiliate status</DropdownMenuLabel>
+									<DropdownMenuSeparator />
+									<DropdownMenuCheckboxItem
+										checked={affiliateFilter.has("yes")}
+										onCheckedChange={() => toggleAffiliateFilter("yes")}
+									>
+										Confirmed
+									</DropdownMenuCheckboxItem>
+									<DropdownMenuCheckboxItem
+										checked={affiliateFilter.has("unsure")}
+										onCheckedChange={() => toggleAffiliateFilter("unsure")}
+									>
+										Unsure
+									</DropdownMenuCheckboxItem>
+									<DropdownMenuCheckboxItem
+										checked={affiliateFilter.has("no")}
+										onCheckedChange={() => toggleAffiliateFilter("no")}
+									>
+										Not affiliate
+									</DropdownMenuCheckboxItem>
+								</DropdownMenuContent>
+							</DropdownMenu>
+
+							<DropdownMenu>
+								<DropdownMenuTrigger
+									render={
+										<TriggerButton
+											label={
+												sortBy === "score_desc"
+													? "Score, high to low"
+													: sortBy === "score_asc"
+														? "Score, low to high"
+														: sortBy === "date_desc"
+															? "Newest published"
+															: "Domain, A-Z"
+											}
+										/>
+									}
+								/>
+								<DropdownMenuContent align="start">
+									<DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+										<DropdownMenuRadioItem value="score_desc">Score, high to low</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="score_asc">Score, low to high</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="date_desc">Newest published</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="domain_asc">Domain, A-Z</DropdownMenuRadioItem>
+									</DropdownMenuRadioGroup>
+								</DropdownMenuContent>
+							</DropdownMenu>
+
+							<div className="ml-auto flex items-center gap-2 text-sm">
+								<span className="font-semibold tabular-nums">{filteredCount}</span>
+								<span className="text-muted-foreground">
+									of {totalResults} article{totalResults === 1 ? "" : "s"}
+								</span>
 								{(dropParts.length > 0 || foundParts.length > 0) && (
-									<details className="ml-auto text-xs text-muted-foreground">
+									<details className="text-xs text-muted-foreground">
 										<summary className="cursor-pointer list-none transition-colors hover:text-foreground">
 											{stats?.candidates ?? 0} checked
 										</summary>
-										<p className="mt-2 max-w-md text-right leading-relaxed">
+										<p className="mt-2 max-w-xs text-right leading-relaxed">
 											{foundParts.length > 0 && <>{foundParts.join(", ")}. </>}
 											{dropParts.length > 0 && <>Filtered out: {dropParts.join(", ")}.</>}
 										</p>
@@ -634,30 +826,25 @@ function ArticleFinderPage() {
 							<EmptyState
 								icon={IconSearch}
 								title="Nothing matches these filters"
-								description="Loosen the mentions/affiliate filters above, the results are still there."
+								description="Loosen the filters above, the results are still there."
 							/>
 						) : (
-							<div className="space-y-7">
-								{filteredHigh.length > 0 && (
-									<section>
-										<SectionHeading count={filteredHigh.length}>High authority</SectionHeading>
-										<div className="divide-y">
-											{filteredHigh.map((r) => (
-												<ArticleRow key={r.url} r={r} brandName={brand?.name} />
-											))}
-										</div>
-									</section>
-								)}
-								{filteredNiche.length > 0 && (
-									<section>
-										<SectionHeading count={filteredNiche.length}>Niche &amp; blog</SectionHeading>
-										<div className="divide-y">
-											{filteredNiche.map((r) => (
-												<ArticleRow key={r.url} r={r} brandName={brand?.name} />
-											))}
-										</div>
-									</section>
-								)}
+							<div className="overflow-x-auto rounded-lg border">
+								<Table>
+									<TableHeader>
+										<TableRow className="hover:bg-transparent">
+											<TableHead className="w-14">Score</TableHead>
+											<TableHead>Article</TableHead>
+											<TableHead>Status</TableHead>
+											<TableHead className="w-16 text-right">Open</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{sortedRows.map((r) => (
+											<ResultRow key={r.url} r={r} brandName={brand?.name} />
+										))}
+									</TableBody>
+								</Table>
 							</div>
 						)}
 					</div>
