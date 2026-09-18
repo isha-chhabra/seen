@@ -71,55 +71,57 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Seen palette. Dark purple base with an explicit LAYER system, not one
-   purple repeated at slightly different opacities: --background is a
-   near-neutral dark slate (barely purple, recedes), --sidebar is darker and
-   even more neutral still (chrome, not content), --card is a distinctly
-   richer/more saturated violet-navy (a real step up in both lightness and
-   chroma so it reads as its own surface), --secondary/--accent step lighter
-   again for a third tier. Multi-color accents (violet/blue/orange/sage/
-   yellow) each map to one data category. Yellow is tuned toward gold rather
-   than lemon so it sits with violet instead of fighting its cool undertone.
-   --highlight-* is the violet-tint surface used for callouts, active nav and
+   Seen palette v3: dusty/tonal dark palette (near-black neutral base, muted
+   teal + dusty rose + wine + gold + sage), not the violet/glow "AI tool"
+   default from the previous pass — modeled on an editorial-agency reference,
+   not a SaaS-dashboard one. --background is near-neutral almost-black
+   (recedes), --sidebar is a wine-tinted near-black (its own subtle identity,
+   not just "darker gray"), --card is a cool slate-navy — a real hue AND
+   lightness jump from the background so it reads as a distinct surface, not
+   a tint of it. --primary is a muted pine/teal (calm, "detected/found" —
+   fits an AI-visibility tool), paired as a teal-to-dusty-rose gradient
+   instead of anything violet or neon. The chart set (teal/rose/gold/sage/
+   mauve) is five real, desaturated hues, not shades of one accent.
+   --highlight-* is the teal-tint surface used for callouts, active nav and
    selected rows.
    --------------------------------------------------------------------------- */
 :root {
 	--radius: 0.625rem;
-	--background: oklch(0.17 0.016 278);
-	--foreground: oklch(0.96 0.006 290);
-	--card: oklch(0.27 0.048 288);
-	--card-foreground: oklch(0.96 0.006 290);
-	--popover: oklch(0.3 0.05 290);
-	--popover-foreground: oklch(0.96 0.006 290);
-	--primary: oklch(0.62 0.22 295);
-	--primary-foreground: oklch(0.98 0.004 290);
-	--primary-gradient-to: oklch(0.72 0.15 205);
-	--secondary: oklch(0.35 0.045 285);
-	--secondary-foreground: oklch(0.95 0.006 290);
-	--muted: oklch(0.3 0.035 285);
-	--muted-foreground: oklch(0.74 0.02 285);
-	--accent: oklch(0.38 0.05 285);
-	--accent-foreground: oklch(0.96 0.006 290);
-	--destructive: oklch(0.65 0.21 25);
+	--background: oklch(0.14 0.008 80);
+	--foreground: oklch(0.96 0.006 200);
+	--card: oklch(0.3 0.045 235);
+	--card-foreground: oklch(0.96 0.006 200);
+	--popover: oklch(0.33 0.05 235);
+	--popover-foreground: oklch(0.96 0.006 200);
+	--primary: oklch(0.48 0.07 190);
+	--primary-foreground: oklch(0.97 0.008 190);
+	--primary-gradient-to: oklch(0.68 0.1 5);
+	--secondary: oklch(0.34 0.05 340);
+	--secondary-foreground: oklch(0.95 0.006 200);
+	--muted: oklch(0.28 0.02 235);
+	--muted-foreground: oklch(0.72 0.02 210);
+	--accent: oklch(0.36 0.055 235);
+	--accent-foreground: oklch(0.96 0.006 200);
+	--destructive: oklch(0.58 0.17 22);
 	--border: oklch(1 0 0 / 10%);
 	--input: oklch(1 0 0 / 14%);
-	--ring: oklch(0.68 0.2 295);
-	--chart-1: oklch(0.62 0.22 295);
-	--chart-2: oklch(0.68 0.16 245);
-	--chart-3: oklch(0.72 0.17 55);
-	--chart-4: oklch(0.75 0.14 165);
-	--chart-5: oklch(0.82 0.13 85);
-	--highlight: oklch(0.34 0.07 295);
-	--highlight-foreground: oklch(0.87 0.12 295);
-	--highlight-border: oklch(0.46 0.11 295);
-	--sidebar: oklch(0.13 0.014 275);
-	--sidebar-foreground: oklch(0.94 0.006 290);
-	--sidebar-primary: oklch(0.62 0.22 295);
-	--sidebar-primary-foreground: oklch(0.98 0.004 290);
-	--sidebar-accent: oklch(0.3 0.04 288);
-	--sidebar-accent-foreground: oklch(0.96 0.006 290);
+	--ring: oklch(0.55 0.09 190);
+	--chart-1: oklch(0.48 0.07 190);
+	--chart-2: oklch(0.68 0.1 5);
+	--chart-3: oklch(0.78 0.08 90);
+	--chart-4: oklch(0.5 0.09 150);
+	--chart-5: oklch(0.55 0.08 340);
+	--highlight: oklch(0.3 0.06 190);
+	--highlight-foreground: oklch(0.85 0.09 190);
+	--highlight-border: oklch(0.42 0.08 190);
+	--sidebar: oklch(0.12 0.02 20);
+	--sidebar-foreground: oklch(0.94 0.006 200);
+	--sidebar-primary: oklch(0.48 0.07 190);
+	--sidebar-primary-foreground: oklch(0.97 0.008 190);
+	--sidebar-accent: oklch(0.16 0.025 20);
+	--sidebar-accent-foreground: oklch(0.96 0.006 200);
 	--sidebar-border: oklch(1 0 0 / 7%);
-	--sidebar-ring: oklch(0.68 0.2 295);
+	--sidebar-ring: oklch(0.55 0.09 190);
 }
 
 /* No separate .dark block: nothing in this app ever toggles a .dark class
@@ -133,15 +135,17 @@
 	}
 	body {
 		@apply bg-background text-foreground;
-		/* Ambient mesh of soft color blobs behind everything — the "liquid
-		   glass" atmosphere the flat --background color alone can't give.
-		   Fixed so it doesn't scroll or retile with page content. */
+		/* Ambient mesh of soft color blobs (teal/wine/gold, matching the
+		   tonal chart palette) plus a fine grain layer — the textured,
+		   tactile quality of the reference, not a flat color fill. Both
+		   fixed so they don't scroll or retile with page content. */
 		background-image:
-			radial-gradient(60rem 40rem at 8% -10%, oklch(0.5 0.16 295 / 35%), transparent 60%),
-			radial-gradient(50rem 36rem at 100% 0%, oklch(0.55 0.14 205 / 26%), transparent 60%),
-			radial-gradient(55rem 40rem at 15% 110%, oklch(0.5 0.14 250 / 22%), transparent 65%);
+			radial-gradient(60rem 40rem at 8% -10%, oklch(0.4 0.07 190 / 30%), transparent 60%),
+			radial-gradient(50rem 36rem at 100% 0%, oklch(0.35 0.06 20 / 32%), transparent 60%),
+			radial-gradient(55rem 40rem at 15% 110%, oklch(0.55 0.08 90 / 14%), transparent 65%),
+			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
 		background-attachment: fixed;
-		background-repeat: no-repeat;
+		background-repeat: no-repeat, no-repeat, no-repeat, repeat;
 	}
 	button:not(:disabled),
 	[role="button"]:not(:disabled) {
@@ -216,7 +220,7 @@
 	-webkit-backdrop-filter: blur(6px);
 	box-shadow:
 		0 1px 2px oklch(0 0 0 / 0.3),
-		0 12px 32px -8px oklch(0.2 0.08 295 / 0.5);
+		0 12px 32px -8px oklch(0.15 0.05 235 / 0.5);
 }
 
 [data-slot="sidebar"] {
@@ -237,7 +241,7 @@
 	-webkit-backdrop-filter: blur(20px);
 	box-shadow:
 		0 2px 4px oklch(0 0 0 / 0.15),
-		0 16px 40px -8px oklch(0.15 0.1 295 / 0.55);
+		0 16px 40px -8px oklch(0.12 0.06 235 / 0.55);
 }
 
 @media (prefers-reduced-transparency: reduce) {
