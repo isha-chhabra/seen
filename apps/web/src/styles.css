@@ -227,9 +227,17 @@
 		0 6px 16px -4px oklch(0 0 0 / 0.06);
 }
 
+/* Glass is reserved for surfaces that float ABOVE the page — menus, popovers,
+   dialogs — never for cards or tables sitting in the page flow: those need
+   full contrast to stay readable, glass on dense data just looks murky. */
 [data-slot="popover-content"],
 [data-slot="dropdown-menu-content"],
-[data-slot="select-content"] {
+[data-slot="select-content"],
+[data-slot="dialog-content"],
+[data-slot="sheet-content"] {
+	background-color: color-mix(in oklch, var(--popover) 82%, transparent);
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
 	box-shadow:
 		0 2px 4px oklch(0 0 0 / 0.05),
 		0 12px 32px -6px oklch(0 0 0 / 0.12);
@@ -240,6 +248,26 @@
 	box-shadow:
 		0 1px 2px oklch(0 0 0 / 0.3),
 		0 10px 28px -6px oklch(0 0 0 / 0.45);
+}
+
+.dark [data-slot="popover-content"],
+.dark [data-slot="dropdown-menu-content"],
+.dark [data-slot="select-content"],
+.dark [data-slot="dialog-content"],
+.dark [data-slot="sheet-content"] {
+	background-color: color-mix(in oklch, var(--popover) 75%, transparent);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+	[data-slot="popover-content"],
+	[data-slot="dropdown-menu-content"],
+	[data-slot="select-content"],
+	[data-slot="dialog-content"],
+	[data-slot="sheet-content"] {
+		background-color: var(--popover);
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
+	}
 }
 
 /* Metrics, counts, dates and money read straight when digits share a width. */
