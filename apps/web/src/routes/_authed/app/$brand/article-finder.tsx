@@ -76,7 +76,7 @@ function prettyAt(iso: string): string {
 	return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-type Query = { query: string; angle?: string; on: boolean };
+type Query = { query: string; angle?: string };
 type Phase = "idle" | "queries" | "searching" | "results";
 // mirrors MAX_QUERIES in apps/web/src/server/article-finder.ts (the server's real cap)
 const MAX_QUERIES_UI = 20;
@@ -281,7 +281,7 @@ function ArticleFinderPage() {
 			const r = await getLatestArticleSearchFn({ data: { brandId } }).catch(() => null);
 			if (cancelled || !r) return;
 			setDirection(r.direction);
-			setQueries(r.queries.map((q) => ({ query: q.query, angle: q.angle, on: true })));
+			setQueries(r.queries.map((q) => ({ query: q.query, angle: q.angle })));
 			setHigh(r.highAuthority);
 			setNiche(r.nicheBlog);
 			setStats(r.stats);
@@ -316,7 +316,7 @@ function ArticleFinderPage() {
 						setDirection(r.direction);
 						if (r.from && r.to) setRange({ from: parseYmd(r.from), to: parseYmd(r.to) });
 						setPages(r.pagesPerSearch || 4);
-						setQueries(r.queries.map((q) => ({ query: q.query, angle: q.angle, on: true })));
+						setQueries(r.queries.map((q) => ({ query: q.query, angle: q.angle })));
 						setHigh(r.highAuthority);
 						setNiche(r.nicheBlog);
 						setStats(r.stats);
@@ -350,7 +350,6 @@ function ArticleFinderPage() {
 		return true;
 	}
 
-	const selected = queries.filter((q) => q.on);
 	const totalResults = high.length + niche.length;
 	// Plain computation, not useMemo: at most ~150 rows, re-sorting on every
 	// render is imperceptible and this stays simpler than getting the
@@ -379,8 +378,12 @@ function ArticleFinderPage() {
 			setNewQuery("");
 			return;
 		}
-		setQueries((qs) => [...qs, { query: q, angle: "Added by you", on: true }]);
+		setQueries((qs) => [...qs, { query: q, angle: "Added by you" }]);
 		setNewQuery("");
+	}
+
+	function removeQuery(i: number) {
+		setQueries((qs) => qs.filter((_, j) => j !== i));
 	}
 
 	async function genQueries() {
@@ -391,7 +394,7 @@ function ArticleFinderPage() {
 			const res = await generateArticleQueriesFn({
 				data: { brandId, direction: direction.trim(), from: ymd(range.from), to: ymd(range.to) },
 			});
-			setQueries(res.queries.map((q) => ({ query: q.query, angle: q.angle, on: true })));
+			setQueries(res.queries.map((q) => ({ query: q.query, angle: q.angle })));
 			setPhase("queries");
 		} catch (e) {
 			setError(e instanceof Error ? e.message : "Couldn't generate queries. Try again.");
@@ -401,7 +404,7 @@ function ArticleFinderPage() {
 	}
 
 	async function run() {
-		if (!range?.from || !range?.to || selected.length === 0) return;
+		if (!range?.from || !range?.to || queries.length === 0) return;
 		setBusy(true);
 		setError(null);
 		setLiveStage(null);
@@ -411,7 +414,7 @@ function ArticleFinderPage() {
 			const res = await findArticlesFn({
 				data: {
 					brandId,
-					queries: selected.map((q) => ({ query: q.query, angle: q.angle })),
+					queries: queries.map((q) => ({ query: q.query, angle: q.angle })),
 					direction: direction.trim() || undefined,
 					from: ymd(range.from),
 					to: ymd(range.to),
@@ -634,25 +637,32 @@ function ArticleFinderPage() {
 								</button>
 							</div>
 						</div>
-						<ul className="-mx-2">
+						{/* Tags input: each query is a removable chip, typing + Enter adds
+						    one more — replaces the old checkbox list + separate "Add"
+						    button/row with a single familiar interaction. */}
+						<div
+							className={cn(
+								"flex min-h-10 flex-wrap items-center gap-1.5 rounded-md border bg-transparent p-2",
+								"focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30",
+							)}
+						>
 							{queries.map((q, i) => (
-								<li key={q.query}>
-									<label className="flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 hover:bg-accent">
-										<Checkbox
-											checked={q.on}
-											onCheckedChange={(v) =>
-												setQueries((qs) => qs.map((x, j) => (j === i ? { ...x, on: v === true } : x)))
-											}
+								<Badge key={q.query} variant="secondary" className="gap-1 py-1 pl-2.5 pr-1.5 text-xs font-normal">
+									{q.query}
+									{!isViewer && (
+										<button
+											type="button"
+											onClick={() => removeQuery(i)}
 											disabled={busy}
-											className="mt-0.5"
-										/>
-										<span className="text-sm">{q.query}</span>
-									</label>
-								</li>
+											aria-label={`Remove query: ${q.query}`}
+											className="flex items-center justify-center rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+										>
+											<IconX className="size-3" />
+										</button>
+									)}
+								</Badge>
 							))}
-						</ul>
-						{!isViewer && queries.length < MAX_QUERIES_UI && (
-							<div className="flex items-center gap-2">
+							{!isViewer && queries.length < MAX_QUERIES_UI && (
 								<input
 									type="text"
 									aria-label="Add a custom search query"
@@ -664,22 +674,13 @@ function ArticleFinderPage() {
 											addQuery();
 										}
 									}}
-									placeholder="Add your own query, e.g. best grilling gifts for dad"
+									placeholder={queries.length === 0 ? "Type a query, press Enter to add it…" : "Add another…"}
 									disabled={busy}
-									className="h-9 flex-1 rounded-md border bg-transparent px-3 text-sm outline-none focus:border-primary"
+									className="h-7 min-w-[140px] flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-muted-foreground"
 								/>
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									onClick={addQuery}
-									disabled={busy || !newQuery.trim()}
-								>
-									Add
-								</Button>
-							</div>
-						)}
-						<Button onClick={run} disabled={busy || selected.length === 0 || isViewer} className="gap-2">
+							)}
+						</div>
+						<Button onClick={run} disabled={busy || queries.length === 0 || isViewer} className="gap-2">
 							{phase === "searching" ? (
 								<IconLoader2 className="size-4 animate-spin" />
 							) : (
@@ -687,7 +688,7 @@ function ArticleFinderPage() {
 							)}
 							{phase === "searching"
 								? "Searching and vetting…"
-								: `Search ${selected.length} ${selected.length === 1 ? "query" : "queries"}`}
+								: `Search ${queries.length} ${queries.length === 1 ? "query" : "queries"}`}
 						</Button>
 						{phase === "searching" && (
 							<div className="space-y-2 rounded-lg border bg-card p-3">
@@ -856,7 +857,7 @@ function ArticleFinderPage() {
 								description="Loosen the filters above, the results are still there."
 							/>
 						) : (
-							<div className="overflow-x-auto rounded-lg border shadow-xs">
+							<div className="scroll-reveal overflow-x-auto rounded-lg border shadow-xs">
 								<Table>
 									<TableHeader>
 										<TableRow className="hover:bg-transparent">

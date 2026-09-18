@@ -299,3 +299,66 @@
 	font-variant-numeric: tabular-nums;
 	font-feature-settings: "tnum";
 }
+
+/* ------------------------------------------------------------------ */
+/* Motion utilities for the in-app tool: opt-in, applied per element   */
+/* (not forced globally) so only genuinely clickable/interactive cards */
+/* lift, and only intentional entrance moments animate on scroll.      */
+/* Both are transform/opacity only (cheap, compositor-only) and honor  */
+/* prefers-reduced-motion.                                             */
+/* ------------------------------------------------------------------ */
+.hover-lift {
+	transition:
+		transform 180ms ease,
+		box-shadow 180ms ease,
+		border-color 180ms ease;
+}
+.hover-lift:hover {
+	transform: translateY(-2px);
+	border-color: color-mix(in oklch, var(--primary) 35%, var(--border));
+	box-shadow:
+		0 1px 2px oklch(0 0 0 / 0.3),
+		0 16px 36px -10px oklch(0.1 0.07 305 / 0.6);
+}
+
+.scroll-reveal {
+	opacity: 0;
+	transform: translateY(14px);
+	animation: scroll-reveal-in 500ms ease-out forwards;
+	animation-timeline: view();
+	animation-range: entry 0% cover 25%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.hover-lift {
+		transition: none;
+	}
+	.hover-lift:hover {
+		transform: none;
+	}
+	.scroll-reveal {
+		opacity: 1;
+		transform: none;
+		animation: none;
+	}
+}
+
+@keyframes scroll-reveal-in {
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Browsers without animation-timeline (Safari, older Firefox) fall back to
+   a simple fade-in on load instead of silently staying invisible forever —
+   detected via feature query since animation-range support is the real
+   signal, not just animation-timeline. */
+@supports not (animation-timeline: view()) {
+	.scroll-reveal {
+		animation-name: scroll-reveal-in;
+		animation-timeline: auto;
+		animation-duration: 400ms;
+		animation-delay: 50ms;
+	}
+}
