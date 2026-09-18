@@ -11,6 +11,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Calendar } from "@workspace/ui/components/calendar";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover";
+import { Switch } from "@workspace/ui/components/switch";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { cn } from "@workspace/ui/lib/utils";
 import { useEffect, useState } from "react";
@@ -128,6 +129,7 @@ function ArticleFinderPage() {
 		return { from, to };
 	});
 	const [pages, setPages] = useState(4);
+	const [excludeBrandMentions, setExcludeBrandMentions] = useState(false);
 	const [phase, setPhase] = useState<Phase>("idle");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -218,6 +220,7 @@ function ArticleFinderPage() {
 					from: ymd(range.from),
 					to: ymd(range.to),
 					pagesPerSearch: pages,
+					excludeBrandMentions,
 				},
 			});
 			setHigh(res.highAuthority);
@@ -371,11 +374,17 @@ function ArticleFinderPage() {
 						</div>
 
 						<div className="space-y-2.5 border-t pt-4 text-sm">
+							<label className="flex cursor-pointer items-center justify-between gap-4">
+								<span>
+									Skip articles that already mention {brand?.name ?? "the brand"}{" "}
+									<span className="text-xs text-muted-foreground">(cheaper: fewer wasted fetches, not just hidden)</span>
+								</span>
+								<Switch checked={excludeBrandMentions} onCheckedChange={setExcludeBrandMentions} disabled={busy} />
+							</label>
 							<p className="text-xs text-muted-foreground">
 								We cast as wide a net as we can, dedupe and vet the results, then check the best hits for other roundups
-								on that same publisher. Whether it mentions {brand?.name ?? "the brand"} already and whether it's
-								affiliate-monetized are both filters on the results screen, not settings here, more depth means a wider
-								net and a higher cost per search.
+								on that same publisher. Whether it's affiliate-monetized is a filter on the results screen, not a setting
+								here, more depth means a wider net and a higher cost per search.
 							</p>
 						</div>
 

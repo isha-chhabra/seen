@@ -424,6 +424,12 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 			from: z.string().regex(ymdRe),
 			to: z.string().regex(ymdRe),
 			pagesPerSearch: z.number().int().min(1).max(MAX_PAGES),
+			// Cheaper than filtering after the fact: keeps most brand-mentioning
+			// pages from ever being fetched/judged, by excluding the brand's name
+			// from the Google queries themselves. Best-effort (Google's negative
+			// keyword isn't exhaustive), so the accurate post-fetch tag still runs
+			// regardless and is what the results-screen toggle relies on.
+			excludeBrandMentions: z.boolean().optional(),
 		}),
 	)
 	.handler(async ({ data }): Promise<ArticleSearchPayload> => {
@@ -452,9 +458,18 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 					.filter((t) => t.length >= 3)
 					.map(wordRe),
 			}));
-		const brandRes = dedupeLower([brand.name, ...(brand.aliases ?? [])])
-			.filter((t) => t.length >= 3)
-			.map(wordRe);
+		const brandNames = dedupeLower([brand.name, ...(brand.aliases ?? [])]).filter((t) => t.length >= 3);
+		const brandRes = brandNames.map(wordRe);
+		// cheaper than filtering after the fact: keeps most brand-mentioning pages
+		// out of the SERP results in the first place, so they never get fetched or
+		// judged. best-effort (Google's negative keyword doesn't catch everything),
+		// the post-fetch brandAlreadyMentioned tag still runs regardless.
+		const excludeSuffix = data.excludeBrandMentions
+			? brandNames
+					.slice(0, 2)
+					.map((n) => `-"${n}"`)
+					.join(" ")
+			: "";
 		const brandDomains = new Set(
 			[brand.website, ...(brand.additionalDomains ?? [])].map((d) => extractDomain(d)).filter(Boolean),
 		);
@@ -653,9 +668,10 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 			for (let p = 0; p < data.pagesPerSearch; p++) serpTasks.push({ query: q.query, page: p });
 		}
 		const serpBatches = await mapPool(serpTasks, SERP_CONCURRENCY, (t) =>
-			googleSerp(t.query, t.page, { from: data.from, to: data.to }).then((rows) =>
-				rows.map((r) => ({ ...r, query: t.query })),
-			),
+			googleSerp(excludeSuffix ? `${t.query} ${excludeSuffix}` : t.query, t.page, {
+				from: data.from,
+				to: data.to,
+			}).then((rows) => rows.map((r) => ({ ...r, query: t.query }))),
 		);
 
 		// 2. dedupe + drop junk / non-Western / brand's & competitors' own sites
@@ -720,7 +736,10 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 		let byUrl2 = new Map<string, ArticleJudgement>();
 		if (expandDomains.length > 0) {
 			const siteQueryBatches = await mapPool(expandDomains, SERP_CONCURRENCY, (domain) =>
-				googleSerp(`${userDirection} site:${domain}`, 0, { from: data.from, to: data.to })
+				googleSerp(`${userDirection}${excludeSuffix ? ` ${excludeSuffix}` : ""} site:${domain}`, 0, {
+					from: data.from,
+					to: data.to,
+				})
 					.then((rows) => rows.map((r) => ({ ...r, query: `site:${domain}` })))
 					.catch(() => [] as Candidate[]),
 			);
