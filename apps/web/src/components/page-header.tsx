@@ -19,7 +19,7 @@ export function PageHeader({ title, subtitle, infoContent, actions, children }: 
 		<div className="space-y-0">
 			<div className="mb-6 flex flex-wrap items-start justify-between gap-3">
 				<div className="min-w-0">
-					<h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+					<h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
 						{title}
 						{infoContent && (
 							<Tooltip>
@@ -40,7 +40,7 @@ export function PageHeader({ title, subtitle, infoContent, actions, children }: 
 export function PageHeaderTitleSkeleton() {
 	return (
 		<div className="mb-6 space-y-2">
-			<Skeleton className="h-8 w-48" />
+			<Skeleton className="h-9 w-48" />
 			<Skeleton className="h-4 w-80" />
 		</div>
 	);
