@@ -32,7 +32,10 @@ export const Route = createFileRoute("/_authed/app/$brand/article-finder")({
 	head: ({ matches, match }) => ({
 		meta: [
 			{ title: buildTitle("Article Finder", { appName: getAppName(match), brandName: getBrandName(matches) }) },
-			{ name: "description", content: "Find vetted Western-market affiliate articles this brand could be pitched into." },
+			{
+				name: "description",
+				content: "Find vetted Western-market affiliate articles this brand could be pitched into.",
+			},
 		],
 	}),
 	component: ArticleFinderPage,
@@ -377,7 +380,9 @@ function ArticleFinderPage() {
 							<label className="flex cursor-pointer items-center justify-between gap-4">
 								<span>
 									Skip articles that already mention {brand?.name ?? "the brand"}{" "}
-									<span className="text-xs text-muted-foreground">(cheaper: fewer wasted fetches, not just hidden)</span>
+									<span className="text-xs text-muted-foreground">
+										(cheaper: fewer wasted fetches, not just hidden)
+									</span>
 								</span>
 								<Switch checked={excludeBrandMentions} onCheckedChange={setExcludeBrandMentions} disabled={busy} />
 							</label>
