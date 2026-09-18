@@ -558,14 +558,35 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 		// across the initial SERP fan-out and the later crawl-expansion pass, both
 		// write into the same `seen` set so nothing is fetched twice.
 		const seen = new Set<string>();
+		const filterDrops = { dupe: 0, noDomain: 0, junk: 0, nonWestern: 0, prWire: 0, ownOrCompetitor: 0 };
 		function filterCandidates(rows: Candidate[]): Candidate[] {
 			return rows.filter((row) => {
 				const key = normalizeUrlKey(row.url);
-				if (!key || seen.has(key)) return false;
+				if (!key || seen.has(key)) {
+					filterDrops.dupe++;
+					return false;
+				}
 				const domain = extractDomain(row.url);
-				if (!domain) return false;
-				if (inJunkDomain(domain) || isNonWesternDomain(domain) || isPrWireDomain(domain)) return false;
-				if (brandDomains.has(domain) || competitorDomains.has(domain)) return false;
+				if (!domain) {
+					filterDrops.noDomain++;
+					return false;
+				}
+				if (inJunkDomain(domain)) {
+					filterDrops.junk++;
+					return false;
+				}
+				if (isNonWesternDomain(domain)) {
+					filterDrops.nonWestern++;
+					return false;
+				}
+				if (isPrWireDomain(domain)) {
+					filterDrops.prWire++;
+					return false;
+				}
+				if (brandDomains.has(domain) || competitorDomains.has(domain)) {
+					filterDrops.ownOrCompetitor++;
+					return false;
+				}
 				seen.add(key);
 				return true;
 			});
@@ -706,8 +727,19 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 			);
 
 			// 2. dedupe + drop junk / non-Western / brand's & competitors' own sites
-			let candidates = filterCandidates(serpBatches.flat());
+			const rawRows = serpBatches.flat();
+			let candidates = filterCandidates(rawRows);
 			const afterJunk = candidates.length;
+			console.info(
+				`[article-finder] brand=${data.brandId} serpRequests=${serpTasks.length} rows=${rawRows.length} kept=${afterJunk} drops=${JSON.stringify(filterDrops)}`,
+			);
+			// Every request coming back empty means the search provider failed, not
+			// that nothing relevant exists, so say so instead of showing "No articles found".
+			if (rawRows.length === 0) {
+				throw new Error(
+					"Google returned no results for these queries. This is usually temporary, try again in a minute.",
+				);
+			}
 			candidates.sort((a, b) => a.rank - b.rank);
 
 			// 3. collapse syndicated copies: same headline across >=2 distinct domains -> keep best-rank one

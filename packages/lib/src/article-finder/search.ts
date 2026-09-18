@@ -62,6 +62,7 @@ async function brightdataRaw(
 			});
 			const body = await res.text();
 			if (res.ok && body.trim()) return body;
+			console.warn(`[article-finder] brightdata ${zone} responded ${res.status}`);
 			if (res.status === 400 || res.status === 401 || res.status === 403) return null;
 		} catch {
 			// network / timeout, fall through to retry
@@ -105,12 +106,7 @@ async function resolveGoogleRedirect(url: string): Promise<string | null> {
 	}
 }
 
-export async function googleSerp(
-	query: string,
-	page: number,
-	opts: { from?: string; to?: string },
-): Promise<SerpOrganicResult[]> {
-	const body = await brightdataRaw(SERP_ZONE, googleSearchUrl(query, page, opts.from, opts.to), 30_000, 3);
+function parseOrganic(body: string | null, page: number): SerpOrganicResult[] {
 	if (!body) return [];
 	let parsed: any;
 	try {
@@ -123,7 +119,7 @@ export async function googleSerp(
 		: Array.isArray(parsed?.organic_results)
 			? parsed.organic_results
 			: [];
-	const mapped = organic
+	return organic
 		.map((o, i) => ({
 			title: String(o?.title ?? o?.name ?? "").trim(),
 			url: String(o?.link ?? o?.url ?? "").trim(),
@@ -136,6 +132,28 @@ export async function googleSerp(
 						: i + 1 + page * 100,
 		}))
 		.filter((o) => o.url.startsWith("http") && o.title.length > 0);
+}
+
+export async function googleSerp(
+	query: string,
+	page: number,
+	opts: { from?: string; to?: string },
+): Promise<SerpOrganicResult[]> {
+	const url = googleSearchUrl(query, page, opts.from, opts.to);
+	// An empty first page for a normal query is nearly always a blocked or
+	// glitched response rather than a genuinely empty SERP, so retry it before
+	// giving up; later pages can legitimately be empty (end of results).
+	const attempts = page === 0 ? 3 : 1;
+	let mapped: SerpOrganicResult[] = [];
+	for (let i = 0; i < attempts && mapped.length === 0; i++) {
+		const body = await brightdataRaw(SERP_ZONE, url, 30_000, 3);
+		mapped = parseOrganic(body, page);
+		if (mapped.length === 0) {
+			console.warn(
+				`[article-finder] empty SERP page (query="${query.slice(0, 60)}" page=${page} attempt=${i + 1}/${attempts} body=${body ? `${body.length} chars` : "none"})`,
+			);
+		}
+	}
 
 	const resolved = await Promise.all(
 		mapped.map(async (o) => {
