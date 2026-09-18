@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef } from "react";
 
-const BLOB_COLORS = [0x3a7476, 0x8a4a58, 0xc9b57a, 0x2e4a56];
+const BLOB_COLORS = [0xc0aafd, 0x7c3aed, 0xd4b96a, 0x4a3d5a];
 
 export function HeroBlobs() {
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -36,10 +36,10 @@ export function HeroBlobs() {
 			container.appendChild(renderer.domElement);
 
 			scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-			const keyLight = new THREE.PointLight(0x9fd8da, 6, 40);
+			const keyLight = new THREE.PointLight(0xc0aafd, 6, 40);
 			keyLight.position.set(6, 5, 8);
 			scene.add(keyLight);
-			const rimLight = new THREE.PointLight(0xe6a9b8, 5, 40);
+			const rimLight = new THREE.PointLight(0xd4b96a, 5, 40);
 			rimLight.position.set(-6, -3, 6);
 			scene.add(rimLight);
 

@@ -37,6 +37,7 @@
 	--color-input: var(--input);
 	--color-border: var(--border);
 	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
 	--color-accent-foreground: var(--accent-foreground);
 	--color-accent: var(--accent);
 	--color-muted-foreground: var(--muted-foreground);
@@ -71,57 +72,54 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Seen palette v3: dusty/tonal dark palette (near-black neutral base, muted
-   teal + dusty rose + wine + gold + sage), not the violet/glow "AI tool"
-   default from the previous pass — modeled on an editorial-agency reference,
-   not a SaaS-dashboard one. --background is near-neutral almost-black
-   (recedes), --sidebar is a wine-tinted near-black (its own subtle identity,
-   not just "darker gray"), --card is a cool slate-navy — a real hue AND
-   lightness jump from the background so it reads as a distinct surface, not
-   a tint of it. --primary is a muted pine/teal (calm, "detected/found" —
-   fits an AI-visibility tool), paired as a teal-to-dusty-rose gradient
-   instead of anything violet or neon. The chart set (teal/rose/gold/sage/
-   mauve) is five real, desaturated hues, not shades of one accent.
-   --highlight-* is the teal-tint surface used for callouts, active nav and
-   selected rows.
+   Seen palette v5: the user's own theme spec (shadcn theme-generator export,
+   dark variant) applied directly for fidelity — a warm near-black background
+   with plum-purple card/sidebar surfaces and a light periwinkle/lavender
+   primary. Chart colors are deliberately NOT part of that swap: kept as the
+   existing multi-hue set (green/gold/mauve/rose/purple) per explicit
+   instruction to leave graph colors alone for differentiation, rather than
+   collapsing to the spec's monochrome-purple chart-1..5. --highlight-* is
+   derived from --primary via color-mix rather than hand-picked, so it always
+   stays in sync with whatever --primary is.
    --------------------------------------------------------------------------- */
 :root {
-	--radius: 0.625rem;
-	--background: oklch(0.19 0.014 70);
-	--foreground: oklch(0.96 0.006 200);
-	--card: oklch(0.3 0.045 235);
-	--card-foreground: oklch(0.96 0.006 200);
-	--popover: oklch(0.33 0.05 235);
-	--popover-foreground: oklch(0.96 0.006 200);
-	--primary: oklch(0.48 0.07 190);
-	--primary-foreground: oklch(0.97 0.008 190);
-	--primary-gradient-to: oklch(0.68 0.1 5);
-	--secondary: oklch(0.34 0.05 340);
-	--secondary-foreground: oklch(0.95 0.006 200);
-	--muted: oklch(0.28 0.02 235);
-	--muted-foreground: oklch(0.72 0.02 210);
-	--accent: oklch(0.36 0.055 235);
-	--accent-foreground: oklch(0.96 0.006 200);
-	--destructive: oklch(0.58 0.17 22);
-	--border: oklch(1 0 0 / 10%);
-	--input: oklch(1 0 0 / 14%);
-	--ring: oklch(0.55 0.09 190);
-	--chart-1: oklch(0.48 0.07 190);
-	--chart-2: oklch(0.68 0.1 5);
-	--chart-3: oklch(0.78 0.08 90);
-	--chart-4: oklch(0.5 0.09 150);
-	--chart-5: oklch(0.55 0.08 340);
-	--highlight: oklch(0.3 0.06 190);
-	--highlight-foreground: oklch(0.85 0.09 190);
-	--highlight-border: oklch(0.42 0.08 190);
-	--sidebar: oklch(0.15 0.024 20);
-	--sidebar-foreground: oklch(0.94 0.006 200);
-	--sidebar-primary: oklch(0.48 0.07 190);
-	--sidebar-primary-foreground: oklch(0.97 0.008 190);
-	--sidebar-accent: oklch(0.16 0.025 20);
-	--sidebar-accent-foreground: oklch(0.96 0.006 200);
-	--sidebar-border: oklch(1 0 0 / 7%);
-	--sidebar-ring: oklch(0.55 0.09 190);
+	--radius: 1.5rem;
+	--background: #1c1917;
+	--foreground: #e0e7ff;
+	--card: #2d2535;
+	--card-foreground: #e0e7ff;
+	--popover: #2d2535;
+	--popover-foreground: #e0e7ff;
+	--primary: #c0aafd;
+	--primary-foreground: #1c1917;
+	--primary-gradient-to: #7c3aed;
+	--secondary: #3f324a;
+	--secondary-foreground: #d1d5db;
+	--muted: #20182b;
+	--muted-foreground: #9ca3af;
+	--accent: #4a3d5a;
+	--accent-foreground: #d1d5db;
+	--destructive: #fca5a5;
+	--destructive-foreground: #1c1917;
+	--border: #3f324a;
+	--input: #3f324a;
+	--ring: #c0aafd;
+	--chart-1: oklch(0.58 0.12 145);
+	--chart-2: oklch(0.8 0.09 90);
+	--chart-3: oklch(0.55 0.08 350);
+	--chart-4: oklch(0.68 0.03 30);
+	--chart-5: oklch(0.55 0.14 300);
+	--highlight: color-mix(in oklch, var(--primary) 18%, var(--background));
+	--highlight-foreground: var(--primary);
+	--highlight-border: color-mix(in oklch, var(--primary) 40%, var(--background));
+	--sidebar: #3f324a;
+	--sidebar-foreground: #e0e7ff;
+	--sidebar-primary: #c0aafd;
+	--sidebar-primary-foreground: #1c1917;
+	--sidebar-accent: #4a3d5a;
+	--sidebar-accent-foreground: #d1d5db;
+	--sidebar-border: #3f324a;
+	--sidebar-ring: #c0aafd;
 }
 
 /* No separate .dark block: nothing in this app ever toggles a .dark class
@@ -135,17 +133,17 @@
 	}
 	body {
 		@apply bg-background text-foreground;
-		/* Ambient mesh of soft color blobs (teal/wine/gold, matching the
-		   tonal chart palette) plus a fine grain layer — the textured,
-		   tactile quality of the reference, not a flat color fill. Slowly
-		   drifting (not a static wash) so the page feels alive even before
-		   any interaction — background-position animation on a few large,
-		   heavily-blurred layers is cheap enough not to need transform/
-		   compositing tricks. Respects prefers-reduced-motion. */
+		/* Ambient mesh of soft color blobs — lavender/violet (from --primary
+		   and --primary-gradient-to) plus a warm gold lift for contrast —
+		   plus a fine grain layer for texture, not a flat color fill.
+		   Slowly drifting (not a static wash) so the page feels alive even
+		   before any interaction — background-position animation on a few
+		   large, heavily-blurred layers is cheap enough not to need
+		   transform/compositing tricks. Respects prefers-reduced-motion. */
 		background-image:
-			radial-gradient(65rem 45rem at 8% -10%, oklch(0.42 0.09 190 / 42%), transparent 62%),
-			radial-gradient(55rem 40rem at 100% 0%, oklch(0.38 0.08 20 / 44%), transparent 62%),
-			radial-gradient(60rem 44rem at 15% 110%, oklch(0.58 0.1 90 / 22%), transparent 68%),
+			radial-gradient(65rem 45rem at 8% -10%, oklch(0.5 0.12 300 / 40%), transparent 62%),
+			radial-gradient(55rem 40rem at 100% 0%, oklch(0.4 0.1 305 / 40%), transparent 62%),
+			radial-gradient(60rem 44rem at 15% 110%, oklch(0.62 0.1 90 / 18%), transparent 68%),
 			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
 		background-attachment: fixed;
 		background-repeat: no-repeat, no-repeat, no-repeat, repeat;
@@ -236,12 +234,11 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Rebrand polish: softer corners + real card depth (less flat).      */
+/* Rebrand polish: real card depth (less flat). --radius is set once,  */
+/* in the main :root block above (1.5rem, per the theme spec) — no    */
+/* second conflicting declaration here.                               */
 /* Plain rules after Tailwind's layers so they win over `shadow-sm`.  */
 /* ------------------------------------------------------------------ */
-:root {
-	--radius: 0.75rem;
-}
 
 /* Glass in the right amount means most surfaces are solid — glass everywhere
    just washes color out and flattens the layering. Cards and the sidebar are
@@ -257,7 +254,7 @@
 	-webkit-backdrop-filter: blur(6px);
 	box-shadow:
 		0 1px 2px oklch(0 0 0 / 0.3),
-		0 12px 32px -8px oklch(0.15 0.05 235 / 0.5);
+		0 12px 32px -8px oklch(0.12 0.06 305 / 0.5);
 }
 
 [data-slot="sidebar"] {
@@ -278,7 +275,7 @@
 	-webkit-backdrop-filter: blur(20px);
 	box-shadow:
 		0 2px 4px oklch(0 0 0 / 0.15),
-		0 16px 40px -8px oklch(0.12 0.06 235 / 0.55);
+		0 16px 40px -8px oklch(0.1 0.07 305 / 0.55);
 }
 
 @media (prefers-reduced-transparency: reduce) {
