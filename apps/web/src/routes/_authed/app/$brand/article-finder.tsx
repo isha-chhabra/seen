@@ -402,8 +402,8 @@ function ArticleFinderPage() {
 							</label>
 							<p className="text-xs text-muted-foreground">
 								We cast as wide a net as we can, dedupe and vet the results, then check the best hits for other roundups
-								on that same publisher. Whether it's affiliate-monetized is a filter on the results screen, not a setting
-								here, more depth means a wider net and a higher cost per search.
+								on that same publisher. Whether it's affiliate-monetized is a filter on the results screen, not a
+								setting here, more depth means a wider net and a higher cost per search.
 							</p>
 						</div>
 
@@ -472,7 +472,13 @@ function ArticleFinderPage() {
 									disabled={busy}
 									className="h-9 flex-1 rounded-md border bg-transparent px-3 text-sm outline-none focus:border-primary"
 								/>
-								<Button type="button" variant="outline" size="sm" onClick={addQuery} disabled={busy || !newQuery.trim()}>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={addQuery}
+									disabled={busy || !newQuery.trim()}
+								>
 									Add
 								</Button>
 							</div>
