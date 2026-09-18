@@ -8,6 +8,7 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from "@workspace/ui/components/sidebar";
+import { motion } from "motion/react";
 
 export interface NavItem {
 	title: string;
@@ -21,13 +22,13 @@ export interface NavGroup {
 	items: NavItem[];
 }
 
-// Active item: pink-tint fill, pink icon, and a pink rail on the left edge.
+// Active item: pink-tint fill, pink icon. The rail on the left edge is a
+// real motion.span (see below), not a CSS pseudo-element, so it can glide
+// between items on navigation instead of just appearing/disappearing.
 // The `data-[active=true]:` prefixes mean this string is safe to apply to every item.
 const ACTIVE =
 	"relative data-[active=true]:!bg-highlight data-[active=true]:!text-highlight-foreground data-[active=true]:font-medium " +
-	"[&[data-active=true]>svg]:!text-primary " +
-	"data-[active=true]:before:absolute data-[active=true]:before:inset-y-1.5 data-[active=true]:before:left-0 " +
-	"data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-full data-[active=true]:before:bg-primary";
+	"[&[data-active=true]>svg]:!text-primary";
 
 export function NavMain({ groups }: { groups: NavGroup[] }) {
 	const params = useParams({ strict: false }) as { brand?: string };
@@ -56,19 +57,35 @@ export function NavMain({ groups }: { groups: NavGroup[] }) {
 						{group.label}
 					</SidebarGroupLabel>
 					<SidebarMenu>
-						{group.items.map((item) => (
-							<SidebarMenuItem key={item.title}>
-								<SidebarMenuButton
-									render={<Link to={getHref(item.url, item.absolute)} onClick={() => setOpenMobile(false)} />}
-									tooltip={item.title}
-									isActive={isActive(item.url, item.absolute)}
-									className={ACTIVE}
-								>
-									{item.icon && <item.icon />}
-									<span>{item.title}</span>
-								</SidebarMenuButton>
-							</SidebarMenuItem>
-						))}
+						{group.items.map((item) => {
+							const active = isActive(item.url, item.absolute);
+							return (
+								<SidebarMenuItem key={item.title}>
+									<SidebarMenuButton
+										render={<Link to={getHref(item.url, item.absolute)} onClick={() => setOpenMobile(false)} />}
+										tooltip={item.title}
+										isActive={active}
+										className={ACTIVE}
+									>
+										{active && (
+											<motion.span
+												layoutId="nav-active-rail"
+												className="pointer-events-none absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-primary"
+												transition={{ type: "spring", stiffness: 500, damping: 35 }}
+											/>
+										)}
+										<motion.span
+											className="flex items-center gap-2"
+											whileHover={{ x: 3 }}
+											transition={{ type: "spring", stiffness: 500, damping: 30 }}
+										>
+											{item.icon && <item.icon />}
+											<span>{item.title}</span>
+										</motion.span>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
+							);
+						})}
 					</SidebarMenu>
 				</SidebarGroup>
 			))}
