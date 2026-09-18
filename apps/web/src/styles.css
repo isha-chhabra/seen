@@ -87,7 +87,7 @@
    --------------------------------------------------------------------------- */
 :root {
 	--radius: 0.625rem;
-	--background: oklch(0.14 0.008 80);
+	--background: oklch(0.19 0.014 70);
 	--foreground: oklch(0.96 0.006 200);
 	--card: oklch(0.3 0.045 235);
 	--card-foreground: oklch(0.96 0.006 200);
@@ -114,7 +114,7 @@
 	--highlight: oklch(0.3 0.06 190);
 	--highlight-foreground: oklch(0.85 0.09 190);
 	--highlight-border: oklch(0.42 0.08 190);
-	--sidebar: oklch(0.12 0.02 20);
+	--sidebar: oklch(0.15 0.024 20);
 	--sidebar-foreground: oklch(0.94 0.006 200);
 	--sidebar-primary: oklch(0.48 0.07 190);
 	--sidebar-primary-foreground: oklch(0.97 0.008 190);
@@ -137,15 +137,52 @@
 		@apply bg-background text-foreground;
 		/* Ambient mesh of soft color blobs (teal/wine/gold, matching the
 		   tonal chart palette) plus a fine grain layer — the textured,
-		   tactile quality of the reference, not a flat color fill. Both
-		   fixed so they don't scroll or retile with page content. */
+		   tactile quality of the reference, not a flat color fill. Slowly
+		   drifting (not a static wash) so the page feels alive even before
+		   any interaction — background-position animation on a few large,
+		   heavily-blurred layers is cheap enough not to need transform/
+		   compositing tricks. Respects prefers-reduced-motion. */
 		background-image:
-			radial-gradient(60rem 40rem at 8% -10%, oklch(0.4 0.07 190 / 30%), transparent 60%),
-			radial-gradient(50rem 36rem at 100% 0%, oklch(0.35 0.06 20 / 32%), transparent 60%),
-			radial-gradient(55rem 40rem at 15% 110%, oklch(0.55 0.08 90 / 14%), transparent 65%),
-			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+			radial-gradient(65rem 45rem at 8% -10%, oklch(0.42 0.09 190 / 42%), transparent 62%),
+			radial-gradient(55rem 40rem at 100% 0%, oklch(0.38 0.08 20 / 44%), transparent 62%),
+			radial-gradient(60rem 44rem at 15% 110%, oklch(0.58 0.1 90 / 22%), transparent 68%),
+			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
 		background-attachment: fixed;
 		background-repeat: no-repeat, no-repeat, no-repeat, repeat;
+		background-position:
+			8% -10%,
+			100% 0%,
+			15% 110%,
+			0 0;
+		animation: bg-drift 36s ease-in-out infinite alternate;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		body {
+			animation: none;
+		}
+	}
+	@keyframes bg-drift {
+		0% {
+			background-position:
+				4% -14%,
+				104% -4%,
+				11% 114%,
+				0 0;
+		}
+		50% {
+			background-position:
+				12% -6%,
+				96% 4%,
+				19% 106%,
+				0 0;
+		}
+		100% {
+			background-position:
+				8% -12%,
+				100% 2%,
+				15% 112%,
+				0 0;
+		}
 	}
 	button:not(:disabled),
 	[role="button"]:not(:disabled) {

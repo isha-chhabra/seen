@@ -3,6 +3,7 @@ import { buttonVariants } from "@workspace/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
 import { Separator } from "@workspace/ui/components/separator";
 import type { ReactNode } from "react";
+import { HeroBlobs } from "@/components/hero-blobs";
 import { Logo } from "@/components/logo";
 
 interface FullPageCardProps {
@@ -27,7 +28,8 @@ export default function FullPageCard({
 	className = "w-md",
 }: FullPageCardProps) {
 	return (
-		<div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
+		<div className="min-h-screen bg-muted/30 flex items-center justify-center p-4 relative overflow-hidden">
+			<HeroBlobs />
 			<div className={`mx-auto ${className}`}>
 				<div className="flex items-center justify-center space-x-3">
 					<Logo />
