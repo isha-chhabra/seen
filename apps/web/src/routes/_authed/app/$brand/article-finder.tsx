@@ -28,7 +28,6 @@ import {
 } from "@workspace/ui/components/dropdown-menu";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@workspace/ui/components/input-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover";
-import { Progress } from "@workspace/ui/components/progress";
 import { Switch } from "@workspace/ui/components/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
 import { Textarea } from "@workspace/ui/components/textarea";
@@ -36,6 +35,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/component
 import { cn } from "@workspace/ui/lib/utils";
 import { useEffect, useState } from "react";
 import type { DateRange } from "react-day-picker";
+import { ArticleSearchLoader } from "@/components/article-search-loader";
 import { DateRangePicker } from "@/components/date-range-picker";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -672,19 +672,7 @@ function ArticleFinderPage() {
 								? "Searching and vetting…"
 								: `Search ${queries.length} ${queries.length === 1 ? "query" : "queries"}`}
 						</Button>
-						{phase === "searching" && (
-							<div className="space-y-2 rounded-lg border bg-card p-3">
-								<div className="flex items-center justify-between text-xs">
-									<span className="font-medium text-foreground">{liveStage ?? "Getting started…"}</span>
-									{liveProgress !== null && <span className="text-muted-foreground">{liveProgress}%</span>}
-								</div>
-								<Progress value={liveProgress ?? 5} className="h-1.5" />
-								<p className="text-xs text-muted-foreground">
-									Usually 3-6 minutes. It keeps running on the server even if you switch tabs or close this one — reopen
-									the app any time and it's either still going or waiting for you.
-								</p>
-							</div>
-						)}
+						{phase === "searching" && <ArticleSearchLoader stage={liveStage} progressPct={liveProgress} />}
 						{phase === "searching" && error && <p className="text-sm text-destructive">{error}</p>}
 					</div>
 				)}
