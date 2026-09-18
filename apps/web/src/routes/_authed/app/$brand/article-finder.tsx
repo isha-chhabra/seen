@@ -30,7 +30,6 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover";
 import { Switch } from "@workspace/ui/components/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
-import { Textarea } from "@workspace/ui/components/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
 import { useEffect, useState } from "react";
@@ -39,6 +38,7 @@ import { ArticleSearchLoader } from "@/components/article-search-loader";
 import { DateRangePicker } from "@/components/date-range-picker";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
+import { TagInput } from "@/components/tag-input";
 import { useBrand, useBrandRole } from "@/hooks/use-brands";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
 import {
@@ -204,7 +204,7 @@ function ArticleFinderPage() {
 	const { brand } = useBrand(brandId);
 	const { isViewer } = useBrandRole(brandId);
 
-	const [direction, setDirection] = useState("");
+	const [directionTags, setDirectionTags] = useState<string[]>([]);
 	const [range, setRange] = useState<DateRange | undefined>(() => {
 		const to = new Date();
 		const from = new Date();
@@ -217,7 +217,6 @@ function ArticleFinderPage() {
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [queries, setQueries] = useState<Query[]>([]);
-	const [newQuery, setNewQuery] = useState("");
 	const [high, setHigh] = useState<ArticleResult[]>([]);
 	const [niche, setNiche] = useState<ArticleResult[]>([]);
 	const [stats, setStats] = useState<Record<string, number> | null>(null);
@@ -262,7 +261,7 @@ function ArticleFinderPage() {
 			}
 			const r = await getLatestArticleSearchFn({ data: { brandId } }).catch(() => null);
 			if (cancelled || !r) return;
-			setDirection(r.direction);
+			setDirectionTags(r.direction ? [r.direction] : []);
 			setQueries(r.queries.map((q) => ({ query: q.query, angle: q.angle })));
 			setHigh(r.highAuthority);
 			setNiche(r.nicheBlog);
@@ -295,7 +294,7 @@ function ArticleFinderPage() {
 				getLatestArticleSearchFn({ data: { brandId } })
 					.then((r) => {
 						if (cancelled || !r) return;
-						setDirection(r.direction);
+						setDirectionTags(r.direction ? [r.direction] : []);
 						if (r.from && r.to) setRange({ from: parseYmd(r.from), to: parseYmd(r.to) });
 						setPages(r.pagesPerSearch || 4);
 						setQueries(r.queries.map((q) => ({ query: q.query, angle: q.angle })));
@@ -351,22 +350,7 @@ function ArticleFinderPage() {
 		}
 	});
 	const filteredCount = sortedRows.length;
-	const canBuild = !isViewer && !busy && direction.trim().length >= 3 && !!range?.from && !!range?.to;
-
-	function addQuery() {
-		const q = newQuery.trim();
-		if (!q || queries.length >= MAX_QUERIES_UI) return;
-		if (queries.some((x) => x.query.toLowerCase() === q.toLowerCase())) {
-			setNewQuery("");
-			return;
-		}
-		setQueries((qs) => [...qs, { query: q, angle: "Added by you" }]);
-		setNewQuery("");
-	}
-
-	function removeQuery(i: number) {
-		setQueries((qs) => qs.filter((_, j) => j !== i));
-	}
+	const canBuild = !isViewer && !busy && directionTags.length > 0 && !!range?.from && !!range?.to;
 
 	async function genQueries() {
 		if (!canBuild || !range?.from || !range?.to) return;
@@ -374,7 +358,7 @@ function ArticleFinderPage() {
 		setError(null);
 		try {
 			const res = await generateArticleQueriesFn({
-				data: { brandId, direction: direction.trim(), from: ymd(range.from), to: ymd(range.to) },
+				data: { brandId, direction: directionTags.join(", "), from: ymd(range.from), to: ymd(range.to) },
 			});
 			setQueries(res.queries.map((q) => ({ query: q.query, angle: q.angle })));
 			setPhase("queries");
@@ -397,7 +381,7 @@ function ArticleFinderPage() {
 				data: {
 					brandId,
 					queries: queries.map((q) => ({ query: q.query, angle: q.angle })),
-					direction: direction.trim() || undefined,
+					direction: directionTags.join(", ") || undefined,
 					from: ymd(range.from),
 					to: ymd(range.to),
 					pagesPerSearch: pages,
@@ -540,16 +524,11 @@ function ArticleFinderPage() {
 				{phase === "idle" && (
 					<div className="space-y-5">
 						<div className="space-y-1.5">
-							<label htmlFor="af-direction" className="text-sm font-medium">
-								What kind of articles are you looking for?
-							</label>
-							<Textarea
-								id="af-direction"
-								rows={3}
-								className="resize-none text-[15px] leading-relaxed"
-								placeholder="e.g. gift guides and roundups for premium steaks and meat boxes"
-								value={direction}
-								onChange={(e) => setDirection(e.target.value)}
+							<span className="text-sm font-medium">What kind of articles are you looking for?</span>
+							<TagInput
+								values={directionTags}
+								onChange={setDirectionTags}
+								placeholder="Type a direction, e.g. gift guides for premium steaks…"
 								disabled={busy}
 							/>
 						</div>
@@ -619,49 +598,15 @@ function ArticleFinderPage() {
 								</button>
 							</div>
 						</div>
-						{/* Tags input: each query is a removable chip, typing + Enter adds
-						    one more — replaces the old checkbox list + separate "Add"
-						    button/row with a single familiar interaction. */}
-						<div
-							className={cn(
-								"flex min-h-10 flex-wrap items-center gap-1.5 rounded-md border bg-transparent p-2",
-								"focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30",
-							)}
-						>
-							{queries.map((q, i) => (
-								<Badge key={q.query} variant="secondary" className="gap-1 py-1 pl-2.5 pr-1.5 text-xs font-normal">
-									{q.query}
-									{!isViewer && (
-										<button
-											type="button"
-											onClick={() => removeQuery(i)}
-											disabled={busy}
-											aria-label={`Remove query: ${q.query}`}
-											className="flex items-center justify-center rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-										>
-											<IconX className="size-3" />
-										</button>
-									)}
-								</Badge>
-							))}
-							{!isViewer && queries.length < MAX_QUERIES_UI && (
-								<input
-									type="text"
-									aria-label="Add a custom search query"
-									value={newQuery}
-									onChange={(e) => setNewQuery(e.target.value)}
-									onKeyDown={(e) => {
-										if (e.key === "Enter") {
-											e.preventDefault();
-											addQuery();
-										}
-									}}
-									placeholder={queries.length === 0 ? "Type a query, press Enter to add it…" : "Add another…"}
-									disabled={busy}
-									className="h-7 min-w-[140px] flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-muted-foreground"
-								/>
-							)}
-						</div>
+						<TagInput
+							values={queries.map((q) => q.query)}
+							onChange={(vals) =>
+								setQueries(vals.map((v) => queries.find((q) => q.query === v) ?? { query: v, angle: "Added by you" }))
+							}
+							placeholder="Type a query, press Enter to add it…"
+							disabled={busy || isViewer}
+							max={MAX_QUERIES_UI}
+						/>
 						<Button onClick={run} disabled={busy || queries.length === 0 || isViewer} className="gap-2">
 							{phase === "searching" ? (
 								<IconLoader2 className="size-4 animate-spin" />

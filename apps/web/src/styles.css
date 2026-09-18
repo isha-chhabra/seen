@@ -400,3 +400,13 @@
 		animation: none;
 	}
 }
+
+/* Query/direction tag chips use a real second accent (gold, from the chart
+   palette) instead of --secondary (purple-family) — CTAs and structural
+   chrome stay the theme's lavender per spec, but the one thing you're
+   actively typing into shouldn't be one more purple surface. */
+.tag-chip {
+	background-color: color-mix(in oklch, var(--chart-2) 20%, transparent);
+	color: var(--chart-2);
+	border-color: color-mix(in oklch, var(--chart-2) 45%, transparent);
+}
