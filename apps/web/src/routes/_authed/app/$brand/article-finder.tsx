@@ -151,6 +151,38 @@ function ArticleFinderPage() {
 		() => new Set(["yes", "unsure"]),
 	);
 
+	// The search itself is a single long HTTP call (can run several minutes with
+	// the wider net + outward crawl) — if the connection drops (laptop sleeps,
+	// network hiccup, tab backgrounded) the browser never sees the response even
+	// though the server finished and saved it. So while we wait, also poll for a
+	// saved run newer than when this one started, and adopt it if the direct
+	// response never arrives — no manual refresh needed either way.
+	const [searchStartedAt, setSearchStartedAt] = useState<number | null>(null);
+	useEffect(() => {
+		if (phase !== "searching" || searchStartedAt === null) return;
+		let cancelled = false;
+		const id = setInterval(() => {
+			getLatestArticleSearchFn({ data: { brandId } })
+				.then((r) => {
+					if (cancelled || !r) return;
+					if (new Date(r.createdAt).getTime() < searchStartedAt) return; // not this run yet
+					setDirection(r.direction);
+					setQueries(r.queries.map((q) => ({ query: q.query, angle: q.angle, on: true })));
+					setHigh(r.highAuthority);
+					setNiche(r.nicheBlog);
+					setStats(r.stats);
+					setLoaded({ at: r.createdAt, by: r.createdBy });
+					setSearchStartedAt(null);
+					setPhase("results");
+				})
+				.catch(() => {});
+		}, 12_000);
+		return () => {
+			cancelled = true;
+			clearInterval(id);
+		};
+	}, [phase, searchStartedAt, brandId]);
+
 	// on open: show the last saved search for this brand, for free
 	useEffect(() => {
 		let cancelled = false;
@@ -228,6 +260,7 @@ function ArticleFinderPage() {
 		setBusy(true);
 		setError(null);
 		setPhase("searching");
+		setSearchStartedAt(Date.now() - 5_000); // small buffer for clock skew between browser and server
 		try {
 			const res = await findArticlesFn({
 				data: {
@@ -244,10 +277,14 @@ function ArticleFinderPage() {
 			setNiche(res.nicheBlog);
 			setStats(res.stats);
 			setLoaded(null);
+			setSearchStartedAt(null);
 			setPhase("results");
 		} catch (e) {
-			setError(e instanceof Error ? e.message : "Search failed.");
-			setPhase("queries");
+			// the request itself failed client-side (not just a slow/dropped
+			// connection with the server still working) — but the poll above is
+			// still running, so if the server actually did finish and save, it'll
+			// still pick the result up. Only show the error state if it doesn't.
+			setError(e instanceof Error ? e.message : "Search failed, or the connection dropped, still checking…");
 		} finally {
 			setBusy(false);
 		}
@@ -493,7 +530,14 @@ function ArticleFinderPage() {
 								? "Searching and vetting…"
 								: `Search ${selected.length} ${selected.length === 1 ? "query" : "queries"}`}
 						</Button>
-						{phase === "searching" && <p className="text-xs text-muted-foreground">Takes about a minute or two.</p>}
+						{phase === "searching" && (
+							<p className="text-xs text-muted-foreground">
+								Usually 3-6 minutes. It's still running on the server even if your connection drops, this tab checks in
+								the background and will pick the result up on its own, no refresh needed. If you do close this tab,
+								reopening the page later shows the finished run too.
+							</p>
+						)}
+						{phase === "searching" && error && <p className="text-sm text-destructive">{error}</p>}
 					</div>
 				)}
 
