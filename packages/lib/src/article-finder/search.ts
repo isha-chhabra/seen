@@ -142,8 +142,9 @@ export async function googleSerp(
 	const url = googleSearchUrl(query, page, opts.from, opts.to);
 	// An empty first page for a normal query is nearly always a blocked or
 	// glitched response rather than a genuinely empty SERP, so retry it before
-	// giving up; later pages can legitimately be empty (end of results).
-	const attempts = page === 0 ? 3 : 1;
+	// giving up; later pages and publisher-scoped site: searches can
+	// legitimately be empty, so those are never retried (it would only cost money).
+	const attempts = page === 0 && !/\bsite:/.test(query) ? 3 : 1;
 	let mapped: SerpOrganicResult[] = [];
 	for (let i = 0; i < attempts && mapped.length === 0; i++) {
 		const body = await brightdataRaw(SERP_ZONE, url, 30_000, 3);
