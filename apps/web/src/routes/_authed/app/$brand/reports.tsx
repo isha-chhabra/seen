@@ -3,17 +3,16 @@
  * One report per brand per rolling 7 days (enforced server-side).
  */
 
-import { IconCalendar, IconLoader2, IconReport } from "@tabler/icons-react";
+import { IconLoader2, IconReport } from "@tabler/icons-react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Button } from "@workspace/ui/components/button";
-import { Calendar } from "@workspace/ui/components/calendar";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover";
 import { Switch } from "@workspace/ui/components/switch";
 import { useEffect, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
+import { DateRangePicker } from "@/components/date-range-picker";
 import { PageHeader } from "@/components/page-header";
 import { type ReportDocProps, ReportDocument } from "@/components/report/report-document";
 import { useBrand, useBrandRole } from "@/hooks/use-brands";
@@ -58,15 +57,7 @@ function RangeField({
 	return (
 		<div className="space-y-1.5">
 			<Label>{label}</Label>
-			<Popover>
-				<PopoverTrigger render={<Button variant="outline" className="w-full justify-start gap-2 font-normal" />}>
-					<IconCalendar className="size-4" />
-					{value?.from ? `${pretty(value.from)} \u2013 ${pretty(value.to)}` : "Pick a range"}
-				</PopoverTrigger>
-				<PopoverContent className="w-auto p-0" align="start">
-					<Calendar mode="range" numberOfMonths={2} selected={value} onSelect={onChange} defaultMonth={value?.from} />
-				</PopoverContent>
-			</Popover>
+			<DateRangePicker value={value} onChange={onChange} className="w-full justify-start" />
 		</div>
 	);
 }

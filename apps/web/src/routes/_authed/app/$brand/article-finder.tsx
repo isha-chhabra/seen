@@ -8,7 +8,6 @@
 import {
 	IconArrowUpRight,
 	IconBolt,
-	IconCalendar,
 	IconChevronDown,
 	IconLink,
 	IconLoader2,
@@ -19,7 +18,6 @@ import {
 import { createFileRoute } from "@tanstack/react-router";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { Calendar } from "@workspace/ui/components/calendar";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import {
 	DropdownMenu,
@@ -38,6 +36,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/component
 import { cn } from "@workspace/ui/lib/utils";
 import { useEffect, useState } from "react";
 import type { DateRange } from "react-day-picker";
+import { DateRangePicker } from "@/components/date-range-picker";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { useBrand, useBrandRole } from "@/hooks/use-brands";
@@ -69,9 +68,6 @@ function ymd(d: Date): string {
 function parseYmd(s: string): Date {
 	return new Date(`${s}T00:00:00`);
 }
-function short(d?: Date): string {
-	return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
-}
 function prettyAt(iso: string): string {
 	return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
@@ -80,20 +76,6 @@ type Query = { query: string; angle?: string };
 type Phase = "idle" | "queries" | "searching" | "results";
 // mirrors MAX_QUERIES in apps/web/src/server/article-finder.ts (the server's real cap)
 const MAX_QUERIES_UI = 20;
-
-function RangeInline({ value, onChange }: { value?: DateRange; onChange: (r?: DateRange) => void }) {
-	return (
-		<Popover>
-			<PopoverTrigger render={<Button variant="outline" size="sm" className="gap-1.5 font-normal" />}>
-				<IconCalendar className="size-3.5" />
-				{value?.from ? `${short(value.from)} to ${short(value.to)}` : "any time"}
-			</PopoverTrigger>
-			<PopoverContent className="w-auto p-0" align="start">
-				<Calendar mode="range" numberOfMonths={2} selected={value} onSelect={onChange} defaultMonth={value?.from} />
-			</PopoverContent>
-		</Popover>
-	);
-}
 
 function ScoreBadge({ score }: { score: number }) {
 	return (
@@ -575,7 +557,7 @@ function ArticleFinderPage() {
 						<div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
 							<div className="flex items-center gap-2">
 								<span className="text-muted-foreground">Published</span>
-								<RangeInline value={range} onChange={setRange} />
+								<DateRangePicker value={range} onChange={setRange} />
 							</div>
 							<div className="flex items-center gap-2">
 								<span className="text-muted-foreground">Depth</span>
