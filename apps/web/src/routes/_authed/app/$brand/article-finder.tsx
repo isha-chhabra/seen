@@ -56,6 +56,8 @@ function prettyAt(iso: string): string {
 
 type Query = { query: string; angle?: string; on: boolean };
 type Phase = "idle" | "queries" | "searching" | "results";
+// mirrors MAX_QUERIES in apps/web/src/server/article-finder.ts (the server's real cap)
+const MAX_QUERIES_UI = 20;
 
 function RangeInline({ value, onChange }: { value?: DateRange; onChange: (r?: DateRange) => void }) {
 	return (
@@ -137,6 +139,7 @@ function ArticleFinderPage() {
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [queries, setQueries] = useState<Query[]>([]);
+	const [newQuery, setNewQuery] = useState("");
 	const [high, setHigh] = useState<ArticleResult[]>([]);
 	const [niche, setNiche] = useState<ArticleResult[]>([]);
 	const [stats, setStats] = useState<Record<string, number> | null>(null);
@@ -191,6 +194,17 @@ function ArticleFinderPage() {
 	const totalResults = high.length + niche.length;
 	const filteredCount = filteredHigh.length + filteredNiche.length;
 	const canBuild = !isViewer && !busy && direction.trim().length >= 3 && !!range?.from && !!range?.to;
+
+	function addQuery() {
+		const q = newQuery.trim();
+		if (!q || queries.length >= MAX_QUERIES_UI) return;
+		if (queries.some((x) => x.query.toLowerCase() === q.toLowerCase())) {
+			setNewQuery("");
+			return;
+		}
+		setQueries((qs) => [...qs, { query: q, angle: "Added by you", on: true }]);
+		setNewQuery("");
+	}
 
 	async function genQueries() {
 		if (!canBuild || !range?.from || !range?.to) return;
@@ -442,6 +456,27 @@ function ArticleFinderPage() {
 								</li>
 							))}
 						</ul>
+						{!isViewer && queries.length < MAX_QUERIES_UI && (
+							<div className="flex items-center gap-2">
+								<input
+									type="text"
+									value={newQuery}
+									onChange={(e) => setNewQuery(e.target.value)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter") {
+											e.preventDefault();
+											addQuery();
+										}
+									}}
+									placeholder="Add your own query, e.g. best grilling gifts for dad"
+									disabled={busy}
+									className="h-9 flex-1 rounded-md border bg-transparent px-3 text-sm outline-none focus:border-primary"
+								/>
+								<Button type="button" variant="outline" size="sm" onClick={addQuery} disabled={busy || !newQuery.trim()}>
+									Add
+								</Button>
+							</div>
+						)}
 						<Button onClick={run} disabled={busy || selected.length === 0 || isViewer} className="gap-2">
 							{phase === "searching" ? (
 								<IconLoader2 className="size-4 animate-spin" />
