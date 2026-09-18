@@ -54,7 +54,7 @@ export const Route = createFileRoute("/_authed/app/$brand/article-finder")({
 			{ title: buildTitle("Article Finder", { appName: getAppName(match), brandName: getBrandName(matches) }) },
 			{
 				name: "description",
-				content: "Find vetted Western-market affiliate articles this brand could be pitched into.",
+				content: "Find articles to pitch this brand to.",
 			},
 		],
 	}),
@@ -502,8 +502,8 @@ function ArticleFinderPage() {
 	return (
 		<PageHeader
 			title="Article Finder"
-			subtitle="Western-market articles to pitch this brand to — a wide net, vetted for topical fit."
-			infoContent="We expand your direction into many angled Google searches. Results outside the US, Canada, UK, Europe, Australia and NZ are dropped, along with retailers and syndicated copies. We read every survivor, then check the best hits for other roundups on that same publisher. Each result is tagged for brand mentions and affiliate links, filter either on the results screen. The last run is saved, so reopening this tab is free."
+			subtitle="Find articles to pitch this brand to."
+			infoContent="We search for editorial articles this brand could be featured in, then check each one for fit and affiliate links. Your last search is saved, so reopening this tab is free."
 			actions={
 				phase === "results" ? (
 					<>
@@ -566,19 +566,11 @@ function ArticleFinderPage() {
 							</div>
 						</div>
 
-						<div className="space-y-2.5 border-t pt-4 text-sm">
+						<div className="border-t pt-4 text-sm">
 							<label className="flex cursor-pointer items-center justify-between gap-4">
-								<span>
-									Skip articles that already mention {brand?.name ?? "the brand"}
-									<span className="ml-1 text-xs text-muted-foreground">(fewer wasted fetches, not just hidden)</span>
-								</span>
+								<span>Skip articles that already mention {brand?.name ?? "the brand"}</span>
 								<Switch checked={excludeBrandMentions} onCheckedChange={setExcludeBrandMentions} disabled={busy} />
 							</label>
-							<p className="text-xs text-muted-foreground">
-								We cast as wide a net as we can, then vet every result. Depth controls how wide, more depth means more
-								results and a higher cost per search. Affiliate status is a filter on the results screen, not a setting
-								here.
-							</p>
 						</div>
 
 						{error && <p className="text-sm text-destructive">{error}</p>}
