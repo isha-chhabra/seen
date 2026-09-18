@@ -12,7 +12,7 @@ import { IconAlertTriangle, IconArrowUpRight, IconCircleCheck, IconX } from "@ta
 import { Link, useLocation, useParams } from "@tanstack/react-router";
 import { Progress } from "@workspace/ui/components/progress";
 import { cn } from "@workspace/ui/lib/utils";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getArticleSearchStatusFn } from "@/server/article-finder";
 
 const POLL_MS = 4_000;
@@ -34,7 +34,32 @@ export function ArticleSearchStatusBar() {
 	const { pathname } = useLocation();
 	const [status, setStatus] = useState<Status>(null);
 	const [dismissedId, setDismissedId] = useState<string | null>(null);
+	const [seenLoaded, setSeenLoaded] = useState(false);
 	const autoDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	// Which finished run was last shown/dismissed is remembered per brand in
+	// this browser, so a completed search pops up once, not on every page load.
+	const seenKey = `article-search-seen:${brandId}`;
+	useEffect(() => {
+		try {
+			setDismissedId(localStorage.getItem(seenKey));
+		} catch {
+			/* storage unavailable: fall back to in-memory only */
+		}
+		setSeenLoaded(true);
+	}, [seenKey]);
+
+	const markSeen = useCallback(
+		(id: string) => {
+			setDismissedId(id);
+			try {
+				localStorage.setItem(seenKey, id);
+			} catch {
+				/* storage unavailable */
+			}
+		},
+		[seenKey],
+	);
 
 	useEffect(() => {
 		if (!brandId) return;
@@ -55,14 +80,23 @@ export function ArticleSearchStatusBar() {
 	useEffect(() => {
 		if (!status || status.status === "running") return;
 		if (status.id === dismissedId) return;
-		autoDismissTimer.current = setTimeout(() => setDismissedId(status.id), AUTO_DISMISS_MS);
+		autoDismissTimer.current = setTimeout(() => markSeen(status.id), AUTO_DISMISS_MS);
 		return () => {
 			if (autoDismissTimer.current) clearTimeout(autoDismissTimer.current);
 		};
-	}, [status, dismissedId]);
+	}, [status, dismissedId, markSeen]);
 
 	const onArticleFinderPage = pathname.includes("/article-finder");
-	if (!brandId || !status || status.id === dismissedId) return null;
+
+	// a result that lands while you're on the Article Finder page is already
+	// shown inline there, so count it as seen instead of popping up later
+	useEffect(() => {
+		if (onArticleFinderPage && status && status.status !== "running" && status.id !== dismissedId) {
+			markSeen(status.id);
+		}
+	}, [onArticleFinderPage, status, dismissedId, markSeen]);
+
+	if (!brandId || !seenLoaded || !status || status.id === dismissedId) return null;
 	// the Article Finder page itself already renders this state inline once a
 	// result lands, no need for a floating duplicate on top of it
 	if (onArticleFinderPage && status.status !== "running") return null;
@@ -103,7 +137,7 @@ export function ArticleSearchStatusBar() {
 						</div>
 						<Link
 							to={`/app/${brandId}/article-finder`}
-							onClick={() => setDismissedId(status.id)}
+							onClick={() => markSeen(status.id)}
 							className="flex shrink-0 items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-transform hover:scale-105"
 						>
 							View
@@ -111,7 +145,7 @@ export function ArticleSearchStatusBar() {
 						</Link>
 						<button
 							type="button"
-							onClick={() => setDismissedId(status.id)}
+							onClick={() => markSeen(status.id)}
 							aria-label="Dismiss"
 							className="shrink-0 text-neutral-500 hover:text-neutral-200"
 						>
@@ -129,14 +163,14 @@ export function ArticleSearchStatusBar() {
 						</div>
 						<Link
 							to={`/app/${brandId}/article-finder`}
-							onClick={() => setDismissedId(status.id)}
+							onClick={() => markSeen(status.id)}
 							className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-transform hover:scale-105"
 						>
 							Retry
 						</Link>
 						<button
 							type="button"
-							onClick={() => setDismissedId(status.id)}
+							onClick={() => markSeen(status.id)}
 							aria-label="Dismiss"
 							className="shrink-0 text-neutral-500 hover:text-neutral-200"
 						>
