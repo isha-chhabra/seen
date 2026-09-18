@@ -71,32 +71,34 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Seen palette. Dark purple base (not a light theme with a dark option —
-   this IS the app's one look now), with real multi-color accents instead of
-   a single hue: violet as primary (buttons, active state, focus), and a
-   distinct color per data category (violet/blue/orange/sage/yellow) so
-   stats and chart series each get their own identity, the way the reference
-   dashboard's per-metric colored rings do. Yellow still exists but as one
-   accent among several, not the dominant color.
+   Seen palette. Dark purple base with an explicit LAYER system, not one
+   purple repeated at slightly different opacities: --background is a
+   near-neutral dark slate (barely purple, recedes), --sidebar is darker and
+   even more neutral still (chrome, not content), --card is a distinctly
+   richer/more saturated violet-navy (a real step up in both lightness and
+   chroma so it reads as its own surface), --secondary/--accent step lighter
+   again for a third tier. Multi-color accents (violet/blue/orange/sage/
+   yellow) each map to one data category. Yellow is tuned toward gold rather
+   than lemon so it sits with violet instead of fighting its cool undertone.
    --highlight-* is the violet-tint surface used for callouts, active nav and
    selected rows.
    --------------------------------------------------------------------------- */
 :root {
 	--radius: 0.625rem;
-	--background: oklch(0.24 0.025 295);
+	--background: oklch(0.17 0.016 278);
 	--foreground: oklch(0.96 0.006 290);
-	--card: oklch(0.28 0.028 292);
+	--card: oklch(0.27 0.048 288);
 	--card-foreground: oklch(0.96 0.006 290);
-	--popover: oklch(0.26 0.03 292);
+	--popover: oklch(0.3 0.05 290);
 	--popover-foreground: oklch(0.96 0.006 290);
 	--primary: oklch(0.62 0.22 295);
 	--primary-foreground: oklch(0.98 0.004 290);
-	--primary-gradient-to: oklch(0.66 0.22 335);
-	--secondary: oklch(0.32 0.028 292);
-	--secondary-foreground: oklch(0.94 0.006 290);
-	--muted: oklch(0.3 0.025 292);
-	--muted-foreground: oklch(0.72 0.02 288);
-	--accent: oklch(0.34 0.032 292);
+	--primary-gradient-to: oklch(0.72 0.15 205);
+	--secondary: oklch(0.35 0.045 285);
+	--secondary-foreground: oklch(0.95 0.006 290);
+	--muted: oklch(0.3 0.035 285);
+	--muted-foreground: oklch(0.74 0.02 285);
+	--accent: oklch(0.38 0.05 285);
 	--accent-foreground: oklch(0.96 0.006 290);
 	--destructive: oklch(0.65 0.21 25);
 	--border: oklch(1 0 0 / 10%);
@@ -106,17 +108,17 @@
 	--chart-2: oklch(0.68 0.16 245);
 	--chart-3: oklch(0.72 0.17 55);
 	--chart-4: oklch(0.75 0.14 165);
-	--chart-5: oklch(0.85 0.16 96);
+	--chart-5: oklch(0.82 0.13 85);
 	--highlight: oklch(0.34 0.07 295);
 	--highlight-foreground: oklch(0.87 0.12 295);
 	--highlight-border: oklch(0.46 0.11 295);
-	--sidebar: oklch(0.2 0.026 294);
-	--sidebar-foreground: oklch(0.96 0.006 290);
+	--sidebar: oklch(0.13 0.014 275);
+	--sidebar-foreground: oklch(0.94 0.006 290);
 	--sidebar-primary: oklch(0.62 0.22 295);
 	--sidebar-primary-foreground: oklch(0.98 0.004 290);
-	--sidebar-accent: oklch(0.3 0.03 292);
+	--sidebar-accent: oklch(0.3 0.04 288);
 	--sidebar-accent-foreground: oklch(0.96 0.006 290);
-	--sidebar-border: oklch(1 0 0 / 8%);
+	--sidebar-border: oklch(1 0 0 / 7%);
 	--sidebar-ring: oklch(0.68 0.2 295);
 }
 
@@ -136,8 +138,8 @@
 		   Fixed so it doesn't scroll or retile with page content. */
 		background-image:
 			radial-gradient(60rem 40rem at 8% -10%, oklch(0.5 0.16 295 / 35%), transparent 60%),
-			radial-gradient(50rem 36rem at 100% 0%, oklch(0.55 0.16 335 / 28%), transparent 60%),
-			radial-gradient(55rem 40rem at 15% 110%, oklch(0.5 0.14 245 / 22%), transparent 65%);
+			radial-gradient(50rem 36rem at 100% 0%, oklch(0.55 0.14 205 / 26%), transparent 60%),
+			radial-gradient(55rem 40rem at 15% 110%, oklch(0.5 0.14 250 / 22%), transparent 65%);
 		background-attachment: fixed;
 		background-repeat: no-repeat;
 	}
@@ -200,40 +202,42 @@
 	--radius: 0.75rem;
 }
 
-/* Every surface reads as glass over the mesh-gradient body — cards and the
-   sidebar included this time, not just floating overlays, per explicit
-   direction: this theme wants "liquid glass purple", not flat panels on a
-   flat background. Cards use a lighter blur/opacity than true overlays
-   (popovers, dialogs) since they sit in the page flow and still need to
-   hold dense content legibly. */
+/* Glass in the right amount means most surfaces are solid — glass everywhere
+   just washes color out and flattens the layering. Cards and the sidebar are
+   near-opaque, richly colored panels (a top sheen highlight gives them a
+   touch of glassy dimension without seeing through them); real glass —
+   strong blur, real transparency — is reserved for the few things that
+   actually float above the page: dropdowns, popovers, dialogs, sheets. */
 [data-slot="card"] {
-	background-color: color-mix(in oklch, var(--card) 62%, transparent);
-	border-color: oklch(1 0 0 / 0.08);
-	backdrop-filter: blur(20px);
-	-webkit-backdrop-filter: blur(20px);
+	background-color: color-mix(in oklch, var(--card) 94%, transparent);
+	background-image: linear-gradient(180deg, oklch(1 0 0 / 7%), transparent 45%);
+	border-color: oklch(1 0 0 / 0.09);
+	backdrop-filter: blur(6px);
+	-webkit-backdrop-filter: blur(6px);
 	box-shadow:
 		0 1px 2px oklch(0 0 0 / 0.3),
-		0 10px 28px -6px oklch(0 0 0 / 0.45);
+		0 12px 32px -8px oklch(0.2 0.08 295 / 0.5);
 }
 
 [data-slot="sidebar"] {
-	background-color: color-mix(in oklch, var(--sidebar) 70%, transparent);
-	backdrop-filter: blur(24px);
-	-webkit-backdrop-filter: blur(24px);
+	background-color: color-mix(in oklch, var(--sidebar) 96%, transparent);
+	backdrop-filter: blur(6px);
+	-webkit-backdrop-filter: blur(6px);
 }
 
-/* Overlays float highest, so they get the strongest blur + most transparency. */
+/* Overlays float highest, so they alone get strong blur + real transparency. */
 [data-slot="popover-content"],
 [data-slot="dropdown-menu-content"],
 [data-slot="select-content"],
 [data-slot="dialog-content"],
 [data-slot="sheet-content"] {
-	background-color: color-mix(in oklch, var(--popover) 75%, transparent);
-	backdrop-filter: blur(16px);
-	-webkit-backdrop-filter: blur(16px);
+	background-color: color-mix(in oklch, var(--popover) 72%, transparent);
+	background-image: linear-gradient(160deg, oklch(1 0 0 / 8%), transparent 50%);
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
 	box-shadow:
-		0 2px 4px oklch(0 0 0 / 0.05),
-		0 12px 32px -6px oklch(0 0 0 / 0.12);
+		0 2px 4px oklch(0 0 0 / 0.15),
+		0 16px 40px -8px oklch(0.15 0.1 295 / 0.55);
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -245,6 +249,7 @@
 	[data-slot="dialog-content"],
 	[data-slot="sheet-content"] {
 		background-color: var(--card);
+		background-image: none;
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;
 	}
