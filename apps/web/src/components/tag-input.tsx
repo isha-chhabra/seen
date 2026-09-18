@@ -51,7 +51,12 @@ export function TagInput({
 			)}
 		>
 			{values.map((v, i) => (
-				<Badge key={v} variant="outline" className="tag-chip gap-1 py-1 pl-2.5 pr-1.5 text-xs font-normal">
+				<Badge
+					key={v}
+					variant="outline"
+					className="tag-chip gap-1 py-1 pl-2.5 pr-1.5 text-xs font-normal"
+					style={{ "--tag-color": `var(--chart-${(i % 5) + 1})` } as React.CSSProperties}
+				>
 					{v}
 					{!disabled && (
 						<button

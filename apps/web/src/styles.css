@@ -401,12 +401,12 @@
 	}
 }
 
-/* Query/direction tag chips use a real second accent (gold, from the chart
-   palette) instead of --secondary (purple-family) — CTAs and structural
-   chrome stay the theme's lavender per spec, but the one thing you're
-   actively typing into shouldn't be one more purple surface. */
+/* Query/direction tag chips cycle through the chart palette (one color per
+   tag, set inline as --tag-color) instead of every tag being the same
+   color — CTAs and structural chrome stay the theme's lavender per spec,
+   but the tags you're actively typing shouldn't be one flat wash either. */
 .tag-chip {
-	background-color: color-mix(in oklch, var(--chart-2) 20%, transparent);
-	color: var(--chart-2);
-	border-color: color-mix(in oklch, var(--chart-2) 45%, transparent);
+	background-color: color-mix(in oklch, var(--tag-color, var(--chart-2)) 20%, transparent);
+	color: var(--tag-color, var(--chart-2));
+	border-color: color-mix(in oklch, var(--tag-color, var(--chart-2)) 45%, transparent);
 }
