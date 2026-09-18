@@ -197,7 +197,7 @@ function ResultRow({ r, brandName }: { r: ArticleResult; brandName?: string }) {
 							>
 								<IconMail className="size-4" />
 							</TooltipTrigger>
-							<TooltipContent>{isEmail ? r.contactHint : "Contact / submissions"}</TooltipContent>
+							<TooltipContent>{isEmail ? r.contactHint : "Contact page"}</TooltipContent>
 						</Tooltip>
 					)}
 					<a
@@ -366,7 +366,7 @@ function ArticleFinderPage() {
 			setQueries(res.queries.map((q) => ({ query: q.query, angle: q.angle, on: true })));
 			setPhase("queries");
 		} catch (e) {
-			setError(e instanceof Error ? e.message : "Couldn't generate queries.");
+			setError(e instanceof Error ? e.message : "Couldn't generate queries. Try again.");
 		} finally {
 			setBusy(false);
 		}
@@ -401,7 +401,7 @@ function ArticleFinderPage() {
 			// connection with the server still working) — but the poll above is
 			// still running, so if the server actually did finish and save, it'll
 			// still pick the result up. Only show the error state if it doesn't.
-			setError(e instanceof Error ? e.message : "Search failed, or the connection dropped, still checking…");
+			setError(e instanceof Error ? e.message : "Connection lost. Still checking in the background, no need to retry.");
 		} finally {
 			setBusy(false);
 		}
@@ -502,18 +502,18 @@ function ArticleFinderPage() {
 	return (
 		<PageHeader
 			title="Article Finder"
-			subtitle="Western-market articles to pitch this brand to, cast a wide net and vetted for topical fit."
-			infoContent="We expand your direction into many angled Google searches, drop results outside the US/Canada/UK/Europe/Australia/NZ and retailer/syndicated results, fetch and read the survivors, then check the best hits for other roundups on that same publisher. Every result is tagged for whether it mentions the brand and whether it shows real affiliate links, filter either on the results screen. The last run is saved, so reopening this tab is free."
+			subtitle="Western-market articles to pitch this brand to — a wide net, vetted for topical fit."
+			infoContent="We expand your direction into many angled Google searches. Results outside the US, Canada, UK, Europe, Australia and NZ are dropped, along with retailers and syndicated copies. We read every survivor, then check the best hits for other roundups on that same publisher. Each result is tagged for brand mentions and affiliate links, filter either on the results screen. The last run is saved, so reopening this tab is free."
 			actions={
 				phase === "results" ? (
 					<>
 						{queries.length > 0 && (
 							<Button variant="ghost" size="sm" onClick={() => setPhase("queries")}>
-								Queries
+								Edit queries
 							</Button>
 						)}
 						<Button variant="ghost" size="sm" onClick={exportCsv} disabled={totalResults === 0 || isViewer}>
-							Export
+							Export CSV
 						</Button>
 						<Button variant="outline" size="sm" onClick={newSearch}>
 							New search
@@ -525,14 +525,20 @@ function ArticleFinderPage() {
 			<div className={phase === "results" ? "max-w-[1400px]" : "max-w-2xl"}>
 				{phase === "idle" && (
 					<div className="space-y-5">
-						<Textarea
-							rows={3}
-							className="resize-none text-[15px] leading-relaxed"
-							placeholder="Describe the articles you want to pitch this brand to. e.g. gift guides and roundups for premium steaks and meat boxes"
-							value={direction}
-							onChange={(e) => setDirection(e.target.value)}
-							disabled={busy}
-						/>
+						<div className="space-y-1.5">
+							<label htmlFor="af-direction" className="text-sm font-medium">
+								What kind of articles are you looking for?
+							</label>
+							<Textarea
+								id="af-direction"
+								rows={3}
+								className="resize-none text-[15px] leading-relaxed"
+								placeholder="e.g. gift guides and roundups for premium steaks and meat boxes"
+								value={direction}
+								onChange={(e) => setDirection(e.target.value)}
+								disabled={busy}
+							/>
+						</div>
 
 						<div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
 							<div className="flex items-center gap-2">
@@ -563,17 +569,15 @@ function ArticleFinderPage() {
 						<div className="space-y-2.5 border-t pt-4 text-sm">
 							<label className="flex cursor-pointer items-center justify-between gap-4">
 								<span>
-									Skip articles that already mention {brand?.name ?? "the brand"}{" "}
-									<span className="text-xs text-muted-foreground">
-										(cheaper: fewer wasted fetches, not just hidden)
-									</span>
+									Skip articles that already mention {brand?.name ?? "the brand"}
+									<span className="ml-1 text-xs text-muted-foreground">(fewer wasted fetches, not just hidden)</span>
 								</span>
 								<Switch checked={excludeBrandMentions} onCheckedChange={setExcludeBrandMentions} disabled={busy} />
 							</label>
 							<p className="text-xs text-muted-foreground">
-								We cast as wide a net as we can, dedupe and vet the results, then check the best hits for other roundups
-								on that same publisher. Whether it's affiliate-monetized is a filter on the results screen, not a
-								setting here, more depth means a wider net and a higher cost per search.
+								We cast as wide a net as we can, then vet every result. Depth controls how wide, more depth means more
+								results and a higher cost per search. Affiliate status is a filter on the results screen, not a setting
+								here.
 							</p>
 						</div>
 
@@ -630,6 +634,7 @@ function ArticleFinderPage() {
 							<div className="flex items-center gap-2">
 								<input
 									type="text"
+									aria-label="Add a custom search query"
 									value={newQuery}
 									onChange={(e) => setNewQuery(e.target.value)}
 									onKeyDown={(e) => {
@@ -665,9 +670,9 @@ function ArticleFinderPage() {
 						</Button>
 						{phase === "searching" && (
 							<p className="text-xs text-muted-foreground">
-								Usually 3-6 minutes. It's still running on the server even if your connection drops, this tab checks in
-								the background and will pick the result up on its own, no refresh needed. If you do close this tab,
-								reopening the page later shows the finished run too.
+								Usually 3-6 minutes. It keeps running on the server even if your connection drops, this tab checks in
+								the background and picks up the result on its own. Closing the tab is fine too, reopening the page later
+								shows the finished run.
 							</p>
 						)}
 						{phase === "searching" && error && <p className="text-sm text-destructive">{error}</p>}
@@ -743,7 +748,7 @@ function ArticleFinderPage() {
 								<PopoverTrigger
 									render={
 										<TriggerButton
-											label="Affiliate status"
+											label="Affiliate"
 											icon={<IconLink className="size-3.5" />}
 											active={affiliateFilter.size < 3}
 											badgeCount={affiliateFilter.size}
@@ -814,7 +819,7 @@ function ArticleFinderPage() {
 						{totalResults === 0 ? (
 							<EmptyState
 								icon={IconSearch}
-								title="Nothing cleared vetting"
+								title="No articles found"
 								description="Try a broader direction, a wider date range, or more depth."
 							/>
 						) : filteredCount === 0 ? (
@@ -830,7 +835,7 @@ function ArticleFinderPage() {
 										<TableRow className="hover:bg-transparent">
 											<TableHead className="w-14">Score</TableHead>
 											<TableHead>Article</TableHead>
-											<TableHead>Status</TableHead>
+											<TableHead>Signals</TableHead>
 											<TableHead className="w-16 text-right">Open</TableHead>
 										</TableRow>
 									</TableHeader>
