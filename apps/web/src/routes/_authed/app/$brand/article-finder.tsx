@@ -23,12 +23,9 @@ import { Calendar } from "@workspace/ui/components/calendar";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import {
 	DropdownMenu,
-	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
-	DropdownMenuLabel,
 	DropdownMenuRadioGroup,
 	DropdownMenuRadioItem,
-	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@workspace/ui/components/input-group";
@@ -146,7 +143,12 @@ function ResultRow({ r, brandName }: { r: ArticleResult; brandName?: string }) {
 	const isEmail = r.contactHint?.includes("@") && !r.contactHint.startsWith("http");
 	const meta = [r.domain, r.publishedDate || null].filter(Boolean).join("  ·  ");
 	return (
-		<TableRow>
+		<TableRow
+			className={cn(
+				"border-l-2",
+				r.fitScore >= 80 ? "border-l-emerald-500" : r.fitScore >= 55 ? "border-l-primary" : "border-l-transparent",
+			)}
+		>
 			<TableCell className="w-14 py-3 align-top">
 				<ScoreBadge score={r.fitScore} />
 			</TableCell>
@@ -245,6 +247,7 @@ function ArticleFinderPage() {
 		() => new Set(["yes", "unsure"]),
 	);
 	const [sortBy, setSortBy] = useState<"score_desc" | "score_asc" | "date_desc" | "domain_asc">("score_desc");
+	const [affiliateOpen, setAffiliateOpen] = useState(false);
 
 	// The search itself is a single long HTTP call (can run several minutes with
 	// the wider net + outward crawl) — if the connection drops (laptop sleeps,
@@ -458,6 +461,26 @@ function ArticleFinderPage() {
 		URL.revokeObjectURL(url);
 	}
 
+	// Single source of truth for each dropdown's option labels, so the trigger
+	// button text and the menu items it opens can never drift out of sync
+	// (sentence case throughout: first word capitalized, proper nouns aside).
+	const tierLabels: Record<typeof tierFilter, string> = {
+		all: "All tiers",
+		high_authority: "High authority",
+		niche_blog: "Niche & blog",
+	};
+	const mentionLabels: Record<typeof mentionFilter, string> = {
+		all: "Any mentions",
+		mentioned: `Mentions ${brand?.name ?? "brand"}`,
+		unmentioned: `Doesn't mention ${brand?.name ?? "brand"}`,
+	};
+	const sortLabels: Record<typeof sortBy, string> = {
+		score_desc: "Score, high to low",
+		score_asc: "Score, low to high",
+		date_desc: "Newest published",
+		domain_asc: "Domain, A to Z",
+	};
+
 	const dropParts = stats
 		? [
 				stats.droppedOffTopic ? `${stats.droppedOffTopic} off-topic` : "",
@@ -660,7 +683,7 @@ function ArticleFinderPage() {
 						)}
 
 						{/* Toolbar */}
-						<div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2">
+						<div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2 shadow-xs">
 							<InputGroup className="h-8 w-full sm:w-64">
 								<InputGroupInput
 									value={searchText}
@@ -682,117 +705,89 @@ function ArticleFinderPage() {
 
 							<DropdownMenu>
 								<DropdownMenuTrigger
-									render={
-										<TriggerButton
-											label={
-												tierFilter === "all"
-													? "All tiers"
-													: tierFilter === "high_authority"
-														? "High authority"
-														: "Niche & blog"
-											}
-											active={tierFilter !== "all"}
-										/>
-									}
+									render={<TriggerButton label={tierLabels[tierFilter]} active={tierFilter !== "all"} />}
 								/>
 								<DropdownMenuContent align="start">
 									<DropdownMenuRadioGroup
 										value={tierFilter}
 										onValueChange={(v) => setTierFilter(v as typeof tierFilter)}
 									>
-										<DropdownMenuRadioItem value="all">All tiers</DropdownMenuRadioItem>
-										<DropdownMenuRadioItem value="high_authority">High authority</DropdownMenuRadioItem>
-										<DropdownMenuRadioItem value="niche_blog">Niche & blog</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="all">{tierLabels.all}</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="high_authority">{tierLabels.high_authority}</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="niche_blog">{tierLabels.niche_blog}</DropdownMenuRadioItem>
 									</DropdownMenuRadioGroup>
 								</DropdownMenuContent>
 							</DropdownMenu>
 
 							<DropdownMenu>
 								<DropdownMenuTrigger
-									render={
-										<TriggerButton
-											label={
-												mentionFilter === "all"
-													? `Mentions ${brand?.name ?? "brand"}: any`
-													: mentionFilter === "mentioned"
-														? `Mentions ${brand?.name ?? "brand"}`
-														: `Doesn't mention ${brand?.name ?? "brand"}`
-											}
-											active={mentionFilter !== "all"}
-										/>
-									}
+									render={<TriggerButton label={mentionLabels[mentionFilter]} active={mentionFilter !== "all"} />}
 								/>
 								<DropdownMenuContent align="start">
 									<DropdownMenuRadioGroup
 										value={mentionFilter}
 										onValueChange={(v) => setMentionFilter(v as typeof mentionFilter)}
 									>
-										<DropdownMenuRadioItem value="all">Any</DropdownMenuRadioItem>
-										<DropdownMenuRadioItem value="mentioned">Mentions {brand?.name ?? "brand"}</DropdownMenuRadioItem>
-										<DropdownMenuRadioItem value="unmentioned">
-											Doesn't mention {brand?.name ?? "brand"}
-										</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="all">{mentionLabels.all}</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="mentioned">{mentionLabels.mentioned}</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="unmentioned">{mentionLabels.unmentioned}</DropdownMenuRadioItem>
 									</DropdownMenuRadioGroup>
 								</DropdownMenuContent>
 							</DropdownMenu>
 
-							<DropdownMenu>
-								<DropdownMenuTrigger
+							{/* Popover + Checkbox, not DropdownMenuCheckboxItem: mirrors the proven
+							    multi-select pattern from @/components/filter-bar's TagsDropdown
+							    rather than a menu-checkbox-item combination untested elsewhere in
+							    this app. */}
+							<Popover open={affiliateOpen} onOpenChange={setAffiliateOpen} modal={false}>
+								<PopoverTrigger
 									render={
 										<TriggerButton
-											label="Affiliate"
+											label="Affiliate status"
 											icon={<IconLink className="size-3.5" />}
 											active={affiliateFilter.size < 3}
 											badgeCount={affiliateFilter.size}
 										/>
 									}
 								/>
-								<DropdownMenuContent align="start">
-									<DropdownMenuLabel>Affiliate status</DropdownMenuLabel>
-									<DropdownMenuSeparator />
-									<DropdownMenuCheckboxItem
-										checked={affiliateFilter.has("yes")}
-										onCheckedChange={() => toggleAffiliateFilter("yes")}
-									>
-										Confirmed
-									</DropdownMenuCheckboxItem>
-									<DropdownMenuCheckboxItem
-										checked={affiliateFilter.has("unsure")}
-										onCheckedChange={() => toggleAffiliateFilter("unsure")}
-									>
-										Unsure
-									</DropdownMenuCheckboxItem>
-									<DropdownMenuCheckboxItem
-										checked={affiliateFilter.has("no")}
-										onCheckedChange={() => toggleAffiliateFilter("no")}
-									>
-										Not affiliate
-									</DropdownMenuCheckboxItem>
-								</DropdownMenuContent>
-							</DropdownMenu>
+								<PopoverContent align="start" className="w-52 p-1">
+									{(
+										[
+											["yes", "Confirmed"],
+											["unsure", "Unsure"],
+											["no", "Not affiliate"],
+										] as const
+									).map(([value, label]) => {
+										const checked = affiliateFilter.has(value);
+										return (
+											<button
+												key={value}
+												type="button"
+												onClick={(e) => {
+													e.preventDefault();
+													toggleAffiliateFilter(value);
+												}}
+												className={cn(
+													"flex w-full cursor-pointer items-center gap-2.5 rounded-sm px-2 py-1.5 text-left text-sm",
+													checked ? "bg-accent" : "hover:bg-muted",
+												)}
+											>
+												<Checkbox checked={checked} className="pointer-events-none" />
+												<span className="flex-1">{label}</span>
+											</button>
+										);
+									})}
+								</PopoverContent>
+							</Popover>
 
 							<DropdownMenu>
-								<DropdownMenuTrigger
-									render={
-										<TriggerButton
-											label={
-												sortBy === "score_desc"
-													? "Score, high to low"
-													: sortBy === "score_asc"
-														? "Score, low to high"
-														: sortBy === "date_desc"
-															? "Newest published"
-															: "Domain, A-Z"
-											}
-										/>
-									}
-								/>
+								<DropdownMenuTrigger render={<TriggerButton label={sortLabels[sortBy]} />} />
 								<DropdownMenuContent align="start">
 									<DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-										<DropdownMenuRadioItem value="score_desc">Score, high to low</DropdownMenuRadioItem>
-										<DropdownMenuRadioItem value="score_asc">Score, low to high</DropdownMenuRadioItem>
-										<DropdownMenuRadioItem value="date_desc">Newest published</DropdownMenuRadioItem>
-										<DropdownMenuRadioItem value="domain_asc">Domain, A-Z</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="score_desc">{sortLabels.score_desc}</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="score_asc">{sortLabels.score_asc}</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="date_desc">{sortLabels.date_desc}</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="domain_asc">{sortLabels.domain_asc}</DropdownMenuRadioItem>
 									</DropdownMenuRadioGroup>
 								</DropdownMenuContent>
 							</DropdownMenu>
@@ -829,7 +824,7 @@ function ArticleFinderPage() {
 								description="Loosen the filters above, the results are still there."
 							/>
 						) : (
-							<div className="overflow-x-auto rounded-lg border">
+							<div className="overflow-x-auto rounded-lg border shadow-xs">
 								<Table>
 									<TableHeader>
 										<TableRow className="hover:bg-transparent">
