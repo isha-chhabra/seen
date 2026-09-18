@@ -446,6 +446,35 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 		if (!brand) throw new Error("Brand not found");
 		const comps = await db.select().from(competitors).where(eq(competitors.brandId, data.brandId));
 
+		// A "running" marker row, visible to any tab under this brand (not just
+		// the one that clicked search) via getArticleSearchStatusFn, so the
+		// progress UI survives navigating away and back. Finalized to "done" (or
+		// "error") below once the pipeline actually finishes.
+		const [runRow] = await db
+			.insert(brandArticleSearches)
+			.values({
+				brandId: data.brandId,
+				direction: (data.direction?.trim() || data.queries.map((q) => q.query).join("; ")).slice(0, 500),
+				periodStart: data.from,
+				periodEnd: data.to,
+				pagesPerSearch: data.pagesPerSearch,
+				freshOnly: true,
+				queries: data.queries,
+				payload: {},
+				createdBy: session.user.name?.trim() || session.user.email || "a teammate",
+				status: "running",
+				stage: "Planning the search",
+				progressPct: 5,
+			})
+			.returning({ id: brandArticleSearches.id });
+		const runId = runRow.id;
+		const setStage = (stage: string, progressPct: number) =>
+			db
+				.update(brandArticleSearches)
+				.set({ stage, progressPct, updatedAt: new Date() })
+				.where(eq(brandArticleSearches.id, runId))
+				.catch(() => {});
+
 		const wordRe = (term: string) =>
 			new RegExp(`(?:^|[^a-z0-9])${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:$|[^a-z0-9])`, "i");
 
@@ -661,274 +690,281 @@ export const findArticlesFn = createServerFn({ method: "POST" })
 			return byUrl;
 		}
 
-		// 1. SERP fan-out
-		const queries = data.queries.slice(0, MAX_QUERIES);
-		const serpTasks: { query: string; page: number }[] = [];
-		for (const q of queries) {
-			for (let p = 0; p < data.pagesPerSearch; p++) serpTasks.push({ query: q.query, page: p });
-		}
-		const serpBatches = await mapPool(serpTasks, SERP_CONCURRENCY, (t) =>
-			googleSerp(excludeSuffix ? `${t.query} ${excludeSuffix}` : t.query, t.page, {
-				from: data.from,
-				to: data.to,
-			}).then((rows) => rows.map((r) => ({ ...r, query: t.query }))),
-		);
-
-		// 2. dedupe + drop junk / non-Western / brand's & competitors' own sites
-		let candidates = filterCandidates(serpBatches.flat());
-		const afterJunk = candidates.length;
-		candidates.sort((a, b) => a.rank - b.rank);
-
-		// 3. collapse syndicated copies: same headline across >=2 distinct domains -> keep best-rank one
-		const byTitle = new Map<string, typeof candidates>();
-		for (const c of candidates) {
-			const k = normalizeTitleKey(c.title);
-			if (k.length < 12) continue;
-			const arr = byTitle.get(k) ?? [];
-			arr.push(c);
-			byTitle.set(k, arr);
-		}
-		const syndicatedDrop = new Set<string>();
-		for (const arr of byTitle.values()) {
-			const domains = new Set(arr.map((a) => extractDomain(a.url)));
-			if (domains.size >= 2) {
-				const best = arr.reduce((a, b) => (a.rank <= b.rank ? a : b));
-				for (const a of arr) if (a.url !== best.url) syndicatedDrop.add(a.url);
+		try {
+			// 1. SERP fan-out
+			await setStage("Searching the web", 10);
+			const queries = data.queries.slice(0, MAX_QUERIES);
+			const serpTasks: { query: string; page: number }[] = [];
+			for (const q of queries) {
+				for (let p = 0; p < data.pagesPerSearch; p++) serpTasks.push({ query: q.query, page: p });
 			}
-		}
-		candidates = candidates.filter((c) => !syndicatedDrop.has(c.url));
-
-		// 4. drop obvious retailers before spending an LLM/fetch on them
-		candidates = dropRetailers(candidates);
-		const afterRetail = candidates.length;
-
-		// 5. fetch every survivor (rank-ordered, capped) + scan page HTML. No more
-		// cheap title/snippet pre-cut, see file header for why.
-		const toFetch = candidates
-			.slice()
-			.sort((a, b) => a.rank - b.rank)
-			.slice(0, MAX_FETCHES);
-		const fetched1 = await mapPool(toFetch, FETCH_CONCURRENCY, (c) => fetchOneCandidate(c, false));
-		const survivors1 = fetched1.filter((x): x is Survivor => x !== null);
-
-		// 6. LLM vetting pass, first wave
-		const byUrl1 = await judgeAll(survivors1);
-
-		// 7. outward crawl: for the best hits so far, check that same publisher for
-		// other roundup pages (a scoped site: search + internal links already sitting
-		// on the page we fetched) and run those candidates through the same
-		// filter/fetch/judge pipeline. This is what finds the long tail a single
-		// round of Google queries never surfaces.
-		const ranked1 = survivors1
-			.map((s) => ({ s, score: byUrl1.get(s.url)?.fitScore ?? 50, relevance: byUrl1.get(s.url)?.relevance }))
-			.filter((r) => r.relevance !== "off_topic")
-			.sort((a, b) => b.score - a.score);
-		const expandDomains: string[] = [];
-		const seenDomains = new Set<string>();
-		for (const { s } of ranked1) {
-			if (seenDomains.has(s.domain)) continue;
-			seenDomains.add(s.domain);
-			expandDomains.push(s.domain);
-			if (expandDomains.length >= CRAWL_EXPAND_DOMAINS) break;
-		}
-
-		let survivors2: Survivor[] = [];
-		let byUrl2 = new Map<string, ArticleJudgement>();
-		if (expandDomains.length > 0) {
-			const siteQueryBatches = await mapPool(expandDomains, SERP_CONCURRENCY, (domain) =>
-				googleSerp(`${userDirection}${excludeSuffix ? ` ${excludeSuffix}` : ""} site:${domain}`, 0, {
+			const serpBatches = await mapPool(serpTasks, SERP_CONCURRENCY, (t) =>
+				googleSerp(excludeSuffix ? `${t.query} ${excludeSuffix}` : t.query, t.page, {
 					from: data.from,
 					to: data.to,
-				})
-					.then((rows) => rows.map((r) => ({ ...r, query: `site:${domain}` })))
-					.catch(() => [] as Candidate[]),
+				}).then((rows) => rows.map((r) => ({ ...r, query: t.query }))),
 			);
-			const internalLinkRows: Candidate[] = ranked1
-				.filter(({ s }) => expandDomains.includes(s.domain))
-				.flatMap(({ s }) =>
-					s.internalLinks.map((l) => ({
-						title: l.text || s.domain,
-						url: l.url,
-						snippet: "",
-						rank: 500,
-						query: `linked from ${s.domain}`,
-					})),
-				);
-			let expansionCandidates = filterCandidates([...siteQueryBatches.flat(), ...internalLinkRows]);
-			expansionCandidates = dropRetailers(expansionCandidates)
+
+			// 2. dedupe + drop junk / non-Western / brand's & competitors' own sites
+			let candidates = filterCandidates(serpBatches.flat());
+			const afterJunk = candidates.length;
+			candidates.sort((a, b) => a.rank - b.rank);
+
+			// 3. collapse syndicated copies: same headline across >=2 distinct domains -> keep best-rank one
+			const byTitle = new Map<string, typeof candidates>();
+			for (const c of candidates) {
+				const k = normalizeTitleKey(c.title);
+				if (k.length < 12) continue;
+				const arr = byTitle.get(k) ?? [];
+				arr.push(c);
+				byTitle.set(k, arr);
+			}
+			const syndicatedDrop = new Set<string>();
+			for (const arr of byTitle.values()) {
+				const domains = new Set(arr.map((a) => extractDomain(a.url)));
+				if (domains.size >= 2) {
+					const best = arr.reduce((a, b) => (a.rank <= b.rank ? a : b));
+					for (const a of arr) if (a.url !== best.url) syndicatedDrop.add(a.url);
+				}
+			}
+			candidates = candidates.filter((c) => !syndicatedDrop.has(c.url));
+
+			// 4. drop obvious retailers before spending an LLM/fetch on them
+			candidates = dropRetailers(candidates);
+			const afterRetail = candidates.length;
+
+			// 5. fetch every survivor (rank-ordered, capped) + scan page HTML. No more
+			// cheap title/snippet pre-cut, see file header for why.
+			const toFetch = candidates
+				.slice()
 				.sort((a, b) => a.rank - b.rank)
-				.slice(0, CRAWL_EXPAND_MAX_FETCHES);
-			const fetched2 = await mapPool(expansionCandidates, FETCH_CONCURRENCY, (c) => fetchOneCandidate(c, true));
-			survivors2 = fetched2.filter((x): x is Survivor => x !== null);
-			byUrl2 = await judgeAll(survivors2);
-		}
+				.slice(0, MAX_FETCHES);
+			await setStage(`Reading ${toFetch.length} articles`, 35);
+			const fetched1 = await mapPool(toFetch, FETCH_CONCURRENCY, (c) => fetchOneCandidate(c, false));
+			const survivors1 = fetched1.filter((x): x is Survivor => x !== null);
 
-		const survivors = [...survivors1, ...survivors2];
-		const byUrl = new Map<string, ArticleJudgement>([...byUrl1, ...byUrl2]);
-		const staleYear = new Date().getFullYear() - 2;
+			// 6. LLM vetting pass, first wave
+			await setStage("Vetting for fit", 60);
+			const byUrl1 = await judgeAll(survivors1);
 
-		/** Combine our own page-scan evidence with the LLM's read. Hard evidence
-		 *  (2+ tagged merchants, a competitor link, rel=sponsored, a known publisher)
-		 *  always wins as "yes"; disagreement or ambiguity lands in "unsure" rather
-		 *  than being forced into yes/no. */
-		function resolveAffiliateStatus(s: Survivor, j: ArticleJudgement | undefined): ArticleResult["affiliateStatus"] {
-			if (s.affiliateSignal === "yes") return "yes";
-			if (j?.affiliateEditorial === "yes") return "yes";
-			if (j?.affiliateEditorial === "no" && s.affiliateSignal === "no") return "no";
-			return "unsure";
-		}
-
-		const highAuthority: ArticleResult[] = [];
-		const nicheBlog: ArticleResult[] = [];
-		const drop = { offTopic: 0, nonWestern: 0, unvetted: 0, dupePublisher: 0 };
-		let affiliateYes = 0;
-		let affiliateNo = 0;
-		let affiliateUnsure = 0;
-		let mentionsBrand = 0;
-		for (const s of survivors) {
-			const j = byUrl.get(s.url);
-			const majorList = isMajorPublisher(s.domain, s.url);
-			const merchantCount = s.merchants.length;
-			// with no judgement, fall back to conservative keep for known publishers only
-			if (!j) {
-				if (!majorList && !s.signals.includes("known publisher") && !s.linksCompetitor && merchantCount < 2) {
-					drop.unvetted++;
-					continue;
-				}
-			} else {
-				if (j.relevance === "off_topic") {
-					drop.offTopic++;
-					continue;
-				}
-				if (!j.westernCentric && !majorList) {
-					drop.nonWestern++;
-					continue;
-				}
-				if (
-					j.relevance === "weak" &&
-					s.competitorsMentioned.length === 0 &&
-					!s.linksCompetitor &&
-					s.affiliateSignal !== "yes"
-				) {
-					drop.offTopic++;
-					continue;
-				}
+			// 7. outward crawl: for the best hits so far, check that same publisher for
+			// other roundup pages (a scoped site: search + internal links already sitting
+			// on the page we fetched) and run those candidates through the same
+			// filter/fetch/judge pipeline. This is what finds the long tail a single
+			// round of Google queries never surfaces.
+			const ranked1 = survivors1
+				.map((s) => ({ s, score: byUrl1.get(s.url)?.fitScore ?? 50, relevance: byUrl1.get(s.url)?.relevance }))
+				.filter((r) => r.relevance !== "off_topic")
+				.sort((a, b) => b.score - a.score);
+			const expandDomains: string[] = [];
+			const seenDomains = new Set<string>();
+			for (const { s } of ranked1) {
+				if (seenDomains.has(s.domain)) continue;
+				seenDomains.add(s.domain);
+				expandDomains.push(s.domain);
+				if (expandDomains.length >= CRAWL_EXPAND_DOMAINS) break;
 			}
 
-			let score = Math.max(0, Math.min(100, Math.round(j?.fitScore ?? (j?.relevance === "weak" ? 42 : 62))));
-			if (s.linksCompetitor) score = Math.max(score, 84);
-			else if (merchantCount >= 3) score = Math.max(score, 72);
-			else if (merchantCount >= 2) score = Math.max(score, 62);
+			let survivors2: Survivor[] = [];
+			let byUrl2 = new Map<string, ArticleJudgement>();
+			if (expandDomains.length > 0) {
+				await setStage(`Checking ${expandDomains.length} publishers for more`, 80);
+				const siteQueryBatches = await mapPool(expandDomains, SERP_CONCURRENCY, (domain) =>
+					googleSerp(`${userDirection}${excludeSuffix ? ` ${excludeSuffix}` : ""} site:${domain}`, 0, {
+						from: data.from,
+						to: data.to,
+					})
+						.then((rows) => rows.map((r) => ({ ...r, query: `site:${domain}` })))
+						.catch(() => [] as Candidate[]),
+				);
+				const internalLinkRows: Candidate[] = ranked1
+					.filter(({ s }) => expandDomains.includes(s.domain))
+					.flatMap(({ s }) =>
+						s.internalLinks.map((l) => ({
+							title: l.text || s.domain,
+							url: l.url,
+							snippet: "",
+							rank: 500,
+							query: `linked from ${s.domain}`,
+						})),
+					);
+				let expansionCandidates = filterCandidates([...siteQueryBatches.flat(), ...internalLinkRows]);
+				expansionCandidates = dropRetailers(expansionCandidates)
+					.sort((a, b) => a.rank - b.rank)
+					.slice(0, CRAWL_EXPAND_MAX_FETCHES);
+				const fetched2 = await mapPool(expansionCandidates, FETCH_CONCURRENCY, (c) => fetchOneCandidate(c, true));
+				survivors2 = fetched2.filter((x): x is Survivor => x !== null);
+				byUrl2 = await judgeAll(survivors2);
+			}
 
-			// staleness: an old roundup with no update signal is a weaker pitch, so
-			// penalize the score, don't drop it, broad recall over a hard cut here
-			const year = s.publishedDate ? Number(s.publishedDate.slice(0, 4)) : null;
-			if (year && year < staleYear && !s.linksCompetitor) score = Math.min(score, 44);
+			const survivors = [...survivors1, ...survivors2];
+			const byUrl = new Map<string, ArticleJudgement>([...byUrl1, ...byUrl2]);
+			const staleYear = new Date().getFullYear() - 2;
 
-			const affiliateStatus = resolveAffiliateStatus(s, j);
-			if (affiliateStatus === "yes") affiliateYes++;
-			else if (affiliateStatus === "no") affiliateNo++;
-			else affiliateUnsure++;
-			if (s.brandAlreadyMentioned) mentionsBrand++;
+			/** Combine our own page-scan evidence with the LLM's read. Hard evidence
+			 *  (2+ tagged merchants, a competitor link, rel=sponsored, a known publisher)
+			 *  always wins as "yes"; disagreement or ambiguity lands in "unsure" rather
+			 *  than being forced into yes/no. */
+			function resolveAffiliateStatus(s: Survivor, j: ArticleJudgement | undefined): ArticleResult["affiliateStatus"] {
+				if (s.affiliateSignal === "yes") return "yes";
+				if (j?.affiliateEditorial === "yes") return "yes";
+				if (j?.affiliateEditorial === "no" && s.affiliateSignal === "no") return "no";
+				return "unsure";
+			}
 
-			const row: ArticleResult = {
-				title: s.title,
-				url: s.url,
-				domain: s.domain,
-				tier: majorList ? "high_authority" : (j?.tier ?? "niche_blog"),
-				fitScore: score,
-				verdict: plain(
-					j?.outreachVerdict?.trim() ||
-						(s.linksCompetitor
-							? `Already affiliate-links a competitor, so they monetize this category and would very likely add ${brand.name}.`
-							: s.competitorsMentioned.length > 0
-								? `Features ${s.competitorsMentioned.join(", ")}, a natural fit to pitch ${brand.name} alongside them.`
-								: `${s.domain} runs affiliate roundups in this space; worth a pitch.`),
-				),
-				relevance: j?.relevance === "weak" ? "weak" : "strong",
-				affiliateStatus,
-				signals: s.signals,
-				merchants: s.merchants,
-				linksCompetitor: s.linksCompetitor,
-				publishedDate: s.publishedDate,
-				competitorsMentioned: s.competitorsMentioned,
-				brandAlreadyMentioned: s.brandAlreadyMentioned,
-				contactHint: s.contactHint,
-				query: s.query,
-				viaCrawl: s.viaCrawl,
+			const highAuthority: ArticleResult[] = [];
+			const nicheBlog: ArticleResult[] = [];
+			const drop = { offTopic: 0, nonWestern: 0, unvetted: 0, dupePublisher: 0 };
+			let affiliateYes = 0;
+			let affiliateNo = 0;
+			let affiliateUnsure = 0;
+			let mentionsBrand = 0;
+			for (const s of survivors) {
+				const j = byUrl.get(s.url);
+				const majorList = isMajorPublisher(s.domain, s.url);
+				const merchantCount = s.merchants.length;
+				// with no judgement, fall back to conservative keep for known publishers only
+				if (!j) {
+					if (!majorList && !s.signals.includes("known publisher") && !s.linksCompetitor && merchantCount < 2) {
+						drop.unvetted++;
+						continue;
+					}
+				} else {
+					if (j.relevance === "off_topic") {
+						drop.offTopic++;
+						continue;
+					}
+					if (!j.westernCentric && !majorList) {
+						drop.nonWestern++;
+						continue;
+					}
+					if (
+						j.relevance === "weak" &&
+						s.competitorsMentioned.length === 0 &&
+						!s.linksCompetitor &&
+						s.affiliateSignal !== "yes"
+					) {
+						drop.offTopic++;
+						continue;
+					}
+				}
+
+				let score = Math.max(0, Math.min(100, Math.round(j?.fitScore ?? (j?.relevance === "weak" ? 42 : 62))));
+				if (s.linksCompetitor) score = Math.max(score, 84);
+				else if (merchantCount >= 3) score = Math.max(score, 72);
+				else if (merchantCount >= 2) score = Math.max(score, 62);
+
+				// staleness: an old roundup with no update signal is a weaker pitch, so
+				// penalize the score, don't drop it, broad recall over a hard cut here
+				const year = s.publishedDate ? Number(s.publishedDate.slice(0, 4)) : null;
+				if (year && year < staleYear && !s.linksCompetitor) score = Math.min(score, 44);
+
+				const affiliateStatus = resolveAffiliateStatus(s, j);
+				if (affiliateStatus === "yes") affiliateYes++;
+				else if (affiliateStatus === "no") affiliateNo++;
+				else affiliateUnsure++;
+				if (s.brandAlreadyMentioned) mentionsBrand++;
+
+				const row: ArticleResult = {
+					title: s.title,
+					url: s.url,
+					domain: s.domain,
+					tier: majorList ? "high_authority" : (j?.tier ?? "niche_blog"),
+					fitScore: score,
+					verdict: plain(
+						j?.outreachVerdict?.trim() ||
+							(s.linksCompetitor
+								? `Already affiliate-links a competitor, so they monetize this category and would very likely add ${brand.name}.`
+								: s.competitorsMentioned.length > 0
+									? `Features ${s.competitorsMentioned.join(", ")}, a natural fit to pitch ${brand.name} alongside them.`
+									: `${s.domain} runs affiliate roundups in this space; worth a pitch.`),
+					),
+					relevance: j?.relevance === "weak" ? "weak" : "strong",
+					affiliateStatus,
+					signals: s.signals,
+					merchants: s.merchants,
+					linksCompetitor: s.linksCompetitor,
+					publishedDate: s.publishedDate,
+					competitorsMentioned: s.competitorsMentioned,
+					brandAlreadyMentioned: s.brandAlreadyMentioned,
+					contactHint: s.contactHint,
+					query: s.query,
+					viaCrawl: s.viaCrawl,
+				};
+				(row.tier === "high_authority" ? highAuthority : nicheBlog).push(row);
+			}
+
+			// at most 2 articles per publisher, an outreach list shouldn't repeat a site
+			const cappedByDomain = (rows: ArticleResult[]): ArticleResult[] => {
+				const perDomain = new Map<string, number>();
+				const out: ArticleResult[] = [];
+				for (const r of [...rows].sort((a, b) => b.fitScore - a.fitScore)) {
+					const n = perDomain.get(r.domain) ?? 0;
+					if (n >= 2) {
+						drop.dupePublisher++;
+						continue;
+					}
+					perDomain.set(r.domain, n + 1);
+					out.push(r);
+				}
+				return out;
 			};
-			(row.tier === "high_authority" ? highAuthority : nicheBlog).push(row);
-		}
 
-		// at most 2 articles per publisher, an outreach list shouldn't repeat a site
-		const cappedByDomain = (rows: ArticleResult[]): ArticleResult[] => {
-			const perDomain = new Map<string, number>();
-			const out: ArticleResult[] = [];
-			for (const r of [...rows].sort((a, b) => b.fitScore - a.fitScore)) {
-				const n = perDomain.get(r.domain) ?? 0;
-				if (n >= 2) {
-					drop.dupePublisher++;
-					continue;
-				}
-				perDomain.set(r.domain, n + 1);
-				out.push(r);
-			}
-			return out;
-		};
+			const sortRows = (rows: ArticleResult[]) =>
+				rows.sort(
+					(a, b) => b.fitScore - a.fitScore || (a.relevance === b.relevance ? 0 : a.relevance === "strong" ? -1 : 1),
+				);
+			const highFinal = sortRows(cappedByDomain(highAuthority));
+			const nicheFinal = sortRows(cappedByDomain(nicheBlog));
 
-		const sortRows = (rows: ArticleResult[]) =>
-			rows.sort(
-				(a, b) => b.fitScore - a.fitScore || (a.relevance === b.relevance ? 0 : a.relevance === "strong" ? -1 : 1),
-			);
-		const highFinal = sortRows(cappedByDomain(highAuthority));
-		const nicheFinal = sortRows(cappedByDomain(nicheBlog));
+			const payload: ArticleSearchPayload = {
+				highAuthority: highFinal,
+				nicheBlog: nicheFinal,
+				stats: {
+					queries: queries.length,
+					serpRequests: serpTasks.length,
+					candidates: afterJunk,
+					pagesFetched: toFetch.length,
+					expandedDomains: expandDomains.length,
+					expandedFound: survivors2.length,
+					highAuthority: highFinal.length,
+					nicheBlog: nicheFinal.length,
+					affiliateYes,
+					affiliateNo,
+					affiliateUnsure,
+					mentionsBrand,
+					droppedOffTopic: drop.offTopic,
+					droppedNonWestern: drop.nonWestern,
+					droppedUnvetted: drop.unvetted,
+					droppedDupePublisher: drop.dupePublisher,
+					droppedRetailer: Math.max(0, afterJunk - afterRetail),
+					droppedSyndicated: syndicatedDrop.size,
+				},
+			};
 
-		const payload: ArticleSearchPayload = {
-			highAuthority: highFinal,
-			nicheBlog: nicheFinal,
-			stats: {
-				queries: queries.length,
-				serpRequests: serpTasks.length,
-				candidates: afterJunk,
-				pagesFetched: toFetch.length,
-				expandedDomains: expandDomains.length,
-				expandedFound: survivors2.length,
-				highAuthority: highFinal.length,
-				nicheBlog: nicheFinal.length,
-				affiliateYes,
-				affiliateNo,
-				affiliateUnsure,
-				mentionsBrand,
-				droppedOffTopic: drop.offTopic,
-				droppedNonWestern: drop.nonWestern,
-				droppedUnvetted: drop.unvetted,
-				droppedDupePublisher: drop.dupePublisher,
-				droppedRetailer: Math.max(0, afterJunk - afterRetail),
-				droppedSyndicated: syndicatedDrop.size,
-			},
-		};
+			// finalize the marker row into the viewable result. freshOnly/strict used
+			// to be hard server-side filters; both are now UI-side toggles over a
+			// single tagged result set, so the column is just kept true for schema
+			// continuity, nothing reads it as a filter anymore.
+			await db
+				.update(brandArticleSearches)
+				.set({ status: "done", stage: null, progressPct: 100, payload, updatedAt: new Date() })
+				.where(eq(brandArticleSearches.id, runId));
 
-		// persist the latest run so re-opening the tab is free. freshOnly/strict
-		// used to be hard server-side filters; both are now UI-side toggles over a
-		// single tagged result set, so the column is just kept true for schema
-		// continuity, nothing reads it as a filter anymore.
-		try {
-			await db.insert(brandArticleSearches).values({
-				brandId: data.brandId,
-				direction: userDirection.slice(0, 500),
-				periodStart: data.from,
-				periodEnd: data.to,
-				pagesPerSearch: data.pagesPerSearch,
-				freshOnly: true,
-				queries: data.queries,
-				payload,
-				createdBy: session.user.name?.trim() || session.user.email || "a teammate",
-			});
+			return payload;
 		} catch (e) {
-			console.error("[article-finder] failed to persist search", e);
+			await db
+				.update(brandArticleSearches)
+				.set({
+					status: "error",
+					stage: null,
+					error: e instanceof Error ? e.message.slice(0, 500) : "Search failed",
+					updatedAt: new Date(),
+				})
+				.where(eq(brandArticleSearches.id, runId))
+				.catch(() => {});
+			throw e;
 		}
-
-		return payload;
 	});
 
 export const getLatestArticleSearchFn = createServerFn({ method: "POST" })
@@ -939,7 +975,7 @@ export const getLatestArticleSearchFn = createServerFn({ method: "POST" })
 		const [row] = await db
 			.select()
 			.from(brandArticleSearches)
-			.where(eq(brandArticleSearches.brandId, data.brandId))
+			.where(and(eq(brandArticleSearches.brandId, data.brandId), eq(brandArticleSearches.status, "done")))
 			.orderBy(desc(brandArticleSearches.createdAt))
 			.limit(1);
 		if (!row) return null;
@@ -968,5 +1004,39 @@ export const getLatestArticleSearchFn = createServerFn({ method: "POST" })
 			highAuthority: norm(payload?.highAuthority),
 			nicheBlog: norm(payload?.nicheBlog),
 			stats: payload?.stats ?? {},
+		};
+	});
+
+/** Cheap, brand-wide poll for whether a search is currently running (any
+ *  status, not just "done") — powers the persistent progress indicator shown
+ *  from every tab under a brand, not just the Article Finder page itself. */
+export const getArticleSearchStatusFn = createServerFn({ method: "POST" })
+	.validator(z.object({ brandId: z.string().min(1) }))
+	.handler(async ({ data }) => {
+		const session = await requireAuthSession();
+		await requireBrandAccess(session.user.id, data.brandId);
+		const [row] = await db
+			.select({
+				id: brandArticleSearches.id,
+				status: brandArticleSearches.status,
+				stage: brandArticleSearches.stage,
+				progressPct: brandArticleSearches.progressPct,
+				error: brandArticleSearches.error,
+				createdAt: brandArticleSearches.createdAt,
+				updatedAt: brandArticleSearches.updatedAt,
+			})
+			.from(brandArticleSearches)
+			.where(eq(brandArticleSearches.brandId, data.brandId))
+			.orderBy(desc(brandArticleSearches.createdAt))
+			.limit(1);
+		if (!row) return null;
+		return {
+			id: row.id,
+			status: row.status as "running" | "done" | "error",
+			stage: row.stage,
+			progressPct: row.progressPct,
+			error: row.error,
+			startedAt: String(row.createdAt),
+			updatedAt: String(row.updatedAt),
 		};
 	});

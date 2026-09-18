@@ -16,6 +16,7 @@ import { Skeleton } from "@workspace/ui/components/skeleton";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { AppSidebar } from "@/components/app-sidebar";
+import { ArticleSearchStatusBar } from "@/components/article-search-status-bar";
 import BrandOnboarding from "@/components/brand-onboarding";
 import { SiteHeader } from "@/components/site-header";
 import { validateBrandFilterSearch } from "@/hooks/use-list-filters";
@@ -225,6 +226,7 @@ function BrandLayout() {
 					</div>
 				</div>
 			</SidebarInset>
+			<ArticleSearchStatusBar />
 		</SidebarProvider>
 	);
 }

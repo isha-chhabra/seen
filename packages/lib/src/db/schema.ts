@@ -263,6 +263,15 @@ export const brandArticleSearches = pgTable(
 		payload: json("payload").notNull(),
 		createdBy: text("created_by"),
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+		// "running"/"error" rows are in-progress search markers (placeholder
+		// payload), so a page open anywhere in the brand can show live status;
+		// "done" is a finished, viewable result. getLatestArticleSearchFn only
+		// ever returns "done" rows.
+		status: text("status").notNull().default("done"),
+		stage: text("stage"),
+		progressPct: integer("progress_pct"),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+		error: text("error"),
 	},
 	(table) => ({
 		brandCreatedIdx: index("brand_article_searches_brand_id_created_at_idx").on(table.brandId, table.createdAt),

@@ -30,6 +30,7 @@ import {
 } from "@workspace/ui/components/dropdown-menu";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@workspace/ui/components/input-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover";
+import { Progress } from "@workspace/ui/components/progress";
 import { Switch } from "@workspace/ui/components/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
 import { Textarea } from "@workspace/ui/components/textarea";
@@ -45,6 +46,7 @@ import {
 	type ArticleResult,
 	findArticlesFn,
 	generateArticleQueriesFn,
+	getArticleSearchStatusFn,
 	getLatestArticleSearchFn,
 } from "@/server/article-finder";
 
@@ -251,51 +253,77 @@ function ArticleFinderPage() {
 
 	// The search itself is a single long HTTP call (can run several minutes with
 	// the wider net + outward crawl) — if the connection drops (laptop sleeps,
-	// network hiccup, tab backgrounded) the browser never sees the response even
-	// though the server finished and saved it. So while we wait, also poll for a
-	// saved run newer than when this one started, and adopt it if the direct
-	// response never arrives — no manual refresh needed either way.
-	const [searchStartedAt, setSearchStartedAt] = useState<number | null>(null);
+	// network hiccup, tab backgrounded, or you navigate away to another tab
+	// entirely) the browser never sees the response even though the server
+	// finished and saved it. So while we wait, also poll the brand-wide status
+	// row (the same one the floating indicator in every other tab reads) for
+	// real stage/progress and to adopt the result the moment it's marked done
+	// — no manual refresh needed, and it picks back up correctly even if this
+	// page was fully unmounted while the search ran.
+	const [liveStage, setLiveStage] = useState<string | null>(null);
+	const [liveProgress, setLiveProgress] = useState<number | null>(null);
 	useEffect(() => {
-		if (phase !== "searching" || searchStartedAt === null) return;
+		if (phase !== "searching") return;
 		let cancelled = false;
-		const id = setInterval(() => {
-			getLatestArticleSearchFn({ data: { brandId } })
-				.then((r) => {
-					if (cancelled || !r) return;
-					if (new Date(r.createdAt).getTime() < searchStartedAt) return; // not this run yet
-					setDirection(r.direction);
-					setQueries(r.queries.map((q) => ({ query: q.query, angle: q.angle, on: true })));
-					setHigh(r.highAuthority);
-					setNiche(r.nicheBlog);
-					setStats(r.stats);
-					setLoaded({ at: r.createdAt, by: r.createdBy });
-					setSearchStartedAt(null);
-					setPhase("results");
-				})
-				.catch(() => {});
-		}, 12_000);
+		async function poll() {
+			const s = await getArticleSearchStatusFn({ data: { brandId } }).catch(() => null);
+			if (cancelled || !s) return;
+			if (s.status === "running") {
+				setLiveStage(s.stage);
+				setLiveProgress(s.progressPct);
+				return;
+			}
+			if (s.status === "error") {
+				setError(s.error ?? "Search failed. Try again.");
+				setPhase("queries");
+				return;
+			}
+			const r = await getLatestArticleSearchFn({ data: { brandId } }).catch(() => null);
+			if (cancelled || !r) return;
+			setDirection(r.direction);
+			setQueries(r.queries.map((q) => ({ query: q.query, angle: q.angle, on: true })));
+			setHigh(r.highAuthority);
+			setNiche(r.nicheBlog);
+			setStats(r.stats);
+			setLoaded({ at: r.createdAt, by: r.createdBy });
+			setPhase("results");
+		}
+		poll();
+		const id = setInterval(poll, 4_000);
 		return () => {
 			cancelled = true;
 			clearInterval(id);
 		};
-	}, [phase, searchStartedAt, brandId]);
+	}, [phase, brandId]);
 
-	// on open: show the last saved search for this brand, for free
+	// on open: a search already running for this brand (started from here or
+	// picked up while this tab was elsewhere) takes priority over the last
+	// saved result, otherwise show the last saved search, for free
 	useEffect(() => {
 		let cancelled = false;
-		getLatestArticleSearchFn({ data: { brandId } })
-			.then((r) => {
-				if (cancelled || !r) return;
-				setDirection(r.direction);
-				if (r.from && r.to) setRange({ from: parseYmd(r.from), to: parseYmd(r.to) });
-				setPages(r.pagesPerSearch || 4);
-				setQueries(r.queries.map((q) => ({ query: q.query, angle: q.angle, on: true })));
-				setHigh(r.highAuthority);
-				setNiche(r.nicheBlog);
-				setStats(r.stats);
-				setLoaded({ at: r.createdAt, by: r.createdBy });
-				setPhase("results");
+		getArticleSearchStatusFn({ data: { brandId } })
+			.then((s) => {
+				if (cancelled) return;
+				if (s?.status === "running") {
+					setLiveStage(s.stage);
+					setLiveProgress(s.progressPct);
+					setPhase("searching");
+					return;
+				}
+				getLatestArticleSearchFn({ data: { brandId } })
+					.then((r) => {
+						if (cancelled || !r) return;
+						setDirection(r.direction);
+						if (r.from && r.to) setRange({ from: parseYmd(r.from), to: parseYmd(r.to) });
+						setPages(r.pagesPerSearch || 4);
+						setQueries(r.queries.map((q) => ({ query: q.query, angle: q.angle, on: true })));
+						setHigh(r.highAuthority);
+						setNiche(r.nicheBlog);
+						setStats(r.stats);
+						setLoaded({ at: r.createdAt, by: r.createdBy });
+						setPhase("results");
+					})
+					.catch(() => {});
 			})
 			.catch(() => {});
 		return () => {
@@ -376,8 +404,9 @@ function ArticleFinderPage() {
 		if (!range?.from || !range?.to || selected.length === 0) return;
 		setBusy(true);
 		setError(null);
+		setLiveStage(null);
+		setLiveProgress(null);
 		setPhase("searching");
-		setSearchStartedAt(Date.now() - 5_000); // small buffer for clock skew between browser and server
 		try {
 			const res = await findArticlesFn({
 				data: {
@@ -394,13 +423,13 @@ function ArticleFinderPage() {
 			setNiche(res.nicheBlog);
 			setStats(res.stats);
 			setLoaded(null);
-			setSearchStartedAt(null);
 			setPhase("results");
 		} catch (e) {
 			// the request itself failed client-side (not just a slow/dropped
-			// connection with the server still working) — but the poll above is
-			// still running, so if the server actually did finish and save, it'll
-			// still pick the result up. Only show the error state if it doesn't.
+			// connection with the server still working) — but the status poll
+			// above is still running, so if the server actually did finish and
+			// save, it'll still pick the result up. Only show the error state if
+			// it doesn't.
 			setError(e instanceof Error ? e.message : "Connection lost. Still checking in the background, no need to retry.");
 		} finally {
 			setBusy(false);
@@ -661,11 +690,17 @@ function ArticleFinderPage() {
 								: `Search ${selected.length} ${selected.length === 1 ? "query" : "queries"}`}
 						</Button>
 						{phase === "searching" && (
-							<p className="text-xs text-muted-foreground">
-								Usually 3-6 minutes. It keeps running on the server even if your connection drops, this tab checks in
-								the background and picks up the result on its own. Closing the tab is fine too, reopening the page later
-								shows the finished run.
-							</p>
+							<div className="space-y-2 rounded-lg border bg-card p-3">
+								<div className="flex items-center justify-between text-xs">
+									<span className="font-medium text-foreground">{liveStage ?? "Getting started…"}</span>
+									{liveProgress !== null && <span className="text-muted-foreground">{liveProgress}%</span>}
+								</div>
+								<Progress value={liveProgress ?? 5} className="h-1.5" />
+								<p className="text-xs text-muted-foreground">
+									Usually 3-6 minutes. It keeps running on the server even if you switch tabs or close this one — reopen
+									the app any time and it's either still going or waiting for you.
+								</p>
+							</div>
 						)}
 						{phase === "searching" && error && <p className="text-sm text-destructive">{error}</p>}
 					</div>
