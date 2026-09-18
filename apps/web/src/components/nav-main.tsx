@@ -1,14 +1,8 @@
 import type { Icon } from "@tabler/icons-react";
 import { Link, useLocation, useParams } from "@tanstack/react-router";
-import {
-	SidebarGroup,
-	SidebarGroupLabel,
-	SidebarMenu,
-	SidebarMenuButton,
-	SidebarMenuItem,
-	useSidebar,
-} from "@workspace/ui/components/sidebar";
-import { motion } from "motion/react";
+import { useSidebar } from "@workspace/ui/components/sidebar";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
+import { useRef, useState } from "react";
 
 export interface NavItem {
 	title: string;
@@ -22,73 +16,115 @@ export interface NavGroup {
 	items: NavItem[];
 }
 
-// Active item: pink-tint fill, pink icon. The rail on the left edge is a
-// real motion.span (see below), not a CSS pseudo-element, so it can glide
-// between items on navigation instead of just appearing/disappearing.
-// The `data-[active=true]:` prefixes mean this string is safe to apply to every item.
-const ACTIVE =
-	"relative data-[active=true]:!bg-highlight data-[active=true]:!text-highlight-foreground data-[active=true]:font-medium " +
-	"[&[data-active=true]>svg]:!text-primary";
+interface HoverState {
+	href: string;
+	top: number;
+	height: number;
+}
 
+/**
+ * Sidebar navigation in the "ruler" style: each row has small tick marks on
+ * its left edge, non-focused rows dim while one is hovered, a highlight pill
+ * slides between rows, and the active row is marked by a short accent bar
+ * that glides to the next active row on navigation. The nav data, links,
+ * active detection and mobile-close behavior are unchanged; only the
+ * presentation is. Icons on NavItem are intentionally not rendered here —
+ * the tick marks take their place. Respects prefers-reduced-motion.
+ */
 export function NavMain({ groups }: { groups: NavGroup[] }) {
 	const params = useParams({ strict: false }) as { brand?: string };
 	const brandId = params.brand;
 	const { setOpenMobile } = useSidebar();
-	const location = useLocation();
-	const pathname = location.pathname;
+	const pathname = useLocation().pathname;
+	const containerRef = useRef<HTMLDivElement>(null);
+	const [hover, setHover] = useState<HoverState | null>(null);
 
-	const getHref = (url: string, absolute?: boolean) => {
-		return absolute ? url : `/app/${brandId}${url}`;
-	};
+	const getHref = (url: string, absolute?: boolean) => (absolute ? url : `/app/${brandId}${url}`);
 
-	const isActive = (url: string, absolute?: boolean) => {
-		const href = getHref(url, absolute);
+	const isActive = (href: string) => {
 		if (href === `/app/${brandId}` || href === `/app/${brandId}/`) {
 			return pathname === `/app/${brandId}` || pathname === `/app/${brandId}/`;
 		}
 		return pathname.startsWith(href);
 	};
 
+	function showHover(href: string, row: HTMLElement) {
+		const container = containerRef.current;
+		if (!container) return;
+		const rowRect = row.getBoundingClientRect();
+		const containerRect = container.getBoundingClientRect();
+		setHover({ href, top: rowRect.top - containerRect.top, height: rowRect.height });
+	}
+
 	return (
-		<>
-			{groups.map((group) => (
-				<SidebarGroup key={group.label}>
-					<SidebarGroupLabel className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-						{group.label}
-					</SidebarGroupLabel>
-					<SidebarMenu>
+		<MotionConfig reducedMotion="user">
+			<div ref={containerRef} className="relative px-2">
+				<AnimatePresence>
+					{hover && (
+						<motion.div
+							key="nav-hover-pill"
+							className="pointer-events-none absolute right-2 left-[33px] z-0 rounded-md bg-primary/15"
+							initial={false}
+							animate={{ top: hover.top + 2, height: hover.height - 4, opacity: 1 }}
+							exit={{ opacity: 0 }}
+							transition={{ type: "spring", stiffness: 300, damping: 30 }}
+						/>
+					)}
+				</AnimatePresence>
+
+				{groups.map((group) => (
+					<div key={group.label} className="flex flex-col">
+						<div className="mt-2 px-0 py-3.5 font-medium text-foreground/40 text-sm">{group.label}</div>
 						{group.items.map((item) => {
-							const active = isActive(item.url, item.absolute);
+							const href = getHref(item.url, item.absolute);
+							const active = isActive(href);
+							const isHovered = hover?.href === href;
+							const opacity = active ? 1 : hover ? (isHovered ? 1 : 0.3) : 0.55;
+							const x = active ? 8 : isHovered ? 6 : 0;
 							return (
-								<SidebarMenuItem key={item.title}>
-									<SidebarMenuButton
-										render={<Link to={getHref(item.url, item.absolute)} onClick={() => setOpenMobile(false)} />}
-										tooltip={item.title}
-										isActive={active}
-										className={ACTIVE}
-									>
-										{active && (
-											<motion.span
-												layoutId="nav-active-rail"
-												className="pointer-events-none absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-primary"
-												transition={{ type: "spring", stiffness: 500, damping: 35 }}
-											/>
-										)}
+								<div key={item.title} className="relative">
+									{active && (
 										<motion.span
-											className="flex items-center gap-2"
-											whileHover={{ x: 3 }}
-											transition={{ type: "spring", stiffness: 500, damping: 30 }}
+											layoutId="nav-active-bar"
+											className="pointer-events-none absolute top-1/2 left-[4px] z-10 h-[1.8px] w-[23px] -translate-y-1/2 rounded-full bg-primary"
+											transition={{ type: "spring", stiffness: 800, damping: 40 }}
+										/>
+									)}
+									<motion.span
+										className="pointer-events-none absolute top-1/2 left-0 h-px -translate-y-1/2 bg-foreground/50"
+										animate={{ width: active ? 0 : isHovered ? 26 : 18 }}
+										transition={{ type: "spring", stiffness: 600, damping: 30 }}
+									/>
+									<span className="pointer-events-none absolute top-0 left-0 h-px w-[16px] bg-foreground/30" />
+									<span className="pointer-events-none absolute top-1/4 left-0 h-px w-[13px] bg-foreground/30" />
+									<span className="pointer-events-none absolute top-3/4 left-0 h-px w-[13px] bg-foreground/30" />
+
+									<motion.div
+										animate={{ opacity, x }}
+										transition={{ type: "spring", stiffness: 700, damping: 30 }}
+										style={{ transformOrigin: "left center" }}
+									>
+										<Link
+											to={href}
+											aria-current={active ? "page" : undefined}
+											onClick={() => setOpenMobile(false)}
+											onMouseEnter={(e) =>
+												showHover(href, e.currentTarget.parentElement?.parentElement ?? e.currentTarget)
+											}
+											onFocus={(e) => showHover(href, e.currentTarget.parentElement?.parentElement ?? e.currentTarget)}
+											onMouseLeave={() => setHover(null)}
+											onBlur={() => setHover(null)}
+											className="relative ml-2 flex select-none items-center gap-2 py-1.5 pl-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
 										>
-											{item.icon && <item.icon />}
-											<span>{item.title}</span>
-										</motion.span>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
+											<span className="relative z-1 truncate">{item.title}</span>
+										</Link>
+									</motion.div>
+								</div>
 							);
 						})}
-					</SidebarMenu>
-				</SidebarGroup>
-			))}
-		</>
+					</div>
+				))}
+			</div>
+		</MotionConfig>
 	);
 }
