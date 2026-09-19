@@ -363,44 +363,6 @@
 	}
 }
 
-/* Article Finder's running-search loader: the multi-ring spinner's rotation
-   is purely decorative (its progress mask, set inline from real data, is
-   what actually means something) — but the flavor-line fade needs a real
-   transition too, or a stage's lines would just snap in and out. */
-.af-loader-spin circle {
-	transform-origin: 120px 120px;
-	animation: af-loader-rotate 8s linear infinite;
-}
-@keyframes af-loader-rotate {
-	from {
-		transform: rotate(0deg);
-	}
-	to {
-		transform: rotate(360deg);
-	}
-}
-.af-loader-line-in {
-	animation: af-loader-fade-in 250ms ease-out;
-}
-@keyframes af-loader-fade-in {
-	from {
-		opacity: 0;
-		transform: translateY(2px);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
-}
-@media (prefers-reduced-motion: reduce) {
-	.af-loader-spin circle {
-		animation: none;
-	}
-	.af-loader-line-in {
-		animation: none;
-	}
-}
-
 /* Query/direction tag chips cycle through the chart palette (one color per
    tag, set inline as --tag-color) instead of every tag being the same
    color — CTAs and structural chrome stay the theme's lavender per spec,

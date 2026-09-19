@@ -241,10 +241,14 @@ function ArticleFinderPage() {
 	// real stage/progress and to adopt the result the moment it's marked done
 	// — no manual refresh needed, and it picks back up correctly even if this
 	// page was fully unmounted while the search ran.
+	// The status poll may only run once the search's marker row exists. Polling
+	// earlier finds the previous run, reads it as "done", and jumps to its
+	// (possibly empty) results while the new search is still starting.
+	const [pollReady, setPollReady] = useState(false);
 	const [liveStage, setLiveStage] = useState<string | null>(null);
 	const [liveProgress, setLiveProgress] = useState<number | null>(null);
 	useEffect(() => {
-		if (phase !== "searching") return;
+		if (phase !== "searching" || !pollReady) return;
 		let cancelled = false;
 		async function poll() {
 			const s = await getArticleSearchStatusFn({ data: { brandId } }).catch(() => null);
@@ -275,7 +279,7 @@ function ArticleFinderPage() {
 			cancelled = true;
 			clearInterval(id);
 		};
-	}, [phase, brandId]);
+	}, [phase, brandId, pollReady]);
 
 	// on open: a search already running for this brand (started from here or
 	// picked up while this tab was elsewhere) takes priority over the last
@@ -288,6 +292,7 @@ function ArticleFinderPage() {
 				if (s?.status === "running") {
 					setLiveStage(s.stage);
 					setLiveProgress(s.progressPct);
+					setPollReady(true);
 					setPhase("searching");
 					return;
 				}
@@ -377,6 +382,7 @@ function ArticleFinderPage() {
 		setError(null);
 		setLiveStage(null);
 		setLiveProgress(null);
+		setPollReady(false);
 		setPhase("searching");
 		try {
 			// Only starts the search; progress and the finished result arrive
@@ -392,6 +398,8 @@ function ArticleFinderPage() {
 					excludeBrandMentions,
 				},
 			});
+			// The marker row exists now, so the poll can safely follow it.
+			setPollReady(true);
 		} catch (e) {
 			// The search never started (validation, debounce, permissions), so
 			// there is nothing for the status poll to pick up: back to the queries.
@@ -611,7 +619,7 @@ function ArticleFinderPage() {
 								<IconSearch className="size-4" />
 							)}
 							{phase === "searching"
-								? "Searching and vetting…"
+								? "Finding articles…"
 								: `Search ${queries.length} ${queries.length === 1 ? "query" : "queries"}`}
 						</Button>
 						{phase === "searching" && <ArticleSearchLoader stage={liveStage} progressPct={liveProgress} />}
