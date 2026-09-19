@@ -8,7 +8,7 @@ into visibility scores, citation analysis, competitor comparison and
 stakeholder reports. On top of that it adds **Article Finder**, a pipeline for
 finding editorial sites worth pitching for affiliate placements.
 
-**Live demo:** https://seen-tool.vercel.app — sign in as `demo@seen-demo.app`
+**Live demo:** https://tryseen.vercel.app — sign in as `demo@seen-demo.app`
 / `SeenDemo-2026` (read-only viewer).
 
 ---
