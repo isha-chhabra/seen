@@ -31,8 +31,8 @@ export function AuthSplitLayout({ title, subtitle, children }: AuthSplitLayoutPr
 					<Logo />
 				</div>
 				<div className="rounded-2xl border bg-card p-7 shadow-[0_1px_2px_oklch(0_0_0/0.04),0_12px_40px_-8px_oklch(0_0_0/0.12)] dark:shadow-[0_1px_2px_oklch(0_0_0/0.4),0_16px_48px_-10px_oklch(0_0_0/0.5)]">
-					<h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-					{subtitle && <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>}
+					<h1 className="text-center text-xl font-semibold tracking-tight">{title}</h1>
+					{subtitle && <p className="mt-1.5 text-center text-sm text-muted-foreground">{subtitle}</p>}
 					<div className="mt-6">{children}</div>
 				</div>
 			</div>

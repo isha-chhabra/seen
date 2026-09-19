@@ -127,7 +127,7 @@ export function NavUser({ canSwitchBrand = true }: { canSwitchBrand?: boolean } 
 							}}
 						>
 							<IconLogout />
-							Log out
+							Sign out
 						</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>

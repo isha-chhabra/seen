@@ -8,7 +8,6 @@
 
 import { IconBrandGoogle } from "@tabler/icons-react";
 import { createFileRoute, Link, useNavigate, useRouteContext } from "@tanstack/react-router";
-import { CLOUD_ENTRY_PRICE_USD } from "@workspace/config/plans";
 import type { ClientConfig } from "@workspace/config/types";
 import { authClient } from "@workspace/lib/auth/client";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
@@ -80,15 +79,22 @@ export function RegisterForm({
 	const [name, setName] = useState("");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
+	const [confirmPassword, setConfirmPassword] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [pendingVerification, setPendingVerification] = useState(false);
 	const [resending, setResending] = useState(false);
 	const source = isCloud ? "cloud-signup" : "self-hosted-signup";
 
+	const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
+
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
 		setError(null);
+		if (password !== confirmPassword) {
+			setError("Passwords don't match. Re-enter them and try again.");
+			return;
+		}
 		setLoading(true);
 
 		try {
@@ -144,12 +150,8 @@ export function RegisterForm({
 
 	return (
 		<AuthSplitLayout
-			title={isCloud ? "Start tracking your AI visibility" : "Create your admin account"}
-			subtitle={
-				isCloud
-					? `Plans start at $${CLOUD_ENTRY_PRICE_USD}/mo. Cancel any time.`
-					: "This is the owner account for your self-hosted instance."
-			}
+			title="Get started with your account"
+			subtitle={isCloud ? undefined : "This is the owner account for your self-hosted instance."}
 			pitch={<SalesPanel variant={isCloud ? "cloud" : "self-hosted"} source={source} />}
 			footer={<SalesFooterLinks source={source} />}
 		>
@@ -215,12 +217,31 @@ export function RegisterForm({
 						minLength={isCloud ? 8 : 6}
 					/>
 				</div>
+				<div className="space-y-2">
+					<Label htmlFor="confirm-password">Confirm password</Label>
+					<Input
+						id="confirm-password"
+						type="password"
+						placeholder="Re-enter your password"
+						value={confirmPassword}
+						onChange={(e) => setConfirmPassword(e.target.value)}
+						required
+						autoComplete="new-password"
+						aria-invalid={passwordsMismatch}
+						aria-describedby={passwordsMismatch ? "confirm-password-error" : undefined}
+					/>
+					{passwordsMismatch && (
+						<p id="confirm-password-error" className="text-sm text-destructive">
+							Passwords don't match.
+						</p>
+					)}
+				</div>
 				<Button type="submit" className="w-full" disabled={loading}>
 					{loading ? "Creating account..." : "Create account"}
 				</Button>
 			</form>
 			{hasUsers && (
-				<p className="text-sm text-muted-foreground pt-4">
+				<p className="pt-4 text-center text-sm text-muted-foreground">
 					Already have an account?{" "}
 					<Link
 						to="/auth/login"

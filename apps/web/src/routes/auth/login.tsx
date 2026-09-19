@@ -213,7 +213,7 @@ export function EmailPasswordLogin({
 	return (
 		<AuthSplitLayout
 			title="Welcome back"
-			subtitle={isCloud ? "Check in on your AI visibility." : "Sign in to your Seen instance."}
+			subtitle="Sign in to continue to Seen."
 			pitch={<SalesPanel variant={isCloud ? "cloud" : "self-hosted"} source={source} />}
 			footer={<SalesFooterLinks source={source} />}
 		>
@@ -278,14 +278,14 @@ export function EmailPasswordLogin({
 				</Button>
 			</form>
 			{canRegister && (
-				<p className="text-sm text-muted-foreground pt-4">
+				<p className="pt-4 text-center text-sm text-muted-foreground">
 					Don't have an account?{" "}
 					<Link
 						to="/auth/register"
 						search={{ ...(returnTo ? { returnTo } : {}), ...(incomingRef ? { ref: incomingRef } : {}) }}
 						className="text-primary hover:underline font-medium"
 					>
-						Create one
+						Sign up
 					</Link>
 				</p>
 			)}
