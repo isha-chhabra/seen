@@ -107,8 +107,9 @@ export const inviteTeamMemberFn = createServerFn({ method: "POST" })
 				.where(eq(invitation.id, id));
 		}
 
-		// No transactional email on this deployment, so the caller shares
-		// `${origin}/accept-invitation/${id}` by hand. Return the id for that.
+		// The invitation email goes out from better-auth's sendInvitationEmail when a
+		// provider is configured. The id is returned so the UI can also offer the
+		// link to share by hand (e.g. if the email lands in spam).
 		return { id, email: data.email };
 	});
 

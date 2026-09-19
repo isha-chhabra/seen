@@ -76,10 +76,7 @@ function AcceptInvitationPage() {
 	}
 
 	return (
-		<FullPageCard
-			title={`You've been invited to join ${invitation.organizationName}`}
-			subtitle={`Invited by ${invitation.inviterEmail}`}
-		>
+		<FullPageCard title="You've been invited to join Seen" subtitle={`Invited by ${invitation.inviterEmail}`}>
 			<div className="space-y-4 w-full">
 				{acceptError && (
 					<Alert variant="destructive">

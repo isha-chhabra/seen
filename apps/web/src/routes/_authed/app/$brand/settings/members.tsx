@@ -7,6 +7,7 @@
  */
 import { IconCheck, IconCopy } from "@tabler/icons-react";
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
+import { invitationSignupPath } from "@workspace/config/invitations";
 import { isOrgAdminRole } from "@workspace/config/roles";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { Badge } from "@workspace/ui/components/badge";
@@ -31,7 +32,7 @@ import {
 
 /** No transactional email on this deployment, so the accept link is shared by hand. */
 function inviteLink(id: string): string {
-	return `${window.location.origin}/accept-invitation/${id}`;
+	return `${window.location.origin}${invitationSignupPath(id)}`;
 }
 
 async function copyText(text: string): Promise<boolean> {
@@ -242,7 +243,8 @@ function TeamSettingsPage() {
 				{lastInvite && (
 					<div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/[0.06] px-3 py-2 text-sm">
 						<span className="text-muted-foreground">
-							Invited <span className="font-medium text-foreground">{lastInvite.email}</span>. Send them this link:
+							Invited <span className="font-medium text-foreground">{lastInvite.email}</span>. We emailed them a sign-up
+							link. You can also send this one:
 						</span>
 						<code className="min-w-0 flex-1 truncate rounded bg-background px-1.5 py-0.5 text-xs">
 							{inviteLink(lastInvite.id)}

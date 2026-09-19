@@ -16,6 +16,7 @@
  *   - GOOGLE_CLIENT_ID/SECRET unset   -> omit the Google social provider
  */
 
+import { invitationSignupPath } from "@workspace/config/invitations";
 import type { CreateAuthOptions } from "@workspace/lib/auth/server";
 import { db } from "@workspace/lib/db/db";
 import { joinOrganization, provisionUmbrellaOrg } from "@workspace/lib/db/provisioning";
@@ -188,8 +189,7 @@ export function getCloudAuthOptions(): CreateAuthOptions {
 						data.email,
 						invitationEmail({
 							inviterName: data.inviter.user.name,
-							orgName: data.organization.name,
-							url: `${appUrl}/accept-invitation/${data.id}`,
+							url: `${appUrl}${invitationSignupPath(data.id)}`,
 						}),
 					);
 				},

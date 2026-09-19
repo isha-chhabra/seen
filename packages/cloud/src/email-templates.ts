@@ -64,18 +64,18 @@ export function passwordResetEmail(input: { url: string }): EmailContent {
 	};
 }
 
-export function invitationEmail(input: { inviterName: string; orgName: string; url: string }): EmailContent {
-	const { inviterName, orgName, url } = input;
+export function invitationEmail(input: { inviterName: string; url: string }): EmailContent {
+	const { inviterName, url } = input;
 	const safeInviterName = escapeHtml(inviterName);
-	const safeOrgName = escapeHtml(orgName);
 	return {
-		subject: `${inviterName} invited you to ${orgName} on Seen`,
+		subject: `${inviterName} invited you to join Seen`,
 		html: wrapHtml(
-			`You've been invited to join ${safeOrgName}`,
-			`${safeInviterName} invited you to join ${safeOrgName} on Seen. Click the button below to accept.`,
+			"You've been invited to join Seen",
+			`${safeInviterName} invited you to join Seen. Sign up to get started.`,
 			url,
+			"Sign up",
 		),
-		text: `${inviterName} invited you to join ${orgName} on Seen. Accept the invitation here: ${url}`,
+		text: `${inviterName} invited you to join Seen. Sign up here to get started: ${url}`,
 	};
 }
 
