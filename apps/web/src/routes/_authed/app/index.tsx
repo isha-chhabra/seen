@@ -169,7 +169,7 @@ function BrandSwitcherPage() {
 							<span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-highlight text-highlight-foreground">
 								<IconPlus className="size-4" />
 							</span>
-							<span className="min-w-0 flex-1 truncate text-sm font-medium">Set up {org.name}</span>
+							<span className="min-w-0 flex-1 truncate text-sm font-medium">Set up a brand</span>
 							<IconArrowRight className="size-4 shrink-0 text-muted-foreground/50 group-hover:text-primary" />
 						</Link>
 					))}

@@ -102,9 +102,7 @@ function BillingSettingsPage() {
 		<div className="max-w-6xl space-y-6">
 			<div>
 				<h1 className="text-3xl font-bold">Billing</h1>
-				<p className="text-muted-foreground">
-					Plan and usage for the <span className="font-medium">{state.organization.name}</span> workspace.
-				</p>
+				<p className="text-muted-foreground">Plan and usage for Seen.</p>
 			</div>
 
 			{entitlements.standing === "grace" && (

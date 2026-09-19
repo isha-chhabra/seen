@@ -15,6 +15,7 @@ import {
 	IconTarget,
 	IconTimeline,
 	IconTool,
+	IconUserCircle,
 	IconUsers,
 } from "@tabler/icons-react";
 import { Link, useRouteContext } from "@tanstack/react-router";
@@ -57,7 +58,8 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 }
 
 function buildNavGroups(args: {
-	isViewer: boolean;
+	/** Admins get the Team page; every non-viewer gets My Profile. Viewers get neither. */
+	teamAccess: TeamAccess;
 	scope: SidebarScope;
 	brand?: BrandWithPrompts | null;
 	isAdmin: boolean;
@@ -65,18 +67,25 @@ function buildNavGroups(args: {
 	reportsEnabled: boolean;
 	features?: ClientConfig["features"];
 }): NavGroup[] {
-	const { scope, brand, isAdmin, isViewer, showAdminSection, reportsEnabled, features } = args;
+	const { scope, brand, isAdmin, teamAccess, showAdminSection, reportsEnabled, features } = args;
 	return [
 		// Only a brand context has a dashboard; a gate page has no destinations.
-		...(scope === "brand" ? brandGroups(brand, features, isViewer) : []),
+		...(scope === "brand" ? brandGroups(brand, features, teamAccess) : []),
 		...(showAdminSection ? [adminGroup(isAdmin, reportsEnabled)] : []),
 	];
+}
+
+interface TeamAccess {
+	/** Can open the Team page. */
+	team: boolean;
+	/** Can open My Profile. False for viewers and while the role is still loading. */
+	profile: boolean;
 }
 
 function brandGroups(
 	brand: BrandWithPrompts | null | undefined,
 	features?: ClientConfig["features"],
-	isViewer = false,
+	teamAccess: TeamAccess = { team: false, profile: false },
 ): NavGroup[] {
 	const groups: NavGroup[] = [];
 	const dashboardItems = [
@@ -156,7 +165,12 @@ function brandGroups(
 					url: "/settings/llms",
 					icon: IconCpu,
 				},
-				...(features?.teamInvites && !isViewer ? [{ title: "Team", url: "/settings/members", icon: IconUsers }] : []),
+				...(features?.teamInvites && teamAccess.team
+					? [{ title: "Team", url: "/settings/members", icon: IconUsers }]
+					: []),
+				...(features?.teamInvites && teamAccess.profile
+					? [{ title: "My Profile", url: "/settings/profile", icon: IconUserCircle }]
+					: []),
 				...(features?.billing ? [{ title: "Billing", url: "/settings/billing", icon: IconCreditCard }] : []),
 			],
 		});
@@ -189,7 +203,8 @@ export function AppSidebar({
 }: AppSidebarProps) {
 	const { setOpenMobile } = useSidebar();
 	const context = useRouteContext({ strict: false }) as { clientConfig?: ClientConfig };
-	const { isViewer } = useBrandRole();
+	const { role, isViewer, isAdmin: isTeamAdmin } = useBrandRole();
+	const teamAccess: TeamAccess = { team: isTeamAdmin, profile: role !== null && !isViewer };
 	// Reports are disabled entirely in cloud; hide the nav entry there.
 	const reportsEnabled = context.clientConfig?.features.reportGeneration ?? true;
 
@@ -201,7 +216,7 @@ export function AppSidebar({
 		scope,
 		brand,
 		isAdmin,
-		isViewer,
+		teamAccess,
 		showAdminSection,
 		reportsEnabled,
 		features: context.clientConfig?.features,

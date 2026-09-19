@@ -1,8 +1,7 @@
-import { IconExternalLink, IconLogout, IconSelector, IconStatusChange, IconUser } from "@tabler/icons-react";
+import { IconExternalLink, IconLogout, IconSelector, IconStatusChange } from "@tabler/icons-react";
 import { Link, useRouteContext } from "@tanstack/react-router";
 import type { ClientConfig } from "@workspace/config/types";
 import { authClient } from "@workspace/lib/auth/client";
-import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -13,6 +12,7 @@ import {
 	DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@workspace/ui/components/sidebar";
+import { UserAvatar } from "@/components/user-avatar";
 import { useAuth } from "@/hooks/use-auth";
 import { resetCrispSession } from "@/lib/analytics/crisp";
 import { resetPostHog } from "@/lib/analytics/posthog";
@@ -47,12 +47,7 @@ export function NavUser({ canSwitchBrand = true }: { canSwitchBrand?: boolean } 
 							/>
 						}
 					>
-						<Avatar className="h-8 w-8 rounded-lg">
-							<AvatarImage src={user.picture} alt={user.name} />
-							<AvatarFallback className="rounded-lg bg-primary/10 text-primary">
-								<IconUser className="size-4" />
-							</AvatarFallback>
-						</Avatar>
+						<UserAvatar name={user.name} color={user.avatarColor} />
 						<div className="grid flex-1 text-left text-sm leading-tight">
 							<span className="truncate font-medium">{user.name}</span>
 							<span className="truncate text-xs">{isNameEmailSame ? "Your Account" : user.email}</span>
@@ -69,12 +64,7 @@ export function NavUser({ canSwitchBrand = true }: { canSwitchBrand?: boolean } 
 						<DropdownMenuGroup>
 							<DropdownMenuLabel className="p-0 font-normal">
 								<div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-									<Avatar className="h-8 w-8 rounded-lg">
-										<AvatarImage src={user.picture} alt={user.name} />
-										<AvatarFallback className="rounded-lg bg-primary/10 text-primary">
-											<IconUser className="size-4" />
-										</AvatarFallback>
-									</Avatar>
+									<UserAvatar name={user.name} color={user.avatarColor} />
 									<div className="grid flex-1 text-left text-sm leading-tight">
 										<span className="truncate font-medium">{user.name}</span>
 										<span className="truncate text-xs">{isNameEmailSame ? "Your Account" : user.email}</span>

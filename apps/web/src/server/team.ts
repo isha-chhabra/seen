@@ -10,7 +10,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { isOrgAdminRole } from "@workspace/config/roles";
 import { db } from "@workspace/lib/db/db";
-import { invitation, member, organization, user } from "@workspace/lib/db/schema";
+import { invitation, member, user } from "@workspace/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuthSession, requireBrandAccess, requireBrandOrganization } from "@/lib/auth/helpers";
@@ -24,10 +24,17 @@ function requireTeamInvites(): void {
 }
 
 export type TeamData = {
-	members: { id: string; role: string; userId: string; name: string; email: string; createdAt: Date }[];
+	members: {
+		id: string;
+		role: string;
+		userId: string;
+		name: string;
+		email: string;
+		avatarColor: string | null;
+		createdAt: Date;
+	}[];
 	invitations: { id: string; email: string; role: string | null; expiresAt: Date }[];
 	currentUserId: string;
-	organization: { id: string; name: string };
 };
 
 export const listTeamFn = createServerFn({ method: "GET" })
@@ -39,6 +46,8 @@ export const listTeamFn = createServerFn({ method: "GET" })
 		requireTeamInvites();
 		const session = await requireAuthSession();
 		const org = await requireBrandOrganization(session.user.id, data.brandId);
+		// The Team page is for admins only; members get their own profile page instead.
+		if (!isOrgAdminRole(org.role)) throw new Error("Only a workspace admin can view the team");
 
 		const members = await db
 			.select({
@@ -47,6 +56,7 @@ export const listTeamFn = createServerFn({ method: "GET" })
 				userId: member.userId,
 				name: user.name,
 				email: user.email,
+				avatarColor: user.avatarColor,
 				createdAt: member.createdAt,
 			})
 			.from(member)
@@ -67,22 +77,7 @@ export const listTeamFn = createServerFn({ method: "GET" })
 			members,
 			invitations,
 			currentUserId: session.user.id,
-			organization: { id: org.id, name: org.name },
 		};
-	});
-
-export const updateOrganizationFn = createServerFn({ method: "POST" })
-	.validator(z.object({ brandId: z.string(), name: z.string().min(1).max(100) }))
-	.handler(async ({ data }) => {
-		requireTeamInvites();
-		const session = await requireAuthSession();
-		const org = await requireBrandOrganization(session.user.id, data.brandId);
-
-		// Org rename is an admin action.
-		if (!isOrgAdminRole(org.role)) throw new Error("Only admins can rename the workspace");
-
-		await db.update(organization).set({ name: data.name.trim() }).where(eq(organization.id, org.id));
-		return { success: true };
 	});
 
 export const inviteTeamMemberFn = createServerFn({ method: "POST" })

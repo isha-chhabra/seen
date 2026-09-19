@@ -10,6 +10,7 @@ export interface AuthUser {
 	name?: string;
 	email?: string;
 	picture?: string;
+	avatarColor?: string;
 	given_name?: string;
 	family_name?: string;
 }
@@ -29,7 +30,7 @@ export interface UseAuthResult {
 export function useAuth(): UseAuthResult {
 	const context = useRouteContext({ strict: false }) as {
 		session?: {
-			user: { id: string; name?: string; email?: string; image?: string | null };
+			user: { id: string; name?: string; email?: string; image?: string | null; avatarColor?: string | null };
 		} | null;
 	};
 	const session = context.session;
@@ -40,6 +41,7 @@ export function useAuth(): UseAuthResult {
 					name: session.user.name,
 					email: session.user.email,
 					picture: session.user.image ?? undefined,
+					avatarColor: session.user.avatarColor ?? undefined,
 				}
 			: null,
 		isLoading: false,

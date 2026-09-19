@@ -35,6 +35,7 @@ export const user = pgTable("user", {
 	banExpires: timestamp("ban_expires"),
 	stripeCustomerId: text("stripe_customer_id"),
 	hasReportGeneratorAccess: boolean("has_report_generator_access").default(false),
+	avatarColor: text("avatar_color"),
 });
 
 export const session = pgTable(

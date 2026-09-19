@@ -16,15 +16,16 @@ import { Label } from "@workspace/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
 import { cn } from "@workspace/ui/lib/utils";
 import { useState } from "react";
+import { UserAvatar } from "@/components/user-avatar";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
+import { getMyBrandRoleFn } from "@/server/brands";
 import {
 	cancelInvitationFn,
 	inviteTeamMemberFn,
 	listTeamFn,
 	removeTeamMemberFn,
 	type TeamData,
-	updateOrganizationFn,
 	updateTeamMemberRoleFn,
 } from "@/server/team";
 
@@ -62,12 +63,13 @@ export const Route = createFileRoute("/_authed/app/$brand/settings/members")({
 		if (!context.clientConfig?.features.teamInvites) {
 			throw redirect({ to: "/app/$brand", params: { brand: params.brand } });
 		}
-		const data = await listTeamFn({ data: { brandId: params.brand } });
-		// Viewers don't get the Team section at all.
-		if (data.members.find((m) => m.userId === data.currentUserId)?.role === "viewer") {
-			throw redirect({ to: "/app/$brand", params: { brand: params.brand } });
+		// Only admins get the Team page. Members have My Profile; viewers have neither.
+		const { role } = await getMyBrandRoleFn({ data: { brandId: params.brand } });
+		if (!isOrgAdminRole(role)) {
+			if (role === "viewer") throw redirect({ to: "/app/$brand", params: { brand: params.brand } });
+			throw redirect({ to: "/app/$brand/settings/profile", params: { brand: params.brand } });
 		}
-		return data;
+		return listTeamFn({ data: { brandId: params.brand } });
 	},
 	head: ({ matches, match }) => {
 		const appName = getAppName(match);
@@ -84,7 +86,7 @@ export const Route = createFileRoute("/_authed/app/$brand/settings/members")({
 
 function TeamSettingsPage() {
 	const { brand: brandId } = Route.useParams();
-	const { members, invitations, currentUserId, organization } = Route.useLoaderData();
+	const { members, invitations, currentUserId } = Route.useLoaderData();
 	const isAdmin = isOrgAdminRole(members.find((m) => m.userId === currentUserId)?.role ?? "");
 	const router = useRouter();
 	const [inviteEmail, setInviteEmail] = useState("");
@@ -92,8 +94,6 @@ function TeamSettingsPage() {
 	const [inviteExpiry, setInviteExpiry] = useState("30");
 	const [inviting, setInviting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [workspaceName, setWorkspaceName] = useState(organization.name);
-	const [savingWorkspace, setSavingWorkspace] = useState(false);
 	const [lastInvite, setLastInvite] = useState<{ email: string; id: string } | null>(null);
 	const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -103,20 +103,6 @@ function TeamSettingsPage() {
 			setCopiedId(id);
 			setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1600);
 		});
-	}
-
-	async function handleSaveWorkspace(e: React.FormEvent) {
-		e.preventDefault();
-		setError(null);
-		setSavingWorkspace(true);
-		try {
-			await updateOrganizationFn({ data: { brandId, name: workspaceName } });
-			await router.invalidate();
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to update workspace name");
-		} finally {
-			setSavingWorkspace(false);
-		}
 	}
 
 	async function handleInvite(e: React.FormEvent) {
@@ -183,7 +169,7 @@ function TeamSettingsPage() {
 		<div className="space-y-6">
 			<div>
 				<h1 className="text-3xl font-bold">Team</h1>
-				<p className="text-muted-foreground">Invite teammates and manage who has access to your workspace.</p>
+				<p className="text-muted-foreground">Invite teammates and manage who has access to Seen.</p>
 			</div>
 
 			{error && (
@@ -191,25 +177,6 @@ function TeamSettingsPage() {
 					<AlertDescription>{error}</AlertDescription>
 				</Alert>
 			)}
-
-			<div className="space-y-3">
-				<h2 className="text-lg font-semibold">Workspace</h2>
-				<form onSubmit={handleSaveWorkspace} className="flex flex-wrap items-end gap-3">
-					<div className="flex flex-col gap-2">
-						<Label htmlFor="workspace-name">Name</Label>
-						<Input
-							id="workspace-name"
-							value={workspaceName}
-							onChange={(e) => setWorkspaceName(e.target.value)}
-							required
-							className="w-64"
-						/>
-					</div>
-					<Button type="submit" disabled={savingWorkspace}>
-						{savingWorkspace ? "Saving..." : "Save"}
-					</Button>
-				</form>
-			</div>
 
 			<div className="space-y-2">
 				<h2 className="text-lg font-semibold">Invite a teammate</h2>
@@ -299,9 +266,12 @@ function TeamSettingsPage() {
 				<div className="divide-y rounded-md border">
 					{members.map((m) => (
 						<div key={m.id} className="flex items-center justify-between gap-3 p-3">
-							<div className="min-w-0">
-								<p className="truncate font-medium">{m.name}</p>
-								<p className="truncate text-sm text-muted-foreground">{m.email}</p>
+							<div className="flex min-w-0 items-center gap-3">
+								<UserAvatar name={m.name} color={m.avatarColor} />
+								<div className="min-w-0">
+									<p className="truncate font-medium">{m.name}</p>
+									<p className="truncate text-sm text-muted-foreground">{m.email}</p>
+								</div>
 							</div>
 							<div className="flex shrink-0 items-center gap-3">
 								{isAdmin && m.userId !== currentUserId ? (
