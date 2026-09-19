@@ -10,6 +10,9 @@ sslip.io one. There is no code here and no build.
 - `installCommand` is empty on purpose: this project has nothing to install, and
   the monorepo's root install would otherwise run (and fail a frozen-lockfile
   check).
+- Project settings that matter: Root Directory `deploy/vercel-front`, "Include
+  files outside the root directory" **off**, Install Command override
+  `echo "nothing to install"`.
 - Set `APP_URL` in the droplet's `.env` to that address, or sign-in is rejected
   (better-auth checks the browser's Origin against `APP_URL`).
 - Caching is switched off (`x-vercel-enable-rewrite-caching: 0`) so a proxied,
