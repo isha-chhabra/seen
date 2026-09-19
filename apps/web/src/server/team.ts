@@ -134,6 +134,36 @@ export const cancelInvitationFn = createServerFn({ method: "POST" })
 		return { success: true };
 	});
 
+export const updateTeamMemberRoleFn = createServerFn({ method: "POST" })
+	.validator(
+		z.object({
+			brandId: z.string(),
+			memberId: z.string(),
+			role: z.enum(["viewer", "member", "admin"]),
+		}),
+	)
+	.handler(async ({ data }) => {
+		requireTeamInvites();
+		const session = await requireAuthSession();
+		const org = await requireBrandOrganization(session.user.id, data.brandId);
+		if (!isOrgAdminRole(org.role)) throw new Error("Only a workspace admin can change roles");
+
+		const [row] = await db
+			.select({ userId: member.userId })
+			.from(member)
+			.where(and(eq(member.id, data.memberId), eq(member.organizationId, org.id)))
+			.limit(1);
+		if (!row) throw new Error("Member not found");
+		// Keeps at least the acting admin an admin, so the workspace can't lock itself out.
+		if (row.userId === session.user.id) throw new Error("You cannot change your own role");
+
+		await db
+			.update(member)
+			.set({ role: data.role })
+			.where(and(eq(member.id, data.memberId), eq(member.organizationId, org.id)));
+		return { success: true };
+	});
+
 export const removeTeamMemberFn = createServerFn({ method: "POST" })
 	.validator(z.object({ brandId: z.string(), memberId: z.string() }))
 	.handler(async ({ data }) => {

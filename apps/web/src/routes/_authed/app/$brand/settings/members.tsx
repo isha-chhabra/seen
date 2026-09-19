@@ -25,6 +25,7 @@ import {
 	removeTeamMemberFn,
 	type TeamData,
 	updateOrganizationFn,
+	updateTeamMemberRoleFn,
 } from "@/server/team";
 
 /** No transactional email on this deployment, so the accept link is shared by hand. */
@@ -145,6 +146,16 @@ function TeamSettingsPage() {
 			setError(err instanceof Error ? err.message : "Failed to send invitation");
 		} finally {
 			setInviting(false);
+		}
+	}
+
+	async function handleRoleChange(memberId: string, role: "viewer" | "member" | "admin") {
+		setError(null);
+		try {
+			await updateTeamMemberRoleFn({ data: { brandId, memberId, role } });
+			await router.invalidate();
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to change role");
 		}
 	}
 
@@ -293,7 +304,23 @@ function TeamSettingsPage() {
 								<p className="truncate text-sm text-muted-foreground">{m.email}</p>
 							</div>
 							<div className="flex shrink-0 items-center gap-3">
-								<Badge variant="secondary">{m.role}</Badge>
+								{isAdmin && m.userId !== currentUserId ? (
+									<Select
+										value={m.role}
+										onValueChange={(value) => handleRoleChange(m.id, value as "viewer" | "member" | "admin")}
+									>
+										<SelectTrigger aria-label={`Role for ${m.name}`} className="w-32">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="viewer">Viewer</SelectItem>
+											<SelectItem value="member">Member</SelectItem>
+											<SelectItem value="admin">Admin</SelectItem>
+										</SelectContent>
+									</Select>
+								) : (
+									<Badge variant="secondary">{m.role}</Badge>
+								)}
 								{m.userId !== currentUserId && (
 									<Button type="button" variant="outline" size="sm" onClick={() => handleRemove(m.id)}>
 										Remove

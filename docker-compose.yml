@@ -43,6 +43,8 @@ services:
       # Invite-only self-serve signup. Comma-separated exact addresses and/or
       # "@domain" entries. Empty = nobody can register. "*" = fully public (don't).
       CLOUD_SIGNUP_ALLOWLIST: ${CLOUD_SIGNUP_ALLOWLIST:-}
+      # Allowlisted signups join this org as members (else they get their own workspace).
+      CLOUD_AUTO_JOIN_ORG_ID: ${CLOUD_AUTO_JOIN_ORG_ID:-}
       # Verification-code email. Leave both unset to skip email (no verification
       # step). Brevo can send from one verified address, no domain needed.
       BREVO_API_KEY: ${BREVO_API_KEY:-}

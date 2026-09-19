@@ -83,6 +83,7 @@ declare global {
 			readonly GOOGLE_CLIENT_ID?: string;
 			readonly GOOGLE_CLIENT_SECRET?: string;
 			readonly RESEND_FROM_EMAIL?: string;
+			readonly CLOUD_AUTO_JOIN_ORG_ID?: string;
 			readonly BREVO_API_KEY?: string;
 			readonly BREVO_FROM_EMAIL?: string;
 		}

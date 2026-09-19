@@ -350,6 +350,8 @@ function ArticleFinderPage() {
 		}
 	});
 	const filteredCount = sortedRows.length;
+	// Controls stay locked while a search runs, including one picked up from another tab.
+	const locked = busy || phase === "searching";
 	const canBuild = !isViewer && !busy && directionTags.length > 0 && !!range?.from && !!range?.to;
 
 	async function genQueries() {
@@ -377,7 +379,9 @@ function ArticleFinderPage() {
 		setLiveProgress(null);
 		setPhase("searching");
 		try {
-			const res = await findArticlesFn({
+			// Only starts the search; progress and the finished result arrive
+			// through the status poll above, which flips the page to "results".
+			await findArticlesFn({
 				data: {
 					brandId,
 					queries: queries.map((q) => ({ query: q.query, angle: q.angle })),
@@ -388,18 +392,11 @@ function ArticleFinderPage() {
 					excludeBrandMentions,
 				},
 			});
-			setHigh(res.highAuthority);
-			setNiche(res.nicheBlog);
-			setStats(res.stats);
-			setLoaded(null);
-			setPhase("results");
 		} catch (e) {
-			// the request itself failed client-side (not just a slow/dropped
-			// connection with the server still working) — but the status poll
-			// above is still running, so if the server actually did finish and
-			// save, it'll still pick the result up. Only show the error state if
-			// it doesn't.
-			setError(e instanceof Error ? e.message : "Connection lost. Still checking in the background, no need to retry.");
+			// The search never started (validation, debounce, permissions), so
+			// there is nothing for the status poll to pick up: back to the queries.
+			setError(e instanceof Error ? e.message : "Couldn't start the search. Try again.");
+			setPhase("queries");
 		} finally {
 			setBusy(false);
 		}
@@ -583,7 +580,7 @@ function ArticleFinderPage() {
 								<button
 									type="button"
 									onClick={genQueries}
-									disabled={busy || isViewer}
+									disabled={locked || isViewer}
 									className="transition-colors hover:text-foreground"
 								>
 									Regenerate
@@ -591,7 +588,7 @@ function ArticleFinderPage() {
 								<button
 									type="button"
 									onClick={() => setPhase(totalResults > 0 ? "results" : "idle")}
-									disabled={busy}
+									disabled={locked}
 									className="transition-colors hover:text-foreground"
 								>
 									{totalResults > 0 ? "Back" : "Edit"}
@@ -604,10 +601,10 @@ function ArticleFinderPage() {
 								setQueries(vals.map((v) => queries.find((q) => q.query === v) ?? { query: v, angle: "Added by you" }))
 							}
 							placeholder="Type a query, press Enter to add it…"
-							disabled={busy || isViewer}
+							disabled={locked || isViewer}
 							max={MAX_QUERIES_UI}
 						/>
-						<Button onClick={run} disabled={busy || queries.length === 0 || isViewer} className="gap-2">
+						<Button onClick={run} disabled={locked || queries.length === 0 || isViewer} className="gap-2">
 							{phase === "searching" ? (
 								<IconLoader2 className="size-4 animate-spin" />
 							) : (
@@ -618,7 +615,7 @@ function ArticleFinderPage() {
 								: `Search ${queries.length} ${queries.length === 1 ? "query" : "queries"}`}
 						</Button>
 						{phase === "searching" && <ArticleSearchLoader stage={liveStage} progressPct={liveProgress} />}
-						{phase === "searching" && error && <p className="text-sm text-destructive">{error}</p>}
+						{error && <p className="text-sm text-destructive">{error}</p>}
 					</div>
 				)}
 

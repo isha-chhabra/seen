@@ -439,6 +439,13 @@ export const ENV_REGISTRY: EnvVarSpec[] = [
 			"Sender address for transactional email, in the form: Seen <notifications@updates.example.com>. The domain must be verified in Resend.",
 	},
 	{
+		name: "CLOUD_AUTO_JOIN_ORG_ID",
+		scope: "server",
+		requiredBy: "optional",
+		description:
+			"Organization id that allowlisted signups join as members (instead of getting a workspace of their own). Ignored when the signup allowlist contains '*'.",
+	},
+	{
 		name: "BREVO_API_KEY",
 		scope: "server",
 		requiredBy: "optional",

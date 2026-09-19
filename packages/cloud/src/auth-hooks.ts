@@ -18,7 +18,7 @@
 
 import type { CreateAuthOptions } from "@workspace/lib/auth/server";
 import { db } from "@workspace/lib/db/db";
-import { provisionUmbrellaOrg } from "@workspace/lib/db/provisioning";
+import { joinOrganization, provisionUmbrellaOrg } from "@workspace/lib/db/provisioning";
 import { invitation } from "@workspace/lib/db/schema";
 import { APIError } from "better-auth/api";
 import { emailOTP } from "better-auth/plugins";
@@ -158,6 +158,16 @@ export function getCloudAuthOptions(): CreateAuthOptions {
 							.where(and(sql`lower(${invitation.email}) = ${email}`, eq(invitation.status, "pending")))
 							.limit(1);
 						if (pendingInvite.length > 0) return;
+
+						// Allowlisted signups join the deployment's shared workspace as
+						// members, so the admin sees them on the Team page and can change
+						// their role or remove them. Never when signup is open to everyone
+						// ("*"): strangers must not land in someone else's workspace.
+						const sharedOrgId = process.env.CLOUD_AUTO_JOIN_ORG_ID;
+						if (sharedOrgId && !getSignupAllowlist().includes("*")) {
+							const joined = await joinOrganization({ userId: user.id, organizationId: sharedOrgId, role: "member" });
+							if (joined) return;
+						}
 
 						await provisionUmbrellaOrg({
 							userId: user.id,

@@ -201,3 +201,31 @@ export async function provisionUmbrellaOrg(input: { userId: string; name: string
 
 	return { orgId };
 }
+
+/**
+ * Add a user to an existing organization. Returns false and writes nothing when
+ * the organization does not exist, so the caller can fall back to giving the
+ * user a workspace of their own. Used by the cloud user.create.after hook to
+ * put allowlisted signups into the deployment's shared workspace.
+ */
+export async function joinOrganization(input: {
+	userId: string;
+	organizationId: string;
+	role: string;
+}): Promise<boolean> {
+	const [org] = await db
+		.select({ id: organization.id })
+		.from(organization)
+		.where(eq(organization.id, input.organizationId))
+		.limit(1);
+	if (!org) return false;
+
+	await db.insert(member).values({
+		id: crypto.randomUUID(),
+		organizationId: input.organizationId,
+		userId: input.userId,
+		role: input.role,
+		createdAt: new Date(),
+	});
+	return true;
+}
