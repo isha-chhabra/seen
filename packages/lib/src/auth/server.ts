@@ -97,12 +97,6 @@ export function createAuth(options?: CreateAuthOptions) {
 					defaultValue: false,
 					input: false,
 				},
-				// Which palette swatch the user's initials avatar is drawn in.
-				avatarColor: {
-					type: "string",
-					required: false,
-					input: true,
-				},
 			},
 		},
 

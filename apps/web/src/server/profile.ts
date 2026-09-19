@@ -1,8 +1,8 @@
 /**
  * Server functions for the signed-in user's own profile page.
  *
- * Name and avatar colour are edited client-side through better-auth's
- * updateUser (which also refreshes the session cookie), so this module only
+ * The name is edited client-side through better-auth's updateUser (which
+ * also refreshes the session cookie), so this module only
  * holds what better-auth can't do: read the page's data in one call, and
  * delete the account behind the safeguards the page promises.
  */
@@ -29,7 +29,8 @@ export type ActivityItem = {
 export type ProfileData = {
 	name: string;
 	email: string;
-	avatarColor: string | null;
+	/** Employer, recognised from the email domain; null when we don't know it. */
+	organization: string | null;
 	role: string;
 	/** ISO timestamp of when the user joined this workspace. */
 	memberSince: string;
@@ -38,9 +39,19 @@ export type ProfileData = {
 };
 
 const SIGN_IN_LABELS: Record<string, string> = {
-	credential: "Email and password",
-	google: "Google",
+	credential: "Email",
+	google: "Google sign in",
 };
+
+/** Organizations we recognise by email domain. Anyone else simply has none to show. */
+const ORGANIZATIONS_BY_DOMAIN: Record<string, string> = {
+	"newengen.com": "New Engen",
+};
+
+function organizationFor(email: string): string | null {
+	const domain = email.split("@").pop()?.trim().toLowerCase() ?? "";
+	return ORGANIZATIONS_BY_DOMAIN[domain] ?? null;
+}
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -105,11 +116,7 @@ export const getMyProfileFn = createServerFn({ method: "GET" })
 		const org = await requireBrandOrganization(session.user.id, data.brandId);
 
 		const [[me], [membership], accounts, activity] = await Promise.all([
-			db
-				.select({ name: user.name, email: user.email, avatarColor: user.avatarColor })
-				.from(user)
-				.where(eq(user.id, session.user.id))
-				.limit(1),
+			db.select({ name: user.name, email: user.email }).from(user).where(eq(user.id, session.user.id)).limit(1),
 			db
 				.select({ createdAt: member.createdAt })
 				.from(member)
@@ -123,7 +130,7 @@ export const getMyProfileFn = createServerFn({ method: "GET" })
 		return {
 			name: me.name,
 			email: me.email,
-			avatarColor: me.avatarColor,
+			organization: organizationFor(me.email),
 			role: org.role,
 			memberSince: membership.createdAt.toISOString(),
 			signInMethods: accounts.map((a) => SIGN_IN_LABELS[a.providerId] ?? a.providerId),

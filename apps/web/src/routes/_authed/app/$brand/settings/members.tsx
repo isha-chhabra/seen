@@ -267,7 +267,7 @@ function TeamSettingsPage() {
 					{members.map((m) => (
 						<div key={m.id} className="flex items-center justify-between gap-3 p-3">
 							<div className="flex min-w-0 items-center gap-3">
-								<UserAvatar name={m.name} color={m.avatarColor} />
+								<UserAvatar name={m.name} seed={m.email} />
 								<div className="min-w-0">
 									<p className="truncate font-medium">{m.name}</p>
 									<p className="truncate text-sm text-muted-foreground">{m.email}</p>

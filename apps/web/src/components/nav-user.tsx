@@ -47,7 +47,7 @@ export function NavUser({ canSwitchBrand = true }: { canSwitchBrand?: boolean } 
 							/>
 						}
 					>
-						<UserAvatar name={user.name} color={user.avatarColor} />
+						<UserAvatar name={user.name} seed={user.email} />
 						<div className="grid flex-1 text-left text-sm leading-tight">
 							<span className="truncate font-medium">{user.name}</span>
 							<span className="truncate text-xs">{isNameEmailSame ? "Your Account" : user.email}</span>
@@ -64,7 +64,7 @@ export function NavUser({ canSwitchBrand = true }: { canSwitchBrand?: boolean } 
 						<DropdownMenuGroup>
 							<DropdownMenuLabel className="p-0 font-normal">
 								<div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-									<UserAvatar name={user.name} color={user.avatarColor} />
+									<UserAvatar name={user.name} seed={user.email} />
 									<div className="grid flex-1 text-left text-sm leading-tight">
 										<span className="truncate font-medium">{user.name}</span>
 										<span className="truncate text-xs">{isNameEmailSame ? "Your Account" : user.email}</span>

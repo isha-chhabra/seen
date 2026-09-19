@@ -148,6 +148,13 @@
       "when": 1790000000000,
       "tag": "0020_user_avatar_color",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790500000000,
+      "tag": "0021_drop_user_avatar_color",
+      "breakpoints": true
     }
   ]
 }

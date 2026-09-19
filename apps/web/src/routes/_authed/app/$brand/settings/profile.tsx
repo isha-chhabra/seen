@@ -1,7 +1,8 @@
 /**
  * /app/$brand/settings/profile - "My Profile" (members and admins; viewers never see it)
  *
- * Name and avatar colour are editable, email is shown but fixed. Recent activity
+ * The name is editable; the email is shown but fixed. The avatar is initials in
+ * a colour derived from the email, so it isn't configurable. Recent activity
  * lists the last few prompt runs and Article Finder searches. Deleting the
  * account sits at the bottom behind a typed confirmation.
  */
@@ -23,10 +24,9 @@ import {
 } from "@workspace/ui/components/dialog";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
-import { cn } from "@workspace/ui/lib/utils";
 import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
-import { AVATAR_COLORS, resolveAvatarColor, UserAvatar } from "@/components/user-avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { DELETE_CONFIRM_PHRASE } from "@/lib/delete-account";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
 import { deleteMyAccountFn, getMyProfileFn, type ProfileData } from "@/server/profile";
@@ -49,7 +49,7 @@ export const Route = createFileRoute("/_authed/app/$brand/settings/profile")({
 		return {
 			meta: [
 				{ title: buildTitle("My Profile", { appName, brandName }) },
-				{ name: "description", content: "Your name, avatar and recent activity." },
+				{ name: "description", content: "Your name and recent activity." },
 			],
 		};
 	},
@@ -72,23 +72,25 @@ function roleLabel(role: string): string {
 	return role === "member" ? "Member" : role;
 }
 
+function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+	return (
+		<div>
+			<dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</dt>
+			<dd className="mt-1.5 text-sm">{children}</dd>
+		</div>
+	);
+}
+
 function ProfilePage() {
 	const profile = Route.useLoaderData();
 	const router = useRouter();
 	const [name, setName] = useState(profile.name);
-	const [color, setColor] = useState(profile.avatarColor);
 	const [savingName, setSavingName] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [notice, setNotice] = useState<string | null>(null);
+	const [saved, setSaved] = useState(false);
 
 	const trimmedName = name.trim();
 	const nameChanged = trimmedName.length > 0 && trimmedName !== profile.name;
-	const activeColor = resolveAvatarColor(color).key;
-
-	function flash(message: string) {
-		setNotice(message);
-		setTimeout(() => setNotice((current) => (current === message ? null : current)), 2200);
-	}
 
 	async function saveName(e: React.FormEvent) {
 		e.preventDefault();
@@ -99,183 +101,124 @@ function ProfilePage() {
 		if (result.error) {
 			setError(result.error.message ?? "Couldn't save your name. Try again.");
 		} else {
-			flash("Name saved");
+			setSaved(true);
+			setTimeout(() => setSaved(false), 2200);
 			await router.invalidate();
 		}
 		setSavingName(false);
 	}
 
-	async function pickColor(key: string) {
-		if (key === activeColor) return;
-		const previous = color;
-		setError(null);
-		setColor(key);
-		const result = await authClient.updateUser({ avatarColor: key });
-		if (result.error) {
-			setColor(previous);
-			setError(result.error.message ?? "Couldn't save the color. Try again.");
-			return;
-		}
-		flash("Avatar color saved");
-		await router.invalidate();
-	}
-
 	return (
-		<div className="max-w-5xl">
+		<div className="max-w-5xl space-y-6">
 			<PageHeader title="My Profile" subtitle="How you appear in Seen, and what you've been up to." />
 
-			<div aria-live="polite" className="h-5 text-sm text-primary">
-				{notice && (
-					<span className="inline-flex items-center gap-1.5">
-						<IconCheck className="size-4" />
-						{notice}
-					</span>
-				)}
-			</div>
-
 			{error && (
-				<Alert variant="destructive" className="mb-4">
+				<Alert variant="destructive">
 					<AlertDescription>{error}</AlertDescription>
 				</Alert>
 			)}
 
-			<div className="grid gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-				<Card className="scroll-reveal h-fit">
-					<CardContent className="flex flex-col items-center gap-5 pt-2 text-center">
-						<UserAvatar name={name || profile.name} color={color} className="size-28 rounded-[2rem] text-4xl" />
-						<div className="min-w-0 max-w-full">
-							<p className="truncate text-lg font-semibold">{profile.name}</p>
-							<p className="truncate text-sm text-muted-foreground">{profile.email}</p>
+			<Card className="scroll-reveal">
+				<CardContent className="flex items-center gap-5">
+					<UserAvatar name={name || profile.name} seed={profile.email} className="size-20 rounded-2xl text-2xl" />
+					<div className="min-w-0">
+						<p className="truncate text-xl font-semibold">{profile.name}</p>
+						<p className="truncate text-sm text-muted-foreground">{profile.email}</p>
+						<Badge variant="secondary" className="mt-2">
+							{roleLabel(profile.role)}
+						</Badge>
+					</div>
+				</CardContent>
+			</Card>
+
+			<div className="grid gap-6 lg:grid-cols-2">
+				<Card className="scroll-reveal">
+					<CardHeader>
+						<CardTitle>Details</CardTitle>
+						<CardDescription>Your name is shown to teammates. Your email is used to sign in.</CardDescription>
+					</CardHeader>
+					<CardContent className="space-y-5">
+						<form onSubmit={saveName} className="space-y-2">
+							<Label htmlFor="profile-name">Name</Label>
+							<div className="flex gap-2">
+								<Input
+									id="profile-name"
+									value={name}
+									onChange={(e) => setName(e.target.value)}
+									maxLength={60}
+									autoComplete="name"
+									required
+								/>
+								<Button type="submit" disabled={!nameChanged || savingName} className="shrink-0">
+									{savingName ? "Saving..." : "Save"}
+								</Button>
+							</div>
+							<p aria-live="polite" className="flex h-4 items-center gap-1.5 text-xs text-primary">
+								{saved && (
+									<>
+										<IconCheck className="size-3.5" />
+										Name saved
+									</>
+								)}
+							</p>
+						</form>
+
+						<div className="space-y-2">
+							<Label htmlFor="profile-email">Email</Label>
+							<div className="relative">
+								<Input id="profile-email" value={profile.email} readOnly disabled className="pr-9" />
+								<IconLock className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
+							</div>
+							<p className="text-xs text-muted-foreground">Your email can't be changed.</p>
 						</div>
-						<div className="w-full space-y-3 border-t pt-5">
-							<p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Avatar color</p>
-							<fieldset className="flex flex-wrap justify-center gap-2.5">
-								<legend className="sr-only">Avatar color</legend>
-								{AVATAR_COLORS.map((swatch) => {
-									const selected = swatch.key === activeColor;
-									return (
-										<label
-											key={swatch.key}
-											title={swatch.label}
-											className={cn(
-												"relative size-8 cursor-pointer rounded-full ring-offset-2 ring-offset-card transition-transform hover:scale-110 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
-												selected && "ring-2 ring-foreground",
-											)}
-											style={{ backgroundColor: `var(${swatch.token})` }}
-										>
-											<input
-												type="radio"
-												name="avatar-color"
-												value={swatch.key}
-												checked={selected}
-												onChange={() => pickColor(swatch.key)}
-												aria-label={swatch.label}
-												className="sr-only"
-											/>
-										</label>
-									);
+
+						<dl className="grid gap-4 border-t pt-5 sm:grid-cols-2">
+							{profile.organization && <Fact label="Organization">{profile.organization}</Fact>}
+							<Fact label="Member since">
+								{new Date(profile.memberSince).toLocaleDateString(undefined, {
+									year: "numeric",
+									month: "short",
+									day: "numeric",
 								})}
-							</fieldset>
-						</div>
+							</Fact>
+							<Fact label="Sign up method">{profile.signInMethods.join(", ") || "Email"}</Fact>
+						</dl>
 					</CardContent>
 				</Card>
 
-				<div className="space-y-6">
-					<Card className="scroll-reveal">
-						<CardHeader>
-							<CardTitle>Details</CardTitle>
-							<CardDescription>Your name is shown to teammates. Your email is used to sign in.</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-5">
-							<form onSubmit={saveName} className="space-y-2">
-								<Label htmlFor="profile-name">Name</Label>
-								<div className="flex gap-2">
-									<Input
-										id="profile-name"
-										value={name}
-										onChange={(e) => setName(e.target.value)}
-										maxLength={60}
-										autoComplete="name"
-										required
-									/>
-									<Button type="submit" disabled={!nameChanged || savingName} className="shrink-0">
-										{savingName ? "Saving..." : "Save"}
-									</Button>
-								</div>
-							</form>
-
-							<div className="space-y-2">
-								<Label htmlFor="profile-email">Email</Label>
-								<div className="relative">
-									<Input id="profile-email" value={profile.email} readOnly disabled className="pr-9" />
-									<IconLock className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
-								</div>
-								<p className="text-xs text-muted-foreground">Your email can't be changed.</p>
-							</div>
-
-							<dl className="grid gap-4 border-t pt-5 sm:grid-cols-3">
-								<div>
-									<dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Role</dt>
-									<dd className="mt-1.5">
-										<Badge variant="secondary">{roleLabel(profile.role)}</Badge>
-									</dd>
-								</div>
-								<div>
-									<dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Member since</dt>
-									<dd className="mt-1.5 text-sm">
-										{new Date(profile.memberSince).toLocaleDateString(undefined, {
-											year: "numeric",
-											month: "short",
-											day: "numeric",
-										})}
-									</dd>
-								</div>
-								<div>
-									<dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Signs in with</dt>
-									<dd className="mt-1.5 text-sm">{profile.signInMethods.join(", ") || "Email and password"}</dd>
-								</div>
-							</dl>
-						</CardContent>
-					</Card>
-
-					<Card className="scroll-reveal">
-						<CardHeader>
-							<CardTitle className="flex items-center gap-2">
-								<IconHistory className="size-4 text-primary" />
-								Recent activity
-							</CardTitle>
-							<CardDescription>The latest prompt runs and Article Finder searches in Seen.</CardDescription>
-						</CardHeader>
-						<CardContent>
-							{profile.activity.length === 0 ? (
-								<p className="text-sm text-muted-foreground">
-									Nothing yet. Prompt runs and Article Finder searches will show up here.
-								</p>
-							) : (
-								<ol className="space-y-4">
-									{profile.activity.map((item) => (
-										<li key={`${item.kind}-${item.at}`} className="flex items-start gap-3">
-											<span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary">
-												{item.kind === "prompt-run" ? (
-													<IconBolt className="size-4" />
-												) : (
-													<IconSearch className="size-4" />
-												)}
-											</span>
-											<div className="min-w-0 flex-1">
-												<p className="text-sm font-medium">{item.title}</p>
-												{item.detail && <p className="truncate text-xs text-muted-foreground">{item.detail}</p>}
-											</div>
-											<time dateTime={item.at} className="shrink-0 text-xs text-muted-foreground">
-												{timeAgo(item.at)}
-											</time>
-										</li>
-									))}
-								</ol>
-							)}
-						</CardContent>
-					</Card>
-				</div>
+				<Card className="scroll-reveal">
+					<CardHeader>
+						<CardTitle className="flex items-center gap-2">
+							<IconHistory className="size-4 text-primary" />
+							Recent activity
+						</CardTitle>
+						<CardDescription>The latest prompt runs and Article Finder searches in Seen.</CardDescription>
+					</CardHeader>
+					<CardContent>
+						{profile.activity.length === 0 ? (
+							<p className="text-sm text-muted-foreground">
+								Nothing yet. Prompt runs and Article Finder searches will show up here.
+							</p>
+						) : (
+							<ol className="space-y-4">
+								{profile.activity.map((item) => (
+									<li key={`${item.kind}-${item.at}`} className="flex items-start gap-3">
+										<span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary">
+											{item.kind === "prompt-run" ? <IconBolt className="size-4" /> : <IconSearch className="size-4" />}
+										</span>
+										<div className="min-w-0 flex-1">
+											<p className="text-sm font-medium">{item.title}</p>
+											{item.detail && <p className="truncate text-xs text-muted-foreground">{item.detail}</p>}
+										</div>
+										<time dateTime={item.at} className="shrink-0 text-xs text-muted-foreground">
+											{timeAgo(item.at)}
+										</time>
+									</li>
+								))}
+							</ol>
+						)}
+					</CardContent>
+				</Card>
 			</div>
 
 			<DeleteAccountCard />
@@ -318,7 +261,7 @@ function DeleteAccountCard() {
 
 	return (
 		<>
-			<Card className="scroll-reveal mt-6 border-destructive/30">
+			<Card className="scroll-reveal border-destructive/30">
 				<CardContent className="flex flex-wrap items-center justify-between gap-4">
 					<div className="min-w-0">
 						<p className="font-medium">Delete account</p>
@@ -341,7 +284,7 @@ function DeleteAccountCard() {
 			<Dialog open={open} onOpenChange={onOpenChange}>
 				<DialogContent>
 					<form onSubmit={confirmDelete} className="space-y-4">
-						<DialogHeader>
+						<DialogHeader className="text-left">
 							<DialogTitle>Delete your account?</DialogTitle>
 							<DialogDescription>
 								This permanently deletes your account and signs you out everywhere. Brands and results stay with the

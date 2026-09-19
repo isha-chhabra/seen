@@ -30,7 +30,6 @@ export type TeamData = {
 		userId: string;
 		name: string;
 		email: string;
-		avatarColor: string | null;
 		createdAt: Date;
 	}[];
 	invitations: { id: string; email: string; role: string | null; expiresAt: Date }[];
@@ -56,7 +55,6 @@ export const listTeamFn = createServerFn({ method: "GET" })
 				userId: member.userId,
 				name: user.name,
 				email: user.email,
-				avatarColor: user.avatarColor,
 				createdAt: member.createdAt,
 			})
 			.from(member)
