@@ -1,5 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "",
   "rewrites": [{ "source": "/(.*)", "destination": "https://165-227-198-85.sslip.io/$1" }],
   "headers": [
     {
