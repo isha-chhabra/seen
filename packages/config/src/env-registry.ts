@@ -438,6 +438,20 @@ export const ENV_REGISTRY: EnvVarSpec[] = [
 		description:
 			"Sender address for transactional email, in the form: Seen <notifications@updates.example.com>. The domain must be verified in Resend.",
 	},
+	{
+		name: "BREVO_API_KEY",
+		scope: "server",
+		requiredBy: "optional",
+		description:
+			"Brevo API key for transactional email, an alternative to Resend that can send from a single verified address (no domain). Wins over Resend when both are set.",
+	},
+	{
+		name: "BREVO_FROM_EMAIL",
+		scope: "server",
+		requiredBy: "optional",
+		description:
+			"Sender for Brevo email, in the form: Seen <you@example.com>. The address must be a verified sender in Brevo.",
+	},
 ];
 
 export const CREDENTIAL_ENV_NAMES: ReadonlySet<string> = new Set(

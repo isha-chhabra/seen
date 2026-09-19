@@ -23,6 +23,16 @@ The canonical list of every cloud-required variable (Stripe, database, etc.) liv
 
 Email templates are code — `packages/cloud/src/email-templates.ts` — not Resend-hosted templates; there is nothing to configure template-side in Resend.
 
+## Brevo setup (no domain needed)
+
+An alternative to Resend that works without owning a domain. Brevo wins when both are configured.
+
+1. Create a free [Brevo](https://www.brevo.com) account and add a sender under Senders, Domains & Dedicated IPs (Brevo emails that address a code to confirm it).
+2. Create an API key (SMTP & API, API Keys) and set it as `BREVO_API_KEY`.
+3. Set `BREVO_FROM_EMAIL` to the verified sender, e.g. `Seen <you@example.com>`.
+
+Sending uses Brevo's HTTPS API, not SMTP (DigitalOcean droplets block SMTP ports).
+
 ## Google OAuth setup
 
 1. In the Google Cloud console, create an OAuth client of type **Web application**.
@@ -32,7 +42,7 @@ Email templates are code — `packages/cloud/src/email-templates.ts` — not Res
 
 ## Behavior notes
 
-- Email/password sign-in requires a verified email. The verification email is sent on signup, unverified sign-in attempts re-send it, and clicking the link signs the user in automatically.
+- Email/password sign-in requires a verified email. A 6-digit code is emailed on signup, unverified sign-in attempts email a fresh one, and entering it verifies the address and signs the user in.
 - Google-provided emails arrive verified, so OAuth users are never blocked by verification.
 - Team invitations expire after 48 hours (better-auth default). Untouched invitations simply lapse; there is no decline step.
 - Disposable-email domains are rejected at signup (both email/password and OAuth) via the `disposable-email-domains` package; the blocklist updates through normal dependency bumps.

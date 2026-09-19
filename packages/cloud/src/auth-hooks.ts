@@ -2,12 +2,14 @@
  * Cloud auth options for better-auth.
  *
  * Public self-serve signup: email/password with required verification,
- * Google OAuth, Resend transactional email, disposable-domain blocking,
- * invite-only signup allowlist, and umbrella org provisioning on signup.
+ * Google OAuth, transactional email (verification by 6-digit code), disposable-
+ * domain blocking, invite-only signup allowlist, and umbrella org provisioning
+ * on signup.
  *
  * Self-host toggles:
  *   - DISABLE_BILLING=true            -> drop the Stripe plugin, no paywall
- *   - RESEND_API_KEY unset            -> skip all transactional email; signup
+ *   - BREVO_API_KEY and RESEND_API_KEY
+ *     both unset                      -> skip all transactional email; signup
  *                                       needs no verification, invites create a
  *                                       row whose /accept-invitation/<id> link
  *                                       is shared out of band
@@ -19,11 +21,14 @@ import { db } from "@workspace/lib/db/db";
 import { provisionUmbrellaOrg } from "@workspace/lib/db/provisioning";
 import { invitation } from "@workspace/lib/db/schema";
 import { APIError } from "better-auth/api";
+import { emailOTP } from "better-auth/plugins";
 import { and, eq, sql } from "drizzle-orm";
 import { createStripeBillingPlugin } from "./billing/plugin";
 import { isDisposableEmail } from "./disposable-domains";
-import { sendEmail } from "./email";
-import { invitationEmail, passwordResetEmail, verificationEmail } from "./email-templates";
+import { isEmailConfigured, sendEmail } from "./email";
+import { invitationEmail, passwordResetEmail, verificationCodeEmail } from "./email-templates";
+
+const VERIFICATION_CODE_TTL_SECONDS = 5 * 60;
 
 // ── Signup allowlist ──────────────────────────────────────────────────
 
@@ -63,22 +68,46 @@ function getSignupAllowlist(): string[] {
 
 export function getCloudAuthOptions(): CreateAuthOptions {
 	const appUrl = process.env.APP_URL!;
-	const emailEnabled = !!process.env.RESEND_API_KEY;
+	const emailEnabled = isEmailConfigured();
 	const billingDisabled = process.env.DISABLE_BILLING === "true";
 	const hasGoogleOAuth = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 
+	const extraPlugins = [
+		// Verification by code: overrideDefaultEmailVerification routes both the
+		// signup email and the "unverified sign-in" resend through this sender
+		// instead of a link. disableSignUp stops the plugin's own code sign-in
+		// endpoint from creating accounts, so signup only happens through the
+		// email/password + allowlist path.
+		...(emailEnabled
+			? [
+					emailOTP({
+						overrideDefaultEmailVerification: true,
+						disableSignUp: true,
+						expiresIn: VERIFICATION_CODE_TTL_SECONDS,
+						sendVerificationOTP: async ({ email, otp, type }) => {
+							// Only signup/sign-in verification uses codes; the plugin's
+							// password-reset and email-change code flows stay unused.
+							if (type !== "email-verification") return;
+							await sendEmail(
+								email,
+								verificationCodeEmail({ otp, expiresInMinutes: VERIFICATION_CODE_TTL_SECONDS / 60 }),
+							);
+						},
+					}),
+				]
+			: []),
+		...(!billingDisabled ? [createStripeBillingPlugin()] : []),
+	];
+
 	return {
 		// Without a transactional-email provider there is no way to deliver a
-		// verification link, so verification is only required when email works.
+		// verification code, so verification is only required when email works.
 		requireEmailVerification: emailEnabled,
 		...(emailEnabled && {
 			emailVerification: {
 				sendOnSignUp: true,
 				sendOnSignIn: true,
 				autoSignInAfterVerification: true,
-				sendVerificationEmail: async ({ user, url }) => {
-					await sendEmail(user.email, verificationEmail({ url }));
-				},
 			},
 			sendResetPassword: async ({ user, url }) => {
 				await sendEmail(user.email, passwordResetEmail({ url }));
@@ -138,7 +167,7 @@ export function getCloudAuthOptions(): CreateAuthOptions {
 				},
 			},
 		},
-		...(!billingDisabled && { extraPlugins: [createStripeBillingPlugin()] }),
+		...(extraPlugins.length > 0 && { extraPlugins }),
 		organizationOptions: {
 			// Links are shared by hand here, so a 2-day default is too tight.
 			// 30 days by default; the invite form can shorten it per invite.

@@ -2,8 +2,8 @@
  * /auth/register - Account registration page
  *
  * Available in local mode for the single bootstrap signup and in cloud mode
- * for public self-serve signup. Cloud requires email verification before
- * sign-in and also offers Google OAuth.
+ * for public self-serve signup. Cloud verifies the email with an emailed code
+ * (when an email provider is configured) and also offers Google OAuth.
  */
 
 import { IconBrandGoogle } from "@tabler/icons-react";
@@ -19,7 +19,7 @@ import { useState } from "react";
 import { z } from "zod";
 import { AuthSplitLayout } from "@/components/auth/auth-split-layout";
 import { SalesFooterLinks, SalesPanel } from "@/components/auth/sales-panel";
-import FullPageCard from "@/components/full-page-card";
+import { VerifyEmailCode } from "@/components/auth/verify-email-code";
 import { safeReturnTo } from "@/lib/return-to";
 import { buildTitle, getAppName } from "@/lib/route-head";
 
@@ -83,7 +83,6 @@ export function RegisterForm({
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [pendingVerification, setPendingVerification] = useState(false);
-	const [resending, setResending] = useState(false);
 	const source = isCloud ? "cloud-signup" : "self-hosted-signup";
 
 	const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
@@ -102,7 +101,6 @@ export function RegisterForm({
 				email,
 				password,
 				name,
-				...(isCloud && { callbackURL: safeReturnTo(returnTo) }),
 			});
 
 			if (result.error) {
@@ -111,41 +109,22 @@ export function RegisterForm({
 				return;
 			}
 
-			if (isCloud) {
+			// No session token back means the server wants the emailed code first.
+			if (isCloud && !result.data?.token) {
 				setPendingVerification(true);
 				setLoading(false);
 				return;
 			}
 
-			navigate({ to: returnTo ?? "/app" });
+			navigate({ to: safeReturnTo(returnTo) });
 		} catch {
 			setError("Something went wrong. Please try again.");
 			setLoading(false);
 		}
 	}
 
-	async function handleResend() {
-		setResending(true);
-		try {
-			await authClient.sendVerificationEmail({ email, callbackURL: safeReturnTo(returnTo) });
-		} finally {
-			setResending(false);
-		}
-	}
-
 	if (pendingVerification) {
-		return (
-			<FullPageCard title="Check your email" subtitle={`We sent a verification link to ${email}`}>
-				<div className="space-y-4 w-full">
-					<p className="text-sm text-muted-foreground text-center">
-						Click the link in the email to verify your address and get started. The link expires, so verify soon.
-					</p>
-					<Button type="button" variant="outline" className="w-full" onClick={handleResend} disabled={resending}>
-						{resending ? "Sending..." : "Resend verification email"}
-					</Button>
-				</div>
-			</FullPageCard>
-		);
+		return <VerifyEmailCode email={email} returnTo={returnTo} />;
 	}
 
 	return (

@@ -37,6 +37,27 @@ describe("getCloudAuthOptions", () => {
 		expect(options.emailVerification?.sendOnSignIn).toBe(true);
 	});
 
+	it("verifies by emailed code when a provider is configured", () => {
+		const plugins = getCloudAuthOptions().extraPlugins ?? [];
+		expect(plugins.map((plugin) => plugin.id)).toContain("email-otp");
+	});
+
+	it("uses Brevo alone as a provider", () => {
+		vi.stubEnv("RESEND_API_KEY", "");
+		vi.stubEnv("BREVO_API_KEY", "xkeysib-test");
+		const options = getCloudAuthOptions();
+		expect(options.requireEmailVerification).toBe(true);
+		expect((options.extraPlugins ?? []).map((plugin) => plugin.id)).toContain("email-otp");
+	});
+
+	it("skips verification and codes when no email provider is configured", () => {
+		vi.stubEnv("RESEND_API_KEY", "");
+		vi.stubEnv("BREVO_API_KEY", "");
+		const options = getCloudAuthOptions();
+		expect(options.requireEmailVerification).toBe(false);
+		expect((options.extraPlugins ?? []).map((plugin) => plugin.id)).not.toContain("email-otp");
+	});
+
 	it("configures Google OAuth from env", () => {
 		const google = getCloudAuthOptions().socialProviders?.google;
 		if (!google || typeof google === "function") {

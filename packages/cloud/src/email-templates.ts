@@ -38,16 +38,20 @@ function wrapHtml(heading: string, sentence: string, url: string, cta = "Continu
 	`.trim();
 }
 
-export function verificationEmail(input: { url: string }): EmailContent {
-	const { url } = input;
+/** The code is digits only (better-auth's email-otp generator), so it needs no escaping. */
+export function verificationCodeEmail(input: { otp: string; expiresInMinutes: number }): EmailContent {
+	const { otp, expiresInMinutes } = input;
 	return {
-		subject: "Verify your email address",
-		html: wrapHtml(
-			"Verify your email address",
-			"Click the button below to verify your email and finish signing up.",
-			url,
-		),
-		text: `Verify your email address by visiting this link: ${url}`,
+		subject: `${otp} is your Seen verification code`,
+		html: `
+		<div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+			<h1 style="font-size: 20px;">Verify your email address</h1>
+			<p>Enter this code to finish signing in. It expires in ${expiresInMinutes} minutes.</p>
+			<p style="font-size: 32px; font-weight: 600; letter-spacing: 8px; margin: 24px 0;">${otp}</p>
+			<p style="color: #6b7280; font-size: 13px;">If you didn't request this, you can ignore this email.</p>
+		</div>
+	`.trim(),
+		text: `Your Seen verification code is ${otp}. It expires in ${expiresInMinutes} minutes. If you didn't request it, ignore this email.`,
 	};
 }
 

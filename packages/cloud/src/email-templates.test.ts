@@ -5,17 +5,17 @@ import {
 	paymentFailedEmail,
 	paymentRecoveredEmail,
 	subscriptionEndedEmail,
-	verificationEmail,
+	verificationCodeEmail,
 } from "./email-templates";
 
 const URL = "https://app.example.com/verify?token=abc123";
 
-describe("verificationEmail", () => {
-	it("includes the url in html and text with a non-empty subject", () => {
-		const email = verificationEmail({ url: URL });
-		expect(email.subject.length).toBeGreaterThan(0);
-		expect(email.html).toContain(URL);
-		expect(email.text).toContain(URL);
+describe("verificationCodeEmail", () => {
+	it("puts the code in the subject, html and text", () => {
+		const email = verificationCodeEmail({ otp: "482913", expiresInMinutes: 5 });
+		expect(email.subject).toContain("482913");
+		expect(email.html).toContain("482913");
+		expect(email.text).toContain("482913");
 	});
 });
 

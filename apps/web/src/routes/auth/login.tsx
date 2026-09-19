@@ -20,6 +20,7 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { AuthSplitLayout } from "@/components/auth/auth-split-layout";
 import { SalesFooterLinks, SalesPanel } from "@/components/auth/sales-panel";
+import { VerifyEmailCode } from "@/components/auth/verify-email-code";
 import FullPageCard from "@/components/full-page-card";
 import { safeReturnTo } from "@/lib/return-to";
 import { buildTitle, getAppName } from "@/lib/route-head";
@@ -180,6 +181,7 @@ export function EmailPasswordLogin({
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
+	const [needsCode, setNeedsCode] = useState(false);
 	const source = isCloud ? "cloud-signin" : "self-hosted-signin";
 
 	async function handleSubmit(e: React.FormEvent) {
@@ -194,12 +196,13 @@ export function EmailPasswordLogin({
 			});
 
 			if (result.error) {
-				if (isCloud && result.error.status === 403) {
-					setError("Please verify your email first — we just sent you a new verification link.");
+				setLoading(false);
+				if (result.error.code === "EMAIL_NOT_VERIFIED") {
+					// The server has just emailed a fresh code; collect it on the next screen.
+					setNeedsCode(true);
 				} else {
 					setError(result.error.message ?? "Invalid email or password");
 				}
-				setLoading(false);
 				return;
 			}
 
@@ -208,6 +211,10 @@ export function EmailPasswordLogin({
 			setError("Something went wrong. Please try again.");
 			setLoading(false);
 		}
+	}
+
+	if (needsCode) {
+		return <VerifyEmailCode email={email} returnTo={returnTo} />;
 	}
 
 	return (
