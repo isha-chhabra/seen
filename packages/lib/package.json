@@ -35,7 +35,13 @@
 		"./usage": "./src/usage/cost.ts",
 		"./report/narrative": "./src/report/narrative.ts",
 		"./article-finder/llm": "./src/article-finder/llm.ts",
-		"./article-finder/search": "./src/article-finder/search.ts"
+		"./article-finder/search": "./src/article-finder/search.ts",
+		"./influencer-finder/analyze": "./src/influencer-finder/analyze.ts",
+		"./influencer-finder/cost": "./src/influencer-finder/cost.ts",
+		"./influencer-finder/datasets": "./src/influencer-finder/datasets.ts",
+		"./influencer-finder/llm": "./src/influencer-finder/llm.ts",
+		"./influencer-finder/pipeline": "./src/influencer-finder/pipeline.ts",
+		"./influencer-finder/types": "./src/influencer-finder/types.ts"
 	},
 	"dependencies": {
 		"@ai-sdk/anthropic": "^4.0.39",

@@ -16,6 +16,7 @@ import {
 	IconTimeline,
 	IconTool,
 	IconUserCircle,
+	IconUserSearch,
 	IconUsers,
 } from "@tabler/icons-react";
 import { Link, useRouteContext } from "@tanstack/react-router";
@@ -132,6 +133,11 @@ function brandGroups(
 				title: "Article Finder",
 				url: "/article-finder",
 				icon: IconSearch,
+			},
+			{
+				title: "Influencer Finder",
+				url: "/influencer-finder",
+				icon: IconUserSearch,
 			},
 		);
 	}

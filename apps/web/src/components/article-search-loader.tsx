@@ -109,7 +109,15 @@ function Dots({ still }: { still: boolean }) {
 	);
 }
 
-export function ArticleSearchLoader({ stage, progressPct }: { stage: string | null; progressPct: number | null }) {
+export function ArticleSearchLoader({
+	stage,
+	progressPct,
+	title = "Finding articles",
+}: {
+	stage: string | null;
+	progressPct: number | null;
+	title?: string;
+}) {
 	const still = useReducedMotion() ?? false;
 	return (
 		<div role="status" aria-live="polite" className="overflow-hidden rounded-2xl border bg-card">
@@ -118,7 +126,7 @@ export function ArticleSearchLoader({ stage, progressPct }: { stage: string | nu
 			</div>
 			<div className="space-y-1 px-5 pb-5 text-left">
 				<p className="text-lg font-semibold tracking-tight">
-					Finding articles
+					{title}
 					<Dots still={still} />
 				</p>
 				<p className="text-sm text-muted-foreground">

@@ -7,6 +7,7 @@ import {
 	numeric,
 	pgEnum,
 	pgTable,
+	primaryKey,
 	smallint,
 	text,
 	timestamp,
@@ -280,6 +281,56 @@ export const brandArticleSearches = pgTable(
 
 export type BrandArticleSearch = typeof brandArticleSearches.$inferSelect;
 export type NewBrandArticleSearch = typeof brandArticleSearches.$inferInsert;
+
+/**
+ * Influencer Finder runs, one row per search. Same idea as brand_article_searches:
+ * a "running" row is the live marker every open page reads progress from, and
+ * "done" rows hold the finished payload (see influencer-finder/types.ts).
+ */
+export const brandInfluencerSearches = pgTable(
+	"brand_influencer_searches",
+	{
+		id: uuid("id").defaultRandom().primaryKey().notNull(),
+		brandId: text("brand_id")
+			.references(() => brands.id, { onDelete: "cascade" })
+			.notNull(),
+		direction: text("direction"),
+		brief: json("brief").notNull(),
+		payload: json("payload").notNull(),
+		createdBy: text("created_by"),
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+		status: text("status").notNull().default("done"),
+		stage: text("stage"),
+		progressPct: integer("progress_pct"),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+		error: text("error"),
+	},
+	(table) => ({
+		brandCreatedIdx: index("brand_influencer_searches_brand_id_created_at_idx").on(table.brandId, table.createdAt),
+	}),
+).enableRLS();
+
+export type BrandInfluencerSearch = typeof brandInfluencerSearches.$inferSelect;
+
+/**
+ * Creators we've already paid to look up, shared across brands and searches so
+ * nobody is bought twice within the freshness window. `data` is a trimmed copy of
+ * the profile record, not the raw response.
+ */
+export const influencerProfiles = pgTable(
+	"influencer_profiles",
+	{
+		platform: text("platform").notNull(),
+		handle: text("handle").notNull(),
+		data: json("data").notNull(),
+		fetchedAt: timestamp("fetched_at", { withTimezone: true }).defaultNow().notNull(),
+	},
+	(table) => ({
+		pk: primaryKey({ columns: [table.platform, table.handle] }),
+	}),
+).enableRLS();
+
+export type InfluencerProfileRow = typeof influencerProfiles.$inferSelect;
 
 export type Brand = typeof brands.$inferSelect;
 export type NewBrand = typeof brands.$inferInsert;

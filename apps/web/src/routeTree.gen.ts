@@ -37,6 +37,7 @@ import { Route as AuthedAppBrandIndexRouteImport } from './routes/_authed/app/$b
 import { Route as AuthedAppBrandSplatRouteImport } from './routes/_authed/app/$brand/$'
 import { Route as AuthedAppBrandArticleFinderRouteImport } from './routes/_authed/app/$brand/article-finder'
 import { Route as AuthedAppBrandCitationsRouteImport } from './routes/_authed/app/$brand/citations'
+import { Route as AuthedAppBrandInfluencerFinderRouteImport } from './routes/_authed/app/$brand/influencer-finder'
 import { Route as AuthedAppBrandOpportunitiesRouteImport } from './routes/_authed/app/$brand/opportunities'
 import { Route as AuthedAppBrandQueryFanOutRouteImport } from './routes/_authed/app/$brand/query-fan-out'
 import { Route as AuthedAppBrandReportsRouteImport } from './routes/_authed/app/$brand/reports'
@@ -209,6 +210,12 @@ const AuthedAppBrandCitationsRoute = AuthedAppBrandCitationsRouteImport.update({
   path: '/citations',
   getParentRoute: () => AuthedAppBrandRoute,
 } as any)
+const AuthedAppBrandInfluencerFinderRoute =
+  AuthedAppBrandInfluencerFinderRouteImport.update({
+    id: '/influencer-finder',
+    path: '/influencer-finder',
+    getParentRoute: () => AuthedAppBrandRoute,
+  } as any)
 const AuthedAppBrandOpportunitiesRoute =
   AuthedAppBrandOpportunitiesRouteImport.update({
     id: '/opportunities',
@@ -406,6 +413,7 @@ export interface FileRoutesByFullPath {
   '/app/$brand/$': typeof AuthedAppBrandSplatRoute
   '/app/$brand/article-finder': typeof AuthedAppBrandArticleFinderRoute
   '/app/$brand/citations': typeof AuthedAppBrandCitationsRoute
+  '/app/$brand/influencer-finder': typeof AuthedAppBrandInfluencerFinderRoute
   '/app/$brand/opportunities': typeof AuthedAppBrandOpportunitiesRoute
   '/app/$brand/query-fan-out': typeof AuthedAppBrandQueryFanOutRoute
   '/app/$brand/reports': typeof AuthedAppBrandReportsRoute
@@ -461,6 +469,7 @@ export interface FileRoutesByTo {
   '/app/$brand/$': typeof AuthedAppBrandSplatRoute
   '/app/$brand/article-finder': typeof AuthedAppBrandArticleFinderRoute
   '/app/$brand/citations': typeof AuthedAppBrandCitationsRoute
+  '/app/$brand/influencer-finder': typeof AuthedAppBrandInfluencerFinderRoute
   '/app/$brand/opportunities': typeof AuthedAppBrandOpportunitiesRoute
   '/app/$brand/query-fan-out': typeof AuthedAppBrandQueryFanOutRoute
   '/app/$brand/reports': typeof AuthedAppBrandReportsRoute
@@ -522,6 +531,7 @@ export interface FileRoutesById {
   '/_authed/app/$brand/$': typeof AuthedAppBrandSplatRoute
   '/_authed/app/$brand/article-finder': typeof AuthedAppBrandArticleFinderRoute
   '/_authed/app/$brand/citations': typeof AuthedAppBrandCitationsRoute
+  '/_authed/app/$brand/influencer-finder': typeof AuthedAppBrandInfluencerFinderRoute
   '/_authed/app/$brand/opportunities': typeof AuthedAppBrandOpportunitiesRoute
   '/_authed/app/$brand/query-fan-out': typeof AuthedAppBrandQueryFanOutRoute
   '/_authed/app/$brand/reports': typeof AuthedAppBrandReportsRoute
@@ -583,6 +593,7 @@ export interface FileRouteTypes {
     | '/app/$brand/$'
     | '/app/$brand/article-finder'
     | '/app/$brand/citations'
+    | '/app/$brand/influencer-finder'
     | '/app/$brand/opportunities'
     | '/app/$brand/query-fan-out'
     | '/app/$brand/reports'
@@ -638,6 +649,7 @@ export interface FileRouteTypes {
     | '/app/$brand/$'
     | '/app/$brand/article-finder'
     | '/app/$brand/citations'
+    | '/app/$brand/influencer-finder'
     | '/app/$brand/opportunities'
     | '/app/$brand/query-fan-out'
     | '/app/$brand/reports'
@@ -698,6 +710,7 @@ export interface FileRouteTypes {
     | '/_authed/app/$brand/$'
     | '/_authed/app/$brand/article-finder'
     | '/_authed/app/$brand/citations'
+    | '/_authed/app/$brand/influencer-finder'
     | '/_authed/app/$brand/opportunities'
     | '/_authed/app/$brand/query-fan-out'
     | '/_authed/app/$brand/reports'
@@ -956,6 +969,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAppBrandCitationsRouteImport
       parentRoute: typeof AuthedAppBrandRoute
     }
+    '/_authed/app/$brand/influencer-finder': {
+      id: '/_authed/app/$brand/influencer-finder'
+      path: '/influencer-finder'
+      fullPath: '/app/$brand/influencer-finder'
+      preLoaderRoute: typeof AuthedAppBrandInfluencerFinderRouteImport
+      parentRoute: typeof AuthedAppBrandRoute
+    }
     '/_authed/app/$brand/opportunities': {
       id: '/_authed/app/$brand/opportunities'
       path: '/opportunities'
@@ -1189,6 +1209,7 @@ interface AuthedAppBrandRouteChildren {
   AuthedAppBrandSplatRoute: typeof AuthedAppBrandSplatRoute
   AuthedAppBrandArticleFinderRoute: typeof AuthedAppBrandArticleFinderRoute
   AuthedAppBrandCitationsRoute: typeof AuthedAppBrandCitationsRoute
+  AuthedAppBrandInfluencerFinderRoute: typeof AuthedAppBrandInfluencerFinderRoute
   AuthedAppBrandOpportunitiesRoute: typeof AuthedAppBrandOpportunitiesRoute
   AuthedAppBrandQueryFanOutRoute: typeof AuthedAppBrandQueryFanOutRoute
   AuthedAppBrandReportsRoute: typeof AuthedAppBrandReportsRoute
@@ -1212,6 +1233,7 @@ const AuthedAppBrandRouteChildren: AuthedAppBrandRouteChildren = {
   AuthedAppBrandSplatRoute: AuthedAppBrandSplatRoute,
   AuthedAppBrandArticleFinderRoute: AuthedAppBrandArticleFinderRoute,
   AuthedAppBrandCitationsRoute: AuthedAppBrandCitationsRoute,
+  AuthedAppBrandInfluencerFinderRoute: AuthedAppBrandInfluencerFinderRoute,
   AuthedAppBrandOpportunitiesRoute: AuthedAppBrandOpportunitiesRoute,
   AuthedAppBrandQueryFanOutRoute: AuthedAppBrandQueryFanOutRoute,
   AuthedAppBrandReportsRoute: AuthedAppBrandReportsRoute,
