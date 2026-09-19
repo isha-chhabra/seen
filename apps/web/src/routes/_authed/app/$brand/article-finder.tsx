@@ -37,10 +37,12 @@ import type { DateRange } from "react-day-picker";
 import { ArticleSearchLoader } from "@/components/article-search-loader";
 import { DateRangePicker } from "@/components/date-range-picker";
 import { EmptyState } from "@/components/empty-state";
+import { ExportMenu } from "@/components/export-menu";
 import { PageHeader } from "@/components/page-header";
 import { TagInput } from "@/components/tag-input";
 import { useBrand, useBrandRole } from "@/hooks/use-brands";
 import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
+import type { ExportColumn } from "@/lib/table-export";
 import {
 	type ArticleResult,
 	findArticlesFn,
@@ -73,6 +75,19 @@ function prettyAt(iso: string): string {
 }
 
 type Query = { query: string; angle?: string };
+const ARTICLE_EXPORT_COLUMNS: ExportColumn<ArticleResult>[] = [
+	{ header: "category", value: (r) => (r.tier === "high_authority" ? "High-authority" : "Niche / blog") },
+	{ header: "fit score", value: (r) => r.fitScore },
+	{ header: "affiliate", value: (r) => r.affiliateStatus },
+	{ header: "mentions brand", value: (r) => r.brandAlreadyMentioned },
+	{ header: "article name", value: (r) => r.title },
+	{ header: "article link", value: (r) => r.url },
+	{ header: "published", value: (r) => r.publishedDate },
+	{ header: "links competitor", value: (r) => r.linksCompetitor },
+	{ header: "fit reasoning", value: (r) => r.verdict },
+	{ header: "contact", value: (r) => r.contactHint },
+];
+
 type Phase = "idle" | "queries" | "searching" | "results";
 // mirrors MAX_QUERIES in apps/web/src/server/article-finder.ts (the server's real cap)
 const MAX_QUERIES_UI = 20;
@@ -415,55 +430,6 @@ function ArticleFinderPage() {
 		setError(null);
 	}
 
-	function exportCsv() {
-		const esc = (v: string | number) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-		const rows = [
-			[
-				"category",
-				"fit score",
-				"affiliate",
-				"mentions brand",
-				"article name",
-				"article link",
-				"published",
-				"links competitor",
-				"fit reasoning",
-				"contact",
-			]
-				.map(esc)
-				.join(","),
-		];
-		for (const r of sortedRows)
-			rows.push(
-				[
-					r.tier === "high_authority" ? "High-authority" : "Niche / blog",
-					r.fitScore,
-					r.affiliateStatus,
-					r.brandAlreadyMentioned ? "yes" : "",
-					r.title,
-					r.url,
-					r.publishedDate ?? "",
-					r.linksCompetitor ? "yes" : "",
-					r.verdict,
-					r.contactHint ?? "",
-				]
-					.map(esc)
-					.join(","),
-			);
-		const blob = new Blob([`﻿${rows.join("\r\n")}`], { type: "text/csv;charset=utf-8" });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement("a");
-		a.href = url;
-		a.download = `article-finder-${(brand?.name ?? "brand")
-			.replace(/[^\w.\- ]+/g, "")
-			.trim()
-			.replace(/\s+/g, "-")}-${ymd(new Date())}.csv`;
-		document.body.appendChild(a);
-		a.click();
-		a.remove();
-		URL.revokeObjectURL(url);
-	}
-
 	// Single source of truth for each dropdown's option labels, so the trigger
 	// button text and the menu items it opens can never drift out of sync
 	// (sentence case throughout: first word capitalized, proper nouns aside).
@@ -515,9 +481,13 @@ function ArticleFinderPage() {
 								Edit queries
 							</Button>
 						)}
-						<Button variant="ghost" size="sm" onClick={exportCsv} disabled={totalResults === 0 || isViewer}>
-							Export CSV
-						</Button>
+						<ExportMenu
+							rows={sortedRows}
+							columns={ARTICLE_EXPORT_COLUMNS}
+							filePrefix="article-finder"
+							brandName={brand?.name}
+							disabled={totalResults === 0 || isViewer}
+						/>
 						<Button variant="outline" size="sm" onClick={newSearch}>
 							New search
 						</Button>
