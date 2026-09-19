@@ -22,9 +22,12 @@ export const Route = createFileRoute("/auth/logout")({
 					});
 				}
 
+				// Relative on purpose: behind a proxy (e.g. the Vercel front door) the
+				// request URL carries the server's own host, and an absolute redirect
+				// would send the user off the address they signed in on.
 				return new Response(null, {
 					status: 302,
-					headers: { Location: baseUrl },
+					headers: { Location: "/" },
 				});
 			},
 		},
