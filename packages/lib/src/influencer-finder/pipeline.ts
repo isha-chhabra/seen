@@ -139,7 +139,13 @@ interface Working {
 
 const key = (platform: Platform, handle: string) => `${platform}:${handle.toLowerCase()}`;
 const postCode = (url: string): string | undefined => /\/(?:p|reel)\/([\w-]+)/.exec(url)?.[1];
-const clip = (s: string, n: number) => s.replace(/\s+/g, " ").trim().slice(0, n);
+/** Trims to n characters without leaving half an emoji (a lone surrogate) at the cut, which breaks JSON storage. */
+export const clip = (s: string, n: number) =>
+	s
+		.replace(/\s+/g, " ")
+		.trim()
+		.slice(0, n)
+		.replace(/[\uD800-\uDBFF]$/, "");
 
 /** Google lookups in flight at once. */
 const SEARCH_CONCURRENCY = 6;

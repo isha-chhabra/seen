@@ -15,7 +15,7 @@ import { db } from "@workspace/lib/db/db";
 import { brandInfluencerSearches, brands, competitors, influencerProfiles } from "@workspace/lib/db/schema";
 import { scrapeDataset } from "@workspace/lib/influencer-finder/datasets";
 import { draftBrief, expandQueries, judgeCreators, screenHits } from "@workspace/lib/influencer-finder/llm";
-import { type CachedProfile, type Memo, runInfluencerSearch } from "@workspace/lib/influencer-finder/pipeline";
+import { type CachedProfile, clip, type Memo, runInfluencerSearch } from "@workspace/lib/influencer-finder/pipeline";
 import type { InfluencerBrief, InfluencerSearchPayload, Platform } from "@workspace/lib/influencer-finder/types";
 import { and, desc, eq, lt, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -124,10 +124,10 @@ export const generateInfluencerBriefFn = createServerFn({ method: "POST" })
 function trimForCache(data: CachedProfile) {
 	return {
 		ig: data.ig
-			? { ...data.ig, posts: data.ig.posts.slice(0, 12).map((p) => ({ ...p, caption: p.caption.slice(0, 300) })) }
+			? { ...data.ig, posts: data.ig.posts.slice(0, 12).map((p) => ({ ...p, caption: clip(p.caption, 300) })) }
 			: undefined,
 		tt: data.tt,
-		samples: data.samples?.slice(0, 12).map((p) => ({ ...p, caption: p.caption.slice(0, 200) })),
+		samples: data.samples?.slice(0, 12).map((p) => ({ ...p, caption: clip(p.caption, 200) })),
 		samplesAt: data.samplesAt,
 	};
 }
