@@ -296,4 +296,15 @@ describe("runInfluencerSearch", () => {
 		expect(second.scrapeCalls.some((c) => c.dataset === DATASETS.instagramPost)).toBe(true);
 		expect(out.results.find((r) => r.handle === "goodguy")?.engagementAgeDays).toBe(0);
 	});
+
+	it("judges on the bio and the hashtags they use, sending captions only when the bio is nearly empty", async () => {
+		const { deps } = makeDeps();
+		await runInfluencerSearch(input(), deps);
+		const dossiers = vi.mocked(deps.judge).mock.calls.flatMap(([args]) => args.batch);
+		const good = dossiers.find((d) => d.handle === "goodguy");
+		expect(good?.posts).toEqual([]);
+		expect(good?.topHashtags).toContain("#bigandtall");
+		// "menswear" is a short bio, but still over the threshold; a blank one would carry captions
+		expect(dossiers.every((d) => d.bio.length >= 25 || d.posts.length > 0)).toBe(true);
+	});
 });

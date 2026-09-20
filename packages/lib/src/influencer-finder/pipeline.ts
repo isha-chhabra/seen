@@ -44,7 +44,9 @@ const ACTIVITY_REFRESH_MS = 14 * 24 * 3_600_000;
 /** Google results for an identical phrase and page. */
 const SERP_TTL_MS = 7 * 24 * 3_600_000;
 const BATCH = 20;
-const JUDGE_BATCH = 5;
+const JUDGE_BATCH = 8;
+/** How many lookup or judging chunks run at once. */
+const CHUNK_PARALLEL = 3;
 const EXTRA_POSTS_FOR_ENGAGEMENT = 3;
 const GENERIC_TAGS = new Set([
 	"#fashion",
@@ -140,10 +142,34 @@ const postCode = (url: string): string | undefined => /\/(?:p|reel)\/([\w-]+)/.e
 const clip = (s: string, n: number) => s.replace(/\s+/g, " ").trim().slice(0, n);
 
 /** Google lookups in flight at once. */
-const SEARCH_CONCURRENCY = 4;
+const SEARCH_CONCURRENCY = 6;
 /** Most passes over the web in one run, and the deepest Google page tried per phrase. */
 const MAX_ROUNDS = 8;
 const MAX_PAGE = 3;
+
+/**
+ * Runs `work` over `items` in chunks of `size`, a few chunks at a time. `plan` says how many items the
+ * next chunk may take (0 stops) and pays for them before the chunk starts, so the spending limit holds.
+ */
+async function inChunks<T>(
+	items: T[],
+	size: number,
+	plan: (want: number) => number,
+	work: (chunk: T[]) => Promise<void>,
+): Promise<void> {
+	const chunks: T[][] = [];
+	for (let i = 0; i < items.length; ) {
+		const n = plan(Math.min(size, items.length - i));
+		if (n <= 0) break;
+		chunks.push(items.slice(i, i + n));
+		i += n;
+	}
+	let next = 0;
+	const worker = async () => {
+		while (next < chunks.length) await work(chunks[next++] as T[]);
+	};
+	await Promise.all(Array.from({ length: Math.min(CHUNK_PARALLEL, chunks.length) }, worker));
+}
 
 export async function runInfluencerSearch(
 	input: PipelineInput,
@@ -322,22 +348,28 @@ export async function runInfluencerSearch(
 			if (handle) workingFor(handle);
 			else unknownPosts.push(url);
 		}
-		for (let i = 0; i < unknownPosts.length; i += BATCH) {
-			const n = Math.min(BATCH, ledger.affordableRecords(0.02), unknownPosts.length - i);
-			if (n <= 0 || spendLimit()) break;
-			const chunk = unknownPosts.slice(i, i + n);
-			const recs = (await deps.scrape(DATASETS.instagramPost, chunk).catch(() => []))
-				.map(readIgPost)
-				.filter((r): r is IgPostRec => !!r);
-			ledger.chargeRecords(chunk.length);
-			for (const rec of recs) {
-				const w = workingFor(rec.handle);
-				w.samples.set(rec.url, rec);
-				w.samplesAt ??= now();
-				const code = postCode(rec.url);
-				if (code) await deps.memo.put("ig_post", code, { handle: rec.handle }).catch(() => {});
-			}
-		}
+		await inChunks(
+			unknownPosts,
+			BATCH,
+			(want) => {
+				const n = Math.min(want, ledger.affordableRecords(0.02));
+				if (n <= 0 || spendLimit()) return 0;
+				ledger.chargeRecords(n);
+				return n;
+			},
+			async (chunk) => {
+				const recs = (await deps.scrape(DATASETS.instagramPost, chunk).catch(() => []))
+					.map(readIgPost)
+					.filter((r): r is IgPostRec => !!r);
+				for (const rec of recs) {
+					const w = workingFor(rec.handle);
+					w.samples.set(rec.url, rec);
+					w.samplesAt ??= now();
+					const code = postCode(rec.url);
+					if (code) await deps.memo.put("ig_post", code, { handle: rec.handle }).catch(() => {});
+				}
+			},
+		);
 		for (const i of keep.tiktok) {
 			const h = ttHits[i];
 			if (!h) continue;
@@ -394,26 +426,34 @@ export async function runInfluencerSearch(
 			urls: string[],
 			read: (r: DatasetRecord) => IgProfileRec | TtProfileRec | null,
 		) {
-			for (let i = 0; i < urls.length; i += BATCH) {
-				const n = Math.min(BATCH, ledger.affordableRecords(0.015), urls.length - i);
-				if (n <= 0 || spendLimit()) return;
-				const chunk = urls.slice(i, i + n);
-				const recs = await deps.scrape(dataset, chunk).catch(() => []);
-				ledger.chargeRecords(chunk.length);
-				for (const raw of recs) {
-					const rec = read(raw);
-					if (!rec) continue;
-					const w = creators.get(key(dataset === DATASETS.tiktokProfile ? "tiktok" : "instagram", rec.handle));
-					if (!w) continue;
-					if (dataset === DATASETS.tiktokProfile) w.tt = rec as TtProfileRec;
-					else w.ig = rec as IgProfileRec;
-					w.profileAt = now();
-					await save(w);
-				}
-			}
+			await inChunks(
+				urls,
+				BATCH,
+				(want) => {
+					const n = Math.min(want, ledger.affordableRecords(0.015));
+					if (n <= 0 || spendLimit()) return 0;
+					ledger.chargeRecords(n);
+					return n;
+				},
+				async (chunk) => {
+					const recs = await deps.scrape(dataset, chunk).catch(() => []);
+					for (const raw of recs) {
+						const rec = read(raw);
+						if (!rec) continue;
+						const w = creators.get(key(dataset === DATASETS.tiktokProfile ? "tiktok" : "instagram", rec.handle));
+						if (!w) continue;
+						if (dataset === DATASETS.tiktokProfile) w.tt = rec as TtProfileRec;
+						else w.ig = rec as IgProfileRec;
+						w.profileAt = now();
+						await save(w);
+					}
+				},
+			);
 		}
-		await buy(DATASETS.instagramProfile, need.igUrls, readIgProfile);
-		await buy(DATASETS.tiktokProfile, need.ttUrls, readTtProfile);
+		await Promise.all([
+			buy(DATASETS.instagramProfile, need.igUrls, readIgProfile),
+			buy(DATASETS.tiktokProfile, need.ttUrls, readTtProfile),
+		]);
 
 		// Facts that don't need a model, then the model reads what's left.
 		const analysed = fresh.filter((w) => (w.platform === "instagram" ? w.ig : w.tt));
@@ -422,16 +462,22 @@ export async function runInfluencerSearch(
 
 		await stageDone("Judging fit", 70);
 		const toJudge = analysed.filter((w) => !w.preExcluded && passesSize(w));
-		for (let i = 0; i < toJudge.length; i += JUDGE_BATCH) {
-			if (!ledger.canAffordLlm()) break;
-			const batch = toJudge.slice(i, i + JUDGE_BATCH);
-			const out = await deps
-				.judge({ brief, brandName, competitors: competitorNames, batch: batch.map(dossierOf) })
-				.catch(() => [] as Judgment[]);
-			ledger.chargeLlm(JSON.stringify(batch.map(dossierOf)).length + 1400, out.length * 700);
-			const byHandle = new Map(out.map((j) => [j.handle.toLowerCase(), j]));
-			for (const w of batch) w.judged = byHandle.get(w.handle.toLowerCase());
-		}
+		await inChunks(
+			toJudge,
+			JUDGE_BATCH,
+			(want) => {
+				if (!ledger.canAffordLlm()) return 0;
+				ledger.chargeLlm(want * 700 + 1400, want * 350);
+				return want;
+			},
+			async (batch) => {
+				const out = await deps
+					.judge({ brief, brandName, competitors: competitorNames, batch: batch.map(dossierOf) })
+					.catch(() => [] as Judgment[]);
+				const byHandle = new Map(out.map((j) => [j.handle.toLowerCase(), j]));
+				for (const w of batch) w.judged = byHandle.get(w.handle.toLowerCase());
+			},
+		);
 		return analysed.length;
 	}
 
@@ -508,18 +554,29 @@ export async function runInfluencerSearch(
 			return `${(p.date ?? "").slice(0, 10)} ${p.kind ?? ""}: ${clip(p.caption, 130)}${tag}`;
 		});
 		const text = [w.handle, ig?.name, tt?.name, ig?.bio, tt?.bio, ...lines].join(" ");
+		const tagCounts = new Map<string, number>();
+		for (const p of w.posts.slice(0, 12))
+			for (const t of p.caption.match(/#[A-Za-z0-9_]{3,}/g) ?? [])
+				tagCounts.set(t.toLowerCase(), (tagCounts.get(t.toLowerCase()) ?? 0) + 1);
+		const topHashtags = [...tagCounts.entries()]
+			.sort((x, y) => y[1] - x[1])
+			.slice(0, 6)
+			.map(([t]) => t);
+		const bio = clip(ig?.bio ?? tt?.bio ?? "", 300);
 		return {
 			platform: w.platform,
 			handle: w.handle,
 			name: ig?.name ?? tt?.name ?? null,
 			followers: ig?.followers ?? tt?.followers ?? null,
-			bio: clip(ig?.bio ?? tt?.bio ?? "", 300),
+			bio,
 			links: ig?.links ?? [],
 			category: tt?.category ?? null,
 			lastPostDaysAgo: ig ? daysSince(w.posts[0]?.date, now()) : null,
 			postsPerWeek: ig ? postsPerWeek(w.posts.map((p) => p.date).filter((d): d is string => !!d)) : null,
 			engagementPct: w.engagement.pct,
-			posts: lines,
+			topHashtags,
+			// Recent captions only help when the bio says next to nothing.
+			posts: bio.length < 25 ? lines.slice(0, 4) : [],
 			competitorIdentity: matcher.identity([w.handle, ig?.name ?? tt?.name, ...(ig?.links ?? [])]),
 			competitorMentions: matcher.mentions(text),
 		};
@@ -621,28 +678,34 @@ export async function runInfluencerSearch(
 		for (const url of urls.slice(0, Math.max(0, EXTRA_POSTS_FOR_ENGAGEMENT - Math.max(0, w.samples.size - 1))))
 			topUp.push({ w, url });
 	}
-	for (let i = 0; i < topUp.length; i += BATCH) {
-		const n = Math.min(BATCH, ledger.affordableRecords(0), topUp.length - i);
-		if (n <= 0) break;
-		const chunk = topUp.slice(i, i + n);
-		const recs = (
-			await deps
-				.scrape(
-					DATASETS.instagramPost,
-					chunk.map((c) => c.url),
-				)
-				.catch(() => [])
-		)
-			.map(readIgPost)
-			.filter((r): r is IgPostRec => !!r);
-		ledger.chargeRecords(chunk.length);
-		for (const rec of recs) {
-			const w = creators.get(key("instagram", rec.handle));
-			if (!w) continue;
-			w.samples.set(rec.url, rec);
-			w.samplesAt ??= now();
-		}
-	}
+	await inChunks(
+		topUp,
+		BATCH,
+		(want) => {
+			const n = Math.min(want, ledger.affordableRecords(0));
+			if (n <= 0) return 0;
+			ledger.chargeRecords(n);
+			return n;
+		},
+		async (chunk) => {
+			const recs = (
+				await deps
+					.scrape(
+						DATASETS.instagramPost,
+						chunk.map((c) => c.url),
+					)
+					.catch(() => [])
+			)
+				.map(readIgPost)
+				.filter((r): r is IgPostRec => !!r);
+			for (const rec of recs) {
+				const w = creators.get(key("instagram", rec.handle));
+				if (!w) continue;
+				w.samples.set(rec.url, rec);
+				w.samplesAt ??= now();
+			}
+		},
+	);
 	for (const w of worthy) {
 		prepare(w);
 		await deps.cache

@@ -43,7 +43,7 @@ export async function expandQueries(
 			? `Creators already found that fit (handle: bio):\n${args.kept.map((k) => `@${k.handle}: ${k.bio}`).join("\n")}`
 			: "No fitting creators found yet; the phrases used so far may be too narrow or too generic.",
 		`Phrases already searched: ${args.used.join("; ")}.`,
-		`Return 6 new natural phrases, different from those above, that would surface OTHER creators like these. Vary the angle: sub-niches, occasions, products, communities, how such creators describe themselves. No quotes, no operators like site:, no brand names, no years, no country names.`,
+		`Return 6 new SHORT keyword phrases of 2 to 4 words (never full sentences), different from those above, that would surface OTHER creators like these. Vary the angle: sub-niches, occasions, products, communities, how such creators describe themselves. No quotes, no operators like site:, no brand names, no years, no country names.`,
 	].join("\n");
 	const r = await ask(prompt, expandSchema, onCost);
 	return r.queries;
@@ -89,8 +89,8 @@ export async function draftBrief(
 		`The team wants influencers to reach out to. In their words: "${args.direction}".`,
 		...guidanceLines(args),
 		`Return:`,
-		`- instagramQueries: 6 to 8 natural phrases a creator of this kind would write in captions or a shopper would search. Content-first, varied angles (style, fit, reviews, hauls, occasions, sub-audiences). No quotes, no operators like site:, no brand names, no years, no country names.`,
-		`- tiktokQueries: 3 to 5 in the same spirit, phrased the way TikTok creators title videos.`,
+		`- instagramQueries: 6 to 8 SHORT keyword phrases of 2 to 4 words, the kind people type into a search box or use as a topic (for example "big and tall style", "3XL menswear haul"). Never full sentences. Varied angles (style, fit, reviews, hauls, occasions, sub-audiences). No quotes, no operators like site:, no brand names, no years, no country names.`,
+		`- tiktokQueries: 3 to 5 short keyword phrases in the same spirit.`,
 		`- extraCompetitors: up to 10 brands or major retailers a creator here might also promote that compete with ${args.brandName} and are NOT already listed. Short names only.`,
 		`- fitSignals: 6 to 12 short phrases, hashtags or self-descriptions that a truly fitting creator would use about themselves or their content (for example a size, a niche, a community term). Evidence of fit must come from what people say about themselves.`,
 	].join("\n");
@@ -153,7 +153,9 @@ export interface JudgeDossier {
 	lastPostDaysAgo: number | null;
 	postsPerWeek: number | null;
 	engagementPct: number | null;
-	/** "date type: caption #tags [sponsored: ad, brand X]" lines, newest first. */
+	/** The hashtags they use most across recent posts, most used first. */
+	topHashtags: string[];
+	/** Recent caption lines, only included when the bio is nearly empty. */
 	posts: string[];
 	/** Competitor names found in the account's own identity (handle, name, site). */
 	competitorIdentity: string[];
@@ -170,7 +172,10 @@ const judgmentSchema = z.object({
 			verdict: z.enum(["include", "maybe", "exclude"]),
 			confidence: z.number().min(0).max(1),
 			fitReason: z.string().describe("One sentence on why they do or don't fit."),
-			fitEvidence: z.array(z.string()).max(4).describe("Short verbatim quotes from the creator's own bio or captions."),
+			fitEvidence: z
+				.array(z.string())
+				.max(2)
+				.describe("Up to two short verbatim quotes from the creator's own bio or hashtags."),
 			concern: z.string().describe("Main reservation, or an empty string."),
 			competitor: z.object({
 				isCompetitor: z.boolean(),
@@ -194,12 +199,12 @@ export async function judgeCreators(
 		args.brief.fitSignals.length ? `Phrases that count as evidence of fit: ${args.brief.fitSignals.join("; ")}.` : "",
 		...guidanceLines(args.brief),
 		`Rules:`,
-		`- Use ONLY the evidence given. Fit must be supported by the creator's own words (bio, captions, hashtags) and by what they regularly post, never guessed from appearance or a name.`,
+		`- Judge mainly on the bio, name, links and topHashtags (what they post about most). Recent post lines are only given when the bio is nearly empty. Use ONLY the evidence given, never guess from appearance or a name.`,
 		`- "kind": individual_creator means one real person creating content. Shops, restaurants, tailors, labels and media pages are brand_or_business.`,
-		`- fitScore above 75 only with clear fit AND regular relevant posting. Verdict include >= 70 with high confidence, maybe for real but partial or thin evidence, exclude otherwise or for anything that isn't an individual creator.`,
-		`- Sponsored posts are already tagged in the data (ad, gifted, partner, code, own_brand). Do not recount them. Use them only to judge competitor promotion: set promotesCompetitor when a sponsored post is for a competitor.`,
+		`- fitScore above 75 only with a clear fit in the bio and hashtags AND regular posting. Verdict include >= 70 with high confidence, maybe for real but partial or thin evidence, exclude otherwise or for anything that isn't an individual creator.`,
+		`- Sponsorships and competitor promotion are checked in code. Set promotesCompetitor only when the bio or hashtags clearly show it.`,
 		`- competitorIdentity / competitorMentions are pre-checks. Confirm or refute them from the evidence. Naming a competitor in passing (a comparison, a complaint) is not promoting it.`,
-		`Return {"results": [...]} with one entry per candidate, in the same order, each carrying its handle.`,
+		`Keep every fitReason to one short sentence. Return {"results": [...]} with one entry per candidate, in the same order, each carrying its handle.`,
 		JSON.stringify(args.batch),
 	]
 		.filter(Boolean)
