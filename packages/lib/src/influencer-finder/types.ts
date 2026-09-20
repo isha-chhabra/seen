@@ -20,6 +20,13 @@ export interface InfluencerBrief {
 	fitSignals: string[];
 	/** Follower bands to keep; empty means any size. */
 	followerBands: FollowerBand[];
+	/** Optional extras that sharpen the search; every one may be empty or absent. */
+	/** Handles of creators they already like, as a style reference. */
+	similarTo?: string[];
+	/** Kinds of account to rule out, in their words, e.g. "giveaway pages". */
+	avoid?: string[];
+	/** Where the audience should be, e.g. "United States". */
+	basedIn?: string[];
 }
 
 export type FollowerBand = "nano" | "micro" | "mid" | "macro" | "mega";

@@ -15,6 +15,7 @@ export function TagInput({
 	disabled,
 	max,
 	className,
+	plain,
 }: {
 	values: string[];
 	onChange: (values: string[]) => void;
@@ -22,6 +23,8 @@ export function TagInput({
 	disabled?: boolean;
 	max?: number;
 	className?: string;
+	/** Borderless, sits on a form row's hairline instead of drawing its own box. */
+	plain?: boolean;
 }) {
 	const [draft, setDraft] = useState("");
 
@@ -45,8 +48,10 @@ export function TagInput({
 	return (
 		<div
 			className={cn(
-				"flex min-h-10 flex-wrap items-center gap-1.5 rounded-md border bg-transparent p-2",
-				"focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30",
+				"flex min-h-10 flex-wrap items-center gap-1.5 bg-transparent",
+				plain
+					? "transition-shadow focus-within:shadow-[0_1px_0_0_var(--primary)]"
+					: "rounded-md border p-2 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30",
 				className,
 			)}
 		>

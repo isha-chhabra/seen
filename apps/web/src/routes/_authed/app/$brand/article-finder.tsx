@@ -7,12 +7,13 @@
 
 import {
 	IconArrowUpRight,
-	IconBolt,
+	IconChecks,
 	IconChevronDown,
 	IconLink,
 	IconLoader2,
 	IconMail,
 	IconSearch,
+	IconSortDescending,
 	IconX,
 } from "@tabler/icons-react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -38,6 +39,7 @@ import { ArticleSearchLoader } from "@/components/article-search-loader";
 import { DateRangePicker } from "@/components/date-range-picker";
 import { EmptyState } from "@/components/empty-state";
 import { ExportMenu } from "@/components/export-menu";
+import { FinderSteps, FormRow, FormRows, type Step, StopScale, TrustList } from "@/components/finder-form";
 import { PageHeader } from "@/components/page-header";
 import { TagInput } from "@/components/tag-input";
 import { useBrand, useBrandRole } from "@/hooks/use-brands";
@@ -87,6 +89,21 @@ const ARTICLE_EXPORT_COLUMNS: ExportColumn<ArticleResult>[] = [
 	{ header: "fit reasoning", value: (r) => r.verdict },
 	{ header: "contact", value: (r) => r.contactHint },
 ];
+
+const ARTICLE_STEPS: readonly Step[] = [
+	["Describe", "Say what kind of articles to pitch this brand to, in a sentence."],
+	["Check the searches", "See the searches before they run. Add, remove or reword any of them."],
+	["Review articles", "Each article is checked for fit and affiliate links, then sorted by publisher authority."],
+];
+const ARTICLE_TRUST = [
+	{ icon: IconChecks, text: "Every article is checked for fit" },
+	{ icon: IconLink, text: "Affiliate links detected" },
+	{ icon: IconSortDescending, text: "Sorted by publisher authority" },
+] as const;
+const DEPTH_STOPS = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({
+	label: String(n),
+	sub: n === 1 ? "Quick" : n === 8 ? "Thorough" : undefined,
+}));
 
 type Phase = "idle" | "queries" | "searching" | "results";
 // mirrors MAX_QUERIES in apps/web/src/server/article-finder.ts (the server's real cap)
@@ -495,73 +512,71 @@ function ArticleFinderPage() {
 				) : undefined
 			}
 		>
-			<div className={phase === "results" ? "max-w-[1400px]" : "max-w-2xl"}>
+			<div className={phase === "results" ? "max-w-[1400px]" : "max-w-3xl"}>
+				{phase !== "results" && <FinderSteps steps={ARTICLE_STEPS} current={phase === "idle" ? 1 : 2} />}
+
 				{phase === "idle" && (
-					<div className="space-y-5">
-						<div className="space-y-1.5">
-							<span className="text-sm font-medium">What kind of articles are you looking for?</span>
-							<TagInput
-								values={directionTags}
-								onChange={setDirectionTags}
-								placeholder="Type a direction, e.g. gift guides for premium steaks…"
-								disabled={busy}
-							/>
-						</div>
-
-						<div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
-							<div className="flex items-center gap-2">
-								<span className="text-muted-foreground">Published</span>
+					<div>
+						<FormRows>
+							<FormRow label="Articles">
+								<TagInput
+									plain
+									values={directionTags}
+									onChange={setDirectionTags}
+									placeholder="e.g. gift guides for premium steaks"
+									disabled={busy}
+								/>
+							</FormRow>
+							<FormRow label="Published">
 								<DateRangePicker value={range} onChange={setRange} />
-							</div>
-							<div className="flex items-center gap-2">
-								<span className="text-muted-foreground">Depth</span>
-								<div className="flex overflow-hidden rounded-md border">
-									{[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-										<button
-											key={n}
-											type="button"
-											onClick={() => setPages(n)}
-											disabled={busy}
-											className={cn(
-												"h-8 w-8 text-xs tabular-nums transition-colors",
-												pages === n ? "bg-primary text-primary-foreground" : "hover:bg-accent",
-											)}
-										>
-											{n}
-										</button>
-									))}
-								</div>
-							</div>
+							</FormRow>
+							<FormRow label="Depth">
+								<StopScale
+									label="Search depth"
+									stops={DEPTH_STOPS}
+									lo={pages - 1}
+									hi={pages - 1}
+									onPick={(i) => setPages(i + 1)}
+									disabled={busy}
+								/>
+							</FormRow>
+							<FormRow label="Mentions">
+								<label className="flex max-w-md cursor-pointer items-center justify-between gap-4 text-sm">
+									<span>Skip articles that already mention {brand?.name ?? "the brand"}</span>
+									<Switch checked={excludeBrandMentions} onCheckedChange={setExcludeBrandMentions} disabled={busy} />
+								</label>
+							</FormRow>
+						</FormRows>
+
+						{error && <p className="mt-5 text-sm text-destructive">{error}</p>}
+
+						<div className="mt-7 flex flex-wrap items-center gap-x-4 gap-y-2">
+							<Button onClick={genQueries} disabled={!canBuild} className="gap-2">
+								{busy && <IconLoader2 className="size-4 animate-spin" />}
+								{busy ? "Creating plan…" : "Create search plan"}
+							</Button>
+							<span className="text-xs text-muted-foreground">Nothing runs until you continue</span>
 						</div>
 
-						<div className="border-t pt-4 text-sm">
-							<label className="flex cursor-pointer items-center justify-between gap-4">
-								<span>Skip articles that already mention {brand?.name ?? "the brand"}</span>
-								<Switch checked={excludeBrandMentions} onCheckedChange={setExcludeBrandMentions} disabled={busy} />
-							</label>
-						</div>
-
-						{error && <p className="text-sm text-destructive">{error}</p>}
-
-						<Button onClick={genQueries} disabled={!canBuild} className="gap-2">
-							{busy ? <IconLoader2 className="size-4 animate-spin" /> : <IconBolt className="size-4" />}
-							{busy ? "Thinking…" : "Build search"}
-						</Button>
+						<TrustList items={ARTICLE_TRUST} />
 					</div>
 				)}
 
 				{(phase === "queries" || phase === "searching") && (
-					<div className="space-y-4">
-						<div className="flex items-center justify-between">
-							<span className="text-sm font-medium">Review queries</span>
-							<div className="flex gap-4 text-xs text-muted-foreground">
+					<div>
+						<div className="mb-4 flex items-end justify-between gap-4">
+							<div>
+								<h2 className="text-lg font-semibold tracking-tight">Check the searches</h2>
+								<p className="text-sm text-muted-foreground">These run when you continue. Edit anything.</p>
+							</div>
+							<div className="flex shrink-0 gap-4 text-xs text-muted-foreground">
 								<button
 									type="button"
 									onClick={genQueries}
 									disabled={locked || isViewer}
 									className="transition-colors hover:text-foreground"
 								>
-									Regenerate
+									Redo plan
 								</button>
 								<button
 									type="button"
@@ -569,31 +584,36 @@ function ArticleFinderPage() {
 									disabled={locked}
 									className="transition-colors hover:text-foreground"
 								>
-									{totalResults > 0 ? "Back" : "Edit"}
+									{totalResults > 0 ? "Back to results" : "Back"}
 								</button>
 							</div>
 						</div>
-						<TagInput
-							values={queries.map((q) => q.query)}
-							onChange={(vals) =>
-								setQueries(vals.map((v) => queries.find((q) => q.query === v) ?? { query: v, angle: "Added by you" }))
-							}
-							placeholder="Type a query, press Enter to add it…"
-							disabled={locked || isViewer}
-							max={MAX_QUERIES_UI}
-						/>
-						<Button onClick={run} disabled={locked || queries.length === 0 || isViewer} className="gap-2">
-							{phase === "searching" ? (
-								<IconLoader2 className="size-4 animate-spin" />
-							) : (
-								<IconSearch className="size-4" />
-							)}
-							{phase === "searching"
-								? "Finding articles…"
-								: `Search ${queries.length} ${queries.length === 1 ? "query" : "queries"}`}
+						<FormRows>
+							<FormRow label="Searches" hint="Phrases to look up">
+								<TagInput
+									plain
+									values={queries.map((q) => q.query)}
+									onChange={(vals) =>
+										setQueries(
+											vals.map((v) => queries.find((q) => q.query === v) ?? { query: v, angle: "Added by you" }),
+										)
+									}
+									placeholder="Add a phrase, press Enter"
+									disabled={locked || isViewer}
+									max={MAX_QUERIES_UI}
+								/>
+							</FormRow>
+						</FormRows>
+						<Button onClick={run} disabled={locked || queries.length === 0 || isViewer} className="mt-7 gap-2">
+							{phase === "searching" && <IconLoader2 className="size-4 animate-spin" />}
+							{phase === "searching" ? "Finding articles…" : "Find articles"}
 						</Button>
-						{phase === "searching" && <ArticleSearchLoader stage={liveStage} progressPct={liveProgress} />}
-						{error && <p className="text-sm text-destructive">{error}</p>}
+						{phase === "searching" && (
+							<div className="mt-6">
+								<ArticleSearchLoader stage={liveStage} progressPct={liveProgress} />
+							</div>
+						)}
+						{error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 					</div>
 				)}
 

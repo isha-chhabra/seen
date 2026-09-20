@@ -30,6 +30,19 @@ const briefSchema = z.object({
 	fitSignals: z.array(z.string()).min(3).max(14),
 });
 
+/** The optional guidance from the brief, as prompt lines. Empty when none was given. */
+function guidanceLines(b: Pick<InfluencerBrief, "similarTo" | "avoid" | "basedIn">): string[] {
+	return [
+		b.similarTo?.length
+			? `Creators they already like (a style reference, not to be repeated as results): ${b.similarTo.map((h) => `@${h}`).join(", ")}.`
+			: "",
+		b.basedIn?.length
+			? `Audience should be in: ${b.basedIn.join(", ")}. A creator clearly based elsewhere is at most a maybe.`
+			: "",
+		b.avoid?.length ? `Rule out: ${b.avoid.join("; ")}. A creator matching any of these is an exclude.` : "",
+	].filter(Boolean);
+}
+
 export async function draftBrief(
 	args: {
 		brandName: string;
@@ -37,12 +50,16 @@ export async function draftBrief(
 		competitors: string[];
 		direction: string;
 		platforms: Platform[];
+		similarTo?: string[];
+		avoid?: string[];
+		basedIn?: string[];
 	},
 	onCost?: OnCost,
 ): Promise<Pick<InfluencerBrief, "queries" | "fitSignals"> & { extraCompetitors: string[] }> {
 	const prompt = [
 		`Brand: ${args.brandName} (${args.website}). Known competitors: ${args.competitors.join(", ") || "none listed"}.`,
 		`The team wants influencers to reach out to. In their words: "${args.direction}".`,
+		...guidanceLines(args),
 		`Return:`,
 		`- instagramQueries: 6 to 8 natural phrases a creator of this kind would write in captions or a shopper would search. Content-first, varied angles (style, fit, reviews, hauls, occasions, sub-audiences). No quotes, no operators like site:, no brand names, no years, no country names.`,
 		`- tiktokQueries: 3 to 5 in the same spirit, phrased the way TikTok creators title videos.`,
@@ -81,6 +98,7 @@ export async function screenHits(
 	const lines = args.hits.map((h) => `${h.platform === "instagram" ? "IG" : "TT"}${h.index}: ${h.text}`).join("\n");
 	const prompt = [
 		`We look for individual creators (real people) matching this brief: "${args.brief.direction}".`,
+		...guidanceLines(args.brief),
 		`Below are search hits (Instagram posts IGn, TikTok creators TTn). Keep the hits most likely to come from an individual creator who fits.`,
 		`Drop hits that sound like a brand, retailer or store speaking about itself, aggregator or listicle accounts, and unrelated content. Prefer distinct creators. When unsure, keep.`,
 		`Return at most ${args.keep.instagram} Instagram indexes and ${args.keep.tiktok} TikTok indexes.`,
@@ -146,6 +164,7 @@ export async function judgeCreators(
 		`You judge influencer candidates for ${args.brandName}. Brief: "${args.brief.direction}".`,
 		`Competitors of ${args.brandName}: ${args.competitors.join(", ") || "none listed"}.`,
 		args.brief.fitSignals.length ? `Phrases that count as evidence of fit: ${args.brief.fitSignals.join("; ")}.` : "",
+		...guidanceLines(args.brief),
 		`Rules:`,
 		`- Use ONLY the evidence given. Fit must be supported by the creator's own words (bio, captions, hashtags) and by what they regularly post, never guessed from appearance or a name.`,
 		`- "kind": individual_creator means one real person creating content. Shops, restaurants, tailors, labels and media pages are brand_or_business.`,

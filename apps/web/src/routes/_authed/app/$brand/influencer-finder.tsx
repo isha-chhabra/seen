@@ -14,7 +14,8 @@ import type {
 import { Button } from "@workspace/ui/components/button";
 import { useCallback, useEffect, useState } from "react";
 import { ArticleSearchLoader } from "@/components/article-search-loader";
-import { BriefForm, StepsHint } from "@/components/influencer/brief-form";
+import { FinderSteps } from "@/components/finder-form";
+import { BriefForm, type Extras, INFLUENCER_STEPS } from "@/components/influencer/brief-form";
 import { BriefReview } from "@/components/influencer/brief-review";
 import { InfluencerResults } from "@/components/influencer/results-view";
 import { PageHeader } from "@/components/page-header";
@@ -51,6 +52,7 @@ function InfluencerFinderPage() {
 	const [direction, setDirection] = useState<string[]>([]);
 	const [platforms, setPlatforms] = useState<Platform[]>(["instagram"]);
 	const [bands, setBands] = useState<FollowerBand[]>([]);
+	const [extras, setExtras] = useState<Extras>({ similarTo: [], avoid: [], basedIn: [] });
 	const [capUsd, setCapUsd] = useState(0.2);
 	const [target, setTarget] = useState(30);
 
@@ -72,6 +74,11 @@ function InfluencerFinderPage() {
 		setBrief(r.payload.brief);
 		setPlatforms(r.payload.brief.platforms);
 		setBands(r.payload.brief.followerBands);
+		setExtras({
+			similarTo: r.payload.brief.similarTo ?? [],
+			avoid: r.payload.brief.avoid ?? [],
+			basedIn: r.payload.brief.basedIn ?? [],
+		});
 		setPayload(r.payload);
 		setLoaded({ at: r.createdAt, by: r.createdBy });
 		setPhase("results");
@@ -141,7 +148,7 @@ function InfluencerFinderPage() {
 		try {
 			setBrief(
 				await generateInfluencerBriefFn({
-					data: { brandId, direction: direction.join(", "), platforms, followerBands: bands },
+					data: { brandId, direction: direction.join(", "), platforms, followerBands: bands, ...extras },
 				}),
 			);
 			setPhase("review");
@@ -194,8 +201,8 @@ function InfluencerFinderPage() {
 				) : undefined
 			}
 		>
-			<div className={wide ? "max-w-[1400px]" : "max-w-2xl"}>
-				{phase !== "results" && <StepsHint current={phase === "idle" ? 1 : 2} />}
+			<div className={wide ? "max-w-[1400px]" : "max-w-3xl"}>
+				{phase !== "results" && <FinderSteps steps={INFLUENCER_STEPS} current={phase === "idle" ? 1 : 2} />}
 				{phase === "idle" && (
 					<BriefForm
 						direction={direction}
@@ -204,6 +211,8 @@ function InfluencerFinderPage() {
 						onPlatforms={setPlatforms}
 						bands={bands}
 						onBands={setBands}
+						extras={extras}
+						onExtras={setExtras}
 						busy={busy}
 						canSubmit={canBuild}
 						error={error}

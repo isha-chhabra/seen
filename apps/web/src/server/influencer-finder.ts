@@ -47,7 +47,19 @@ const briefSchema = z.object({
 	competitors: z.array(z.string().trim().min(1).max(80)).max(40),
 	fitSignals: z.array(z.string().trim().min(1).max(120)).max(20),
 	followerBands: z.array(bandSchema).max(5),
+	similarTo: z.array(z.string().trim().min(1).max(60)).max(5).optional(),
+	avoid: z.array(z.string().trim().min(1).max(80)).max(8).optional(),
+	basedIn: z.array(z.string().trim().min(1).max(60)).max(3).optional(),
 });
+
+/** "https://instagram.com/some.creator/" or "@Some.Creator" -> "some.creator". */
+const cleanHandle = (h: string) =>
+	h
+		.trim()
+		.replace(/^https?:\/\/(www\.)?(instagram|tiktok)\.com\/(@)?/i, "")
+		.replace(/[/?#].*$/, "")
+		.replace(/^@/, "")
+		.toLowerCase();
 
 const unique = (list: string[]) => [...new Map(list.map((s) => [s.toLowerCase(), s])).values()];
 
@@ -67,6 +79,9 @@ export const generateInfluencerBriefFn = createServerFn({ method: "POST" })
 			direction: z.string().trim().min(3).max(500),
 			platforms: z.array(platformSchema).min(1).max(2),
 			followerBands: z.array(bandSchema).max(5).default([]),
+			similarTo: z.array(z.string().trim().min(1).max(120)).max(5).default([]),
+			avoid: z.array(z.string().trim().min(1).max(80)).max(8).default([]),
+			basedIn: z.array(z.string().trim().min(1).max(60)).max(3).default([]),
 		}),
 	)
 	.handler(async ({ data }): Promise<InfluencerBrief> => {
@@ -75,12 +90,16 @@ export const generateInfluencerBriefFn = createServerFn({ method: "POST" })
 		const { brand, comps } = await loadBrand(data.brandId);
 		const known = comps.map((c) => c.name);
 
+		const similarTo = unique(data.similarTo.map(cleanHandle).filter(Boolean));
 		const draft = await draftBrief({
 			brandName: brand.name,
 			website: brand.website,
 			competitors: known,
 			direction: data.direction,
 			platforms: data.platforms,
+			similarTo,
+			avoid: data.avoid,
+			basedIn: data.basedIn,
 		});
 		const pick = (p: Platform) =>
 			data.platforms.includes(p) ? unique(draft.queries[p].map(cleanQuery).filter(Boolean)) : [];
@@ -91,6 +110,9 @@ export const generateInfluencerBriefFn = createServerFn({ method: "POST" })
 			competitors: unique([...known, ...draft.extraCompetitors]),
 			fitSignals: unique(draft.fitSignals),
 			followerBands: data.followerBands,
+			similarTo,
+			avoid: data.avoid,
+			basedIn: data.basedIn,
 		};
 	});
 
