@@ -145,7 +145,7 @@ export function BriefReview({
 
 			<Field
 				title="What a good fit looks like"
-				help="Signals we look for in a bio or a post. Add or remove to steer the judging."
+				help="Signals in a bio or post that mark a good fit. Add or remove to steer the judging."
 			>
 				<TagInput
 					values={brief.fitSignals}
@@ -191,8 +191,8 @@ export function BriefReview({
 						${est.low.toFixed(2)}–${Math.min(est.high, capUsd).toFixed(2)}
 					</strong>
 					. The search stops at <strong className="tabular-nums">${capUsd.toFixed(2)}</strong> and never goes past it,
-					returning what it has vetted so far. Creators looked up in the last 30 days are reused for free, and we return
-					fewer creators rather than pad the list.
+					keeping what it has vetted so far. Creators looked up in the last 30 days are reused at no cost, and the list
+					is never padded to hit the number.
 				</p>
 			</div>
 

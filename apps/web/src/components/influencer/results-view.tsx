@@ -50,6 +50,7 @@ import {
 	summarize,
 } from "@/lib/influencer-results";
 import type { ExportColumn } from "@/lib/table-export";
+import { rangeCaption, SizeRange } from "./brief-form";
 import { CreatorSheet } from "./creator-sheet";
 import { EXCLUDED_LABEL, FilterTrigger, FitBar, PLATFORM_LABEL, PlatformIcon, VerdictBadge } from "./parts";
 
@@ -524,12 +525,21 @@ export function InfluencerResults({
 						onToggle={(p) => toggleIn("platforms", p)}
 					/>
 				)}
-				<CheckMenu
-					label="Followers"
-					options={BAND_ORDER.map((b) => [b, FOLLOWER_BANDS[b].label] as const)}
-					selected={filters.bands}
-					onToggle={(b) => toggleIn("bands", b)}
-				/>
+				<Popover modal={false}>
+					<PopoverTrigger
+						render={
+							<FilterTrigger
+								label={
+									filters.bands.size > 0 ? rangeCaption([...filters.bands]).replace(" followers", "") : "Followers"
+								}
+								active={filters.bands.size > 0}
+							/>
+						}
+					/>
+					<PopoverContent align="start" className="w-[26rem] max-w-[90vw] p-3">
+						<SizeRange bands={[...filters.bands]} onChange={(v) => set("bands", new Set(v))} />
+					</PopoverContent>
+				</Popover>
 				<StepMenu value={filters.minFit} steps={FIT_STEPS} onChange={(v) => set("minFit", v)} />
 				<StepMenu value={filters.minEngagement} steps={ENGAGEMENT_STEPS} onChange={(v) => set("minEngagement", v)} />
 				<StepMenu value={filters.activeWithinDays} steps={ACTIVE_STEPS} onChange={(v) => set("activeWithinDays", v)} />
@@ -626,7 +636,7 @@ export function InfluencerResults({
 				<EmptyState
 					icon={IconSearch}
 					title="No creators passed the checks"
-					description="We'd rather show none than pad the list. Try a broader direction or more follower sizes."
+					description="The list is never padded with weak fits. Try a broader direction or more follower sizes."
 				/>
 			) : rows.length === 0 ? (
 				<EmptyState

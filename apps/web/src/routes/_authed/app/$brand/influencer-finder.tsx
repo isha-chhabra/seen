@@ -14,7 +14,7 @@ import type {
 import { Button } from "@workspace/ui/components/button";
 import { useCallback, useEffect, useState } from "react";
 import { ArticleSearchLoader } from "@/components/article-search-loader";
-import { BriefForm } from "@/components/influencer/brief-form";
+import { BriefForm, StepsHint } from "@/components/influencer/brief-form";
 import { BriefReview } from "@/components/influencer/brief-review";
 import { InfluencerResults } from "@/components/influencer/results-view";
 import { PageHeader } from "@/components/page-header";
@@ -178,7 +178,7 @@ function InfluencerFinderPage() {
 		<PageHeader
 			title="Influencer Finder"
 			subtitle="Find creators that fit this brand."
-			infoContent="We look for creators whose bio and recent posts fit the brand, then check each one's engagement, posting rhythm, brand collaborations and competitor ties. Your last search is saved, so reopening this tab is free."
+			infoContent="Creators are matched on bio and recent posts, then checked for engagement, posting rhythm, brand collaborations and competitor ties. The last search is saved, so reopening this tab is free."
 			actions={
 				phase === "results" ? (
 					<>
@@ -194,7 +194,8 @@ function InfluencerFinderPage() {
 				) : undefined
 			}
 		>
-			<div className={wide ? "max-w-[1400px]" : phase === "idle" ? "max-w-4xl" : "max-w-2xl"}>
+			<div className={wide ? "max-w-[1400px]" : "max-w-2xl"}>
+				{phase !== "results" && <StepsHint current={phase === "idle" ? 1 : 2} />}
 				{phase === "idle" && (
 					<BriefForm
 						direction={direction}
