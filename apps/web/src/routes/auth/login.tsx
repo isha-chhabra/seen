@@ -39,7 +39,7 @@ export const Route = createFileRoute("/auth/login")({
 		const appName = getAppName(match);
 		return {
 			meta: [
-				{ title: buildTitle("Sign in", { appName }) },
+				{ title: buildTitle("Sign In", { appName }) },
 				{ name: "description", content: "Sign in to your account." },
 			],
 		};
@@ -106,7 +106,7 @@ export function SSOLogin({ returnTo }: { returnTo?: string }) {
 
 	if (error) {
 		return (
-			<FullPageCard title="Sign in">
+			<FullPageCard title="Sign In">
 				<div className="w-full space-y-4">
 					<Alert variant="destructive">
 						<AlertDescription>{error}</AlertDescription>
@@ -148,7 +148,7 @@ export function DemoLogin({ returnTo }: { returnTo?: string }) {
 	}
 
 	return (
-		<FullPageCard title="Sign in">
+		<FullPageCard title="Sign In">
 			<form onSubmit={handleSubmit} className="space-y-4 w-full">
 				<DemoCredentialsCallout />
 				{error && (
@@ -157,7 +157,7 @@ export function DemoLogin({ returnTo }: { returnTo?: string }) {
 					</Alert>
 				)}
 				<Button type="submit" className="w-full" disabled={loading}>
-					{loading ? "Signing in..." : "Sign in"}
+					{loading ? "Signing in..." : "Sign In"}
 				</Button>
 			</form>
 		</FullPageCard>
@@ -219,7 +219,7 @@ export function EmailPasswordLogin({
 
 	return (
 		<AuthSplitLayout
-			title="Welcome back"
+			title="Welcome Back"
 			subtitle="Sign in to continue to Seen."
 			pitch={<SalesPanel variant={isCloud ? "cloud" : "self-hosted"} source={source} />}
 			footer={<SalesFooterLinks source={source} />}
@@ -281,7 +281,7 @@ export function EmailPasswordLogin({
 					/>
 				</div>
 				<Button type="submit" className="w-full" disabled={loading}>
-					{loading ? "Signing in..." : "Sign in"}
+					{loading ? "Signing in..." : "Sign In"}
 				</Button>
 			</form>
 			{canRegister && (
@@ -292,7 +292,7 @@ export function EmailPasswordLogin({
 						search={{ ...(returnTo ? { returnTo } : {}), ...(incomingRef ? { ref: incomingRef } : {}) }}
 						className="text-primary hover:underline font-medium"
 					>
-						Sign up
+						Sign Up
 					</Link>
 				</p>
 			)}

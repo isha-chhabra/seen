@@ -112,7 +112,7 @@ function Dots({ still }: { still: boolean }) {
 export function ArticleSearchLoader({
 	stage,
 	progressPct,
-	title = "Finding articles",
+	title = "Finding Articles",
 }: {
 	stage: string | null;
 	progressPct: number | null;

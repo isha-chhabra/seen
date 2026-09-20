@@ -54,7 +54,7 @@ function InfluencerFinderPage() {
 	const [bands, setBands] = useState<FollowerBand[]>([]);
 	const [extras, setExtras] = useState<Extras>({ similarTo: [], avoid: [], basedIn: [] });
 	const [capUsd, setCapUsd] = useState(0.2);
-	const [target, setTarget] = useState(30);
+	const [target, setTarget] = useState(20);
 
 	const [phase, setPhase] = useState<Phase>("idle");
 	const [busy, setBusy] = useState(false);
@@ -193,11 +193,11 @@ function InfluencerFinderPage() {
 					<>
 						{brief && (
 							<Button variant="ghost" size="sm" onClick={() => setPhase("review")}>
-								Edit plan
+								Edit Plan
 							</Button>
 						)}
 						<Button variant="outline" size="sm" onClick={() => setPhase("idle")}>
-							New search
+							New Search
 						</Button>
 					</>
 				) : undefined
@@ -243,7 +243,7 @@ function InfluencerFinderPage() {
 							/>
 						)}
 						{phase === "searching" && (
-							<ArticleSearchLoader title="Finding creators" stage={liveStage} progressPct={liveProgress} />
+							<ArticleSearchLoader title="Finding Creators" stage={liveStage} progressPct={liveProgress} />
 						)}
 					</div>
 				)}

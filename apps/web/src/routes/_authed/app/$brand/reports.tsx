@@ -177,7 +177,7 @@ function ReportsPage() {
 						)}
 
 						<div className="space-y-1.5">
-							<Label htmlFor="report-name">Report name</Label>
+							<Label htmlFor="report-name">Report Name</Label>
 							<Input
 								id="report-name"
 								placeholder={`${brand?.name ?? "Brand"} visibility, ${pretty(range?.from)} to ${pretty(range?.to)}`}
@@ -187,15 +187,15 @@ function ReportsPage() {
 							/>
 						</div>
 
-						<RangeField label="Report period" value={range} onChange={setRange} />
+						<RangeField label="Report Period" value={range} onChange={setRange} />
 
 						<div className="flex items-center gap-3">
 							<Switch id="cmp" checked={compareOn} onCheckedChange={setCompareOn} disabled={status === "working"} />
 							<Label htmlFor="cmp" className="cursor-pointer font-normal">
-								Compare to another period
+								Compare to Another Period
 							</Label>
 						</div>
-						{compareOn && <RangeField label="Comparison period" value={compareRange} onChange={setCompareRange} />}
+						{compareOn && <RangeField label="Comparison Period" value={compareRange} onChange={setCompareRange} />}
 
 						{error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -221,7 +221,7 @@ function ReportsPage() {
 				{lastReport && (
 					<div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4 text-sm">
 						<div className="min-w-0">
-							<div className="font-medium">Last report</div>
+							<div className="font-medium">Last Report</div>
 							<div className="truncate text-xs text-muted-foreground">{lastReport.periodLabel}</div>
 						</div>
 						<Button

@@ -78,7 +78,7 @@ function NoPlatformsCard() {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>Tracked platforms</CardTitle>
+				<CardTitle>Tracked Platforms</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<p className="text-sm text-muted-foreground">This brand is not tracked on any platform yet.</p>
@@ -328,7 +328,7 @@ function PremiumApiPool({ premium }: { premium: PremiumPool }) {
 						params={{ brand: brandId }}
 						className={buttonVariants({ variant: "outline", size: "sm" })}
 					>
-						Choose prompts
+						Choose Prompts
 					</Link>
 					<Link
 						to="/app/$brand/settings/billing"
@@ -364,7 +364,7 @@ function AddPlatformsCard({ platforms }: { platforms: ModelPickerState["unconfig
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>Track more platforms</CardTitle>
+				<CardTitle>Track More Platforms</CardTitle>
 				<CardDescription>
 					Add these to <code className="font-mono text-xs">SCRAPE_TARGETS</code> to start tracking them. One account is
 					enough, but which kind you pick changes the data: a scraper reads the product a visitor uses, an API asks the
@@ -400,7 +400,7 @@ function AddPlatformsCard({ platforms }: { platforms: ModelPickerState["unconfig
 					rel="noopener noreferrer"
 					className={buttonVariants({ variant: "outline", size: "sm" })}
 				>
-					Provider setup guide
+					Provider Setup Guide
 					<IconExternalLink className="h-4 w-4" />
 				</a>
 			</CardContent>

@@ -102,14 +102,14 @@ export function ResetPasswordForm({
 				{/* The only thing to do from here, so it carries the weight the other
 				    pages give their submit button. */}
 				<Link to="/auth/forgot-password" className={buttonVariants({ className: "w-full" })}>
-					Request a new reset link
+					Request a New Reset Link
 				</Link>
 			</AuthSplitLayout>
 		);
 	}
 
 	return (
-		<AuthSplitLayout title="Choose a new password" pitch={panel} footer={footer}>
+		<AuthSplitLayout title="Choose a New Password" pitch={panel} footer={footer}>
 			<form onSubmit={handleSubmit} className="space-y-4 w-full">
 				{error && (
 					<Alert variant="destructive">
@@ -117,7 +117,7 @@ export function ResetPasswordForm({
 					</Alert>
 				)}
 				<div className="space-y-2">
-					<Label htmlFor="new-password">New password</Label>
+					<Label htmlFor="new-password">New Password</Label>
 					<Input
 						id="new-password"
 						type="password"
@@ -131,7 +131,7 @@ export function ResetPasswordForm({
 					/>
 				</div>
 				<div className="space-y-2">
-					<Label htmlFor="confirm-password">Confirm password</Label>
+					<Label htmlFor="confirm-password">Confirm Password</Label>
 					<Input
 						id="confirm-password"
 						type="password"

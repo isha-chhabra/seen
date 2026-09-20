@@ -489,7 +489,7 @@ function BrandRow({
 						</Badge>
 					) : (
 						<Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
-							All on schedule
+							All on Schedule
 						</Badge>
 					)}
 				</TableCell>
@@ -585,7 +585,7 @@ function BrandRow({
 															<span className="text-xs text-muted-foreground">Processing...</span>
 														)}
 														{prompt.jobStatus === "created" && (
-															<span className="text-xs text-muted-foreground">In queue</span>
+															<span className="text-xs text-muted-foreground">In Queue</span>
 														)}
 														{prompt.jobStatus === "retry" && (
 															<span className="text-xs text-muted-foreground">Retrying soon</span>

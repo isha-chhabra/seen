@@ -91,6 +91,7 @@ function makeDeps(overrides: Partial<PipelineDeps> = {}) {
 					]
 				: [{ url: "https://www.tiktok.com/@ttguy/video/1", title: "tall guy", snippet: "tall" }],
 		),
+		expand: vi.fn(async () => []),
 		scrape: vi.fn(async (dataset: string, urls: string[]) => {
 			scrapeCalls.push({ dataset, urls });
 			if (dataset === DATASETS.instagramPost) return urls.map(igPostRecord);
@@ -203,5 +204,40 @@ describe("runInfluencerSearch", () => {
 		const stages: string[] = [];
 		await runInfluencerSearch(input(), deps, (stage) => void stages.push(stage));
 		expect(stages).toEqual(expect.arrayContaining(["Searching the web", "Judging fit", "Finishing up"]));
+	});
+
+	it("keeps searching (deeper pages, new phrases) until the requested number of creators is kept", async () => {
+		const igOnly = { ...brief, platforms: ["instagram" as const], queries: { instagram: ["big and tall style"], tiktok: [] } };
+		const codesFor = (query: string, page: number) =>
+			[1, 2, 3].map((n) => ({
+				url: `https://www.instagram.com/reel/${query.replace(/\W/g, "").slice(-6)}P${page}N${n}/`,
+				title: "t",
+				snippet: "s",
+			}));
+		const { deps } = makeDeps({
+			serp: vi.fn(async (query: string, page: number) => codesFor(query, page)),
+			expand: vi.fn(async () => ["broad shoulder tailoring", "tall dad style"]),
+		});
+		const out = await runInfluencerSearch(input({ brief: igOnly, targetResults: 9, capUsd: 0.5 }), deps);
+		const kept = out.results.filter((r) => r.verdict !== "exclude");
+		expect(kept.length).toBeGreaterThanOrEqual(9);
+		expect(vi.mocked(deps.serp).mock.calls.some(([, page]) => page > 0)).toBe(true);
+		expect(deps.expand).toHaveBeenCalled();
+		expect(out.stats.requested).toBe(9);
+		expect(out.cost.usd).toBeLessThanOrEqual(0.5);
+	});
+
+	it("says so when it runs out of money before reaching the requested number", async () => {
+		const igOnly = { ...brief, platforms: ["instagram" as const], queries: { instagram: ["big and tall style"], tiktok: [] } };
+		const { deps } = makeDeps({
+			serp: vi.fn(async (query: string, page: number) =>
+				[1, 2, 3].map((n) => ({ url: `https://www.instagram.com/reel/${query.replace(/\W/g, "").slice(-6)}P${page}N${n}/`, title: "t", snippet: "s" })),
+			),
+			expand: vi.fn(async () => ["another angle", "one more angle"]),
+		});
+		const out = await runInfluencerSearch(input({ brief: igOnly, targetResults: 50, capUsd: 0.1 }), deps);
+		expect(out.cost.usd).toBeLessThanOrEqual(0.1);
+		expect(out.results.filter((r) => r.verdict !== "exclude").length).toBeLessThan(50);
+		expect(out.stats.stoppedAtBudget).toBe(true);
 	});
 });

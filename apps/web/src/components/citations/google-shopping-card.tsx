@@ -155,7 +155,7 @@ export function GoogleShoppingCard({ googleModule, brandId }: { googleModule: Go
 
 				{googleModule.search.queries.length > 0 && (
 					<div>
-						<h4 className="text-sm font-medium mb-2">Search queries</h4>
+						<h4 className="text-sm font-medium mb-2">Search Queries</h4>
 						<div className="divide-y divide-border/50">
 							{(showAllQueries ? googleModule.search.queries : googleModule.search.queries.slice(0, 5)).map((q) => {
 								const isExpanded = expandedQuery === q.query;

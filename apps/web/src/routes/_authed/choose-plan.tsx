@@ -78,7 +78,7 @@ function ChoosePlanPage() {
 		<SidebarProvider>
 			<AppSidebar scope="account" />
 			<SidebarInset className="md:border md:border-border/60 md:rounded-xl overflow-hidden">
-				<SiteHeader title="Choose a plan" />
+				<SiteHeader title="Choose a Plan" />
 				<div className="flex flex-1 flex-col">{body}</div>
 			</SidebarInset>
 		</SidebarProvider>
@@ -146,13 +146,13 @@ function PlanPicker({ paywall }: { paywall: PaywallRequired }) {
 	return (
 		<div className="mx-auto max-w-6xl space-y-8 p-8">
 			<div className="space-y-2 text-center">
-				<h1 className="text-3xl font-bold">Choose your plan</h1>
+				<h1 className="text-3xl font-bold">Choose Your Plan</h1>
 				<p className="text-muted-foreground">Start tracking how AI answer engines talk about your brand.</p>
 				<div className="flex items-center justify-center gap-3 pt-2">
 					<span className={annual ? "text-muted-foreground" : "font-medium"}>Monthly</span>
 					<Switch checked={annual} onCheckedChange={setAnnual} aria-label="Annual billing" />
 					<span className={annual ? "font-medium" : "text-muted-foreground"}>
-						Annual <Badge variant="secondary">2 months free</Badge>
+						Annual <Badge variant="secondary">2 Months Free</Badge>
 					</span>
 				</div>
 			</div>

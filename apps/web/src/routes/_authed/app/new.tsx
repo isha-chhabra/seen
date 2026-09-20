@@ -227,11 +227,11 @@ function NewBrandPage() {
 							params={{ brand: activeOrg.billingBrandId }}
 							className={buttonVariants({ className: "w-full" })}
 						>
-							Go to billing
+							Go to Billing
 						</Link>
 					) : (
 						<Link to="/choose-plan" search={{ org: activeOrg.id }} className={buttonVariants({ className: "w-full" })}>
-							Choose a plan
+							Choose a Plan
 						</Link>
 					)}
 				</div>
@@ -257,10 +257,10 @@ function NewBrandPage() {
 	}
 
 	return (
-		<FullPageCard title="Create a new brand" subtitle="Set up a brand to start tracking" showBackButton>
+		<FullPageCard title="Create a New Brand" subtitle="Set up a brand to start tracking" showBackButton>
 			<form action={handleDetailsSubmit} className="space-y-4">
 				<div className="space-y-2">
-					<Label htmlFor="brandName">Brand name</Label>
+					<Label htmlFor="brandName">Brand Name</Label>
 					<Input
 						id="brandName"
 						name="brandName"

@@ -125,7 +125,7 @@ function BillingSettingsPage() {
 			)}
 			{entitlements.standing === "none" && (
 				<Alert variant="destructive">
-					<AlertTitle>No active subscription</AlertTitle>
+					<AlertTitle>No Active Subscription</AlertTitle>
 					<AlertDescription>Tracking is stopped until a plan is chosen.</AlertDescription>
 				</Alert>
 			)}
@@ -207,7 +207,7 @@ function BillingSettingsPage() {
 
 			{state.premiumAddonAvailable && (
 				<Section
-					title="Extra premium"
+					title="Extra Premium"
 					description={`Beyond what your plan includes, at $${PREMIUM_ADDON_MONTHLY_USD} per pairing per month.`}
 				>
 					<PremiumAddonCard
@@ -279,7 +279,7 @@ function BillingAction({
 	if (isCustomPlan) return null;
 	return (
 		<Button size="sm" onClick={onChoosePlan}>
-			Choose a plan
+			Choose a Plan
 		</Button>
 	);
 }
@@ -386,7 +386,7 @@ function UsageCard({ state }: { state: BillingState }) {
 		<Card>
 			<CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				<UsageMeter label="Brands" used={state.usage.brands} limit={entitlements.maxBrands} />
-				<UsageMeter label="Tracked prompts" used={state.usage.enabledPrompts} limit={entitlements.maxPrompts} />
+				<UsageMeter label="Tracked Prompts" used={state.usage.enabledPrompts} limit={entitlements.maxPrompts} />
 				{entitlements.premiumPool > 0 && (
 					<UsageMeter
 						label={
@@ -467,7 +467,7 @@ function PremiumAddonCard({
 				)}
 				<div className="flex items-end gap-3">
 					<div className="space-y-1">
-						<Label htmlFor="premium-addon-quantity">Purchased pairings</Label>
+						<Label htmlFor="premium-addon-quantity">Purchased Pairings</Label>
 						<Input
 							id="premium-addon-quantity"
 							type="number"

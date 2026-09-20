@@ -63,7 +63,7 @@ export function VerifyEmailCode({ email, returnTo }: { email: string; returnTo?:
 	}
 
 	return (
-		<AuthSplitLayout title="Check your email" subtitle={`Enter the ${CODE_LENGTH}-digit code we sent to ${email}.`}>
+		<AuthSplitLayout title="Check Your Email" subtitle={`Enter the ${CODE_LENGTH}-digit code we sent to ${email}.`}>
 			<form onSubmit={handleSubmit} className="w-full space-y-4">
 				{error && (
 					<Alert variant="destructive">
@@ -76,7 +76,7 @@ export function VerifyEmailCode({ email, returnTo }: { email: string; returnTo?:
 					</Alert>
 				)}
 				<div className="space-y-2">
-					<Label htmlFor="verification-code">Verification code</Label>
+					<Label htmlFor="verification-code">Verification Code</Label>
 					<Input
 						id="verification-code"
 						value={code}

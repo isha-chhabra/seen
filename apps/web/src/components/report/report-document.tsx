@@ -132,7 +132,7 @@ function Page1(p: ReportDocProps) {
 		<div style={page} data-report-page={1}>
 			<Head {...p} n={1} />
 			<div style={{ marginBottom: 18 }}>
-				<div style={label}>What this report measures</div>
+				<div style={label}>What This Report Measures</div>
 				<div style={{ marginTop: 6 }}>{o.whatThisIs}</div>
 			</div>
 			<Callout>
@@ -202,11 +202,11 @@ function Page2(p: ReportDocProps) {
 			<div style={{ marginBottom: 14 }}>{b.intro}</div>
 			<div style={{ display: "flex", gap: 28 }}>
 				<div style={{ flex: 1 }}>
-					<div style={h2}>AI recommends you here</div>
+					<div style={h2}>AI Recommends You Here</div>
 					<QList items={b.winning} kind="win" />
 				</div>
 				<div style={{ flex: 1 }}>
-					<div style={h2}>AI leaves you out here</div>
+					<div style={h2}>AI Leaves You Out Here</div>
 					<QList
 						items={b.losing.map((l) => ({
 							question: l.question,
@@ -218,7 +218,7 @@ function Page2(p: ReportDocProps) {
 				</div>
 			</div>
 			<div style={{ marginTop: 24 }}>
-				<div style={h2}>By AI assistant</div>
+				<div style={h2}>By AI Assistant</div>
 				<div style={{ marginBottom: 8 }}>{b.engineNote}</div>
 				<BarChart width={690} height={170} data={bars} margin={{ top: 8, right: 12, bottom: 0, left: -18 }}>
 					<CartesianGrid stroke="#f1f5f9" vertical={false} />
@@ -247,7 +247,7 @@ function Page3(p: ReportDocProps) {
 			</Callout>
 			<div style={{ display: "flex", gap: 28, marginTop: 22 }}>
 				<div style={{ flex: "0 0 250px" }}>
-					<div style={label}>Where AI's sources come from</div>
+					<div style={label}>Where AI's Sources Come From</div>
 					<div style={{ marginTop: 10 }}>
 						{mix.map(([k, n]) => (
 							<div key={k} style={{ marginBottom: 8 }}>
@@ -293,7 +293,7 @@ function Page4(p: ReportDocProps) {
 	return (
 		<div style={page} data-report-page={4}>
 			<Head {...p} n={4} />
-			<div style={h2}>Your action plan</div>
+			<div style={h2}>Your Action Plan</div>
 			<div style={{ marginBottom: 16 }}>
 				{p.narrative.actionPlan.map((a, i) => (
 					<div
@@ -322,7 +322,7 @@ function Page4(p: ReportDocProps) {
 					</div>
 				))}
 			</div>
-			<div style={h2}>How to read this report</div>
+			<div style={h2}>How to Read This Report</div>
 			<div>
 				{p.narrative.glossary.map((g) => (
 					<div key={g.term} style={{ fontSize: 11, marginBottom: 4 }}>

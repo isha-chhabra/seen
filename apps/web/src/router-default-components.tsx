@@ -33,7 +33,7 @@ export function DefaultErrorComponent({ error }: ErrorComponentProps) {
 
 	return (
 		<FullPageCard
-			title="Something went wrong"
+			title="Something Went Wrong"
 			subtitle="An unexpected error occurred while loading this page."
 			showBackButton={true}
 		/>

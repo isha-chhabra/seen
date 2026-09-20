@@ -127,6 +127,8 @@ export interface InfluencerSearchStats {
 	excluded: number;
 	/** Set when the run stopped early because it reached the spending limit. */
 	stoppedAtBudget: boolean;
+	/** How many creators were asked for, to compare with how many were kept. */
+	requested?: number;
 }
 
 export interface InfluencerSearchCost {

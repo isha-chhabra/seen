@@ -46,16 +46,16 @@ function buildPresets(today: Date): { label: string; range: DateRange }[] {
 	return [
 		{ label: "Today", range: { from: today, to: today } },
 		{ label: "Yesterday", range: { from: addDays(today, -1), to: addDays(today, -1) } },
-		{ label: "Last 7 days", range: { from: addDays(today, -6), to: today } },
-		{ label: "Last 14 days", range: { from: addDays(today, -13), to: today } },
-		{ label: "Last 30 days", range: { from: addDays(today, -29), to: today } },
-		{ label: "Last 90 days", range: { from: addDays(today, -89), to: today } },
-		{ label: "Month to date", range: { from: startOfMonth(today), to: today } },
-		{ label: "Quarter to date", range: { from: startOfQuarter(today), to: today } },
-		{ label: "Year to date", range: { from: startOfYear(today), to: today } },
-		{ label: "Last month", range: { from: startOfMonth(lastMonthDay), to: endOfMonth(lastMonthDay) } },
-		{ label: "Last quarter", range: { from: startOfQuarter(lastQuarterDay), to: endOfQuarter(lastQuarterDay) } },
-		{ label: "Last year", range: { from: startOfYear(lastYearDay), to: endOfYear(lastYearDay) } },
+		{ label: "Last 7 Days", range: { from: addDays(today, -6), to: today } },
+		{ label: "Last 14 Days", range: { from: addDays(today, -13), to: today } },
+		{ label: "Last 30 Days", range: { from: addDays(today, -29), to: today } },
+		{ label: "Last 90 Days", range: { from: addDays(today, -89), to: today } },
+		{ label: "Month to Date", range: { from: startOfMonth(today), to: today } },
+		{ label: "Quarter to Date", range: { from: startOfQuarter(today), to: today } },
+		{ label: "Year to Date", range: { from: startOfYear(today), to: today } },
+		{ label: "Last Month", range: { from: startOfMonth(lastMonthDay), to: endOfMonth(lastMonthDay) } },
+		{ label: "Last Quarter", range: { from: startOfQuarter(lastQuarterDay), to: endOfQuarter(lastQuarterDay) } },
+		{ label: "Last Year", range: { from: startOfYear(lastYearDay), to: endOfYear(lastYearDay) } },
 	];
 }
 

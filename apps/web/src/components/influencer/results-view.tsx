@@ -4,6 +4,8 @@
  * export menu. Filtering is live and free, nothing here re-runs the search.
  */
 import {
+	IconAdjustmentsHorizontal,
+	IconAlertTriangle,
 	IconArrowDown,
 	IconArrowUp,
 	IconLayoutGrid,
@@ -21,7 +23,6 @@ import {
 	type Platform,
 } from "@workspace/lib/influencer-finder/types";
 import { Button } from "@workspace/ui/components/button";
-import { Checkbox } from "@workspace/ui/components/checkbox";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -36,6 +37,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { useMemo, useState } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { ExportMenu } from "@/components/export-menu";
+import { StopScale, ToggleGroup } from "@/components/finder-form";
 import { UserAvatar } from "@/components/user-avatar";
 import {
 	applyFilters,
@@ -50,7 +52,7 @@ import {
 	summarize,
 } from "@/lib/influencer-results";
 import type { ExportColumn } from "@/lib/table-export";
-import { rangeCaption, SizeRange } from "./brief-form";
+import { SizeRange } from "./brief-form";
 import { CreatorSheet } from "./creator-sheet";
 import { EXCLUDED_LABEL, FilterTrigger, FitBar, PLATFORM_LABEL, PlatformIcon, VerdictBadge } from "./parts";
 
@@ -80,109 +82,80 @@ const EXPORT_COLUMNS: ExportColumn<InfluencerResult>[] = [
 ];
 
 const SORT_LABEL: Record<SortKey, string> = {
-	fit: "Fit score",
+	fit: "Fit Score",
 	followers: "Followers",
 	engagement: "Engagement",
-	postsPerWeek: "Posting frequency",
-	lastPost: "Most recent post",
-	collabs: "Brand collabs",
+	postsPerWeek: "Posting Frequency",
+	lastPost: "Most Recent Post",
+	collabs: "Brand Collabs",
 	name: "Name",
 };
 
 const ENGAGEMENT_STEPS = [
-	[0, "Any engagement"],
+	[0, "Any"],
 	[1, "1%+"],
 	[2, "2%+"],
 	[3, "3%+"],
 	[5, "5%+"],
 ] as const;
 const ACTIVE_STEPS = [
-	[0, "Any activity"],
-	[14, "Posted in 2 weeks"],
-	[30, "Posted in 30 days"],
-	[90, "Posted in 90 days"],
+	[0, "Any"],
+	[14, "2 Weeks"],
+	[30, "30 Days"],
+	[90, "90 Days"],
 ] as const;
 const POSTING_STEPS = [
-	[0, "Any frequency"],
-	[1, "1+ per week"],
-	[3, "3+ per week"],
-	[5, "5+ per week"],
+	[0, "Any"],
+	[1, "1+/Wk"],
+	[3, "3+/Wk"],
+	[5, "5+/Wk"],
 ] as const;
 const FIT_STEPS = [
-	[0, "Any fit"],
+	[0, "Any"],
 	[60, "60+"],
 	[70, "70+"],
 	[80, "80+"],
 	[90, "90+"],
 ] as const;
-const COLLAB_LABEL: Record<CollabFilter, string> = {
-	any: "Any collab history",
-	has: "Does brand collabs",
-	none: "No brand collabs seen",
-};
-
-/** A single-choice dropdown whose menu items are numeric steps. */
-function StepMenu({
-	value,
-	steps,
-	onChange,
-}: {
-	value: number;
-	steps: readonly (readonly [number, string])[];
-	onChange: (v: number) => void;
-}) {
-	const label = steps.find(([v]) => v === value)?.[1] ?? steps[0]?.[1] ?? "";
+const COLLAB_STEPS: readonly (readonly [CollabFilter, string])[] = [
+	["any", "Any"],
+	["has", "Has Collabs"],
+	["none", "None Seen"],
+];
+/** One row of the filter panel: a label, then the control. */
+function PanelRow({ label, children }: { label: string; children: React.ReactNode }) {
 	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger render={<FilterTrigger label={label} active={value !== 0} />} />
-			<DropdownMenuContent align="start">
-				<DropdownMenuRadioGroup value={String(value)} onValueChange={(v) => onChange(Number(v))}>
-					{steps.map(([v, l]) => (
-						<DropdownMenuRadioItem key={v} value={String(v)}>
-							{l}
-						</DropdownMenuRadioItem>
-					))}
-				</DropdownMenuRadioGroup>
-			</DropdownMenuContent>
-		</DropdownMenu>
+		<div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-4 py-3">
+			<span className="pt-0.5 font-medium text-sm">{label}</span>
+			<div className="min-w-0">{children}</div>
+		</div>
 	);
 }
 
-/** A multi-select popover, the same pattern Article Finder uses for its affiliate filter. */
-function CheckMenu<T extends string>({
+/** A numeric filter as a ruler; the first stop is always "Any". */
+function StepScale({
 	label,
-	options,
-	selected,
-	onToggle,
+	steps,
+	value,
+	onChange,
 }: {
 	label: string;
-	options: readonly (readonly [T, string])[];
-	selected: Set<T>;
-	onToggle: (v: T) => void;
+	steps: readonly (readonly [number, string])[];
+	value: number;
+	onChange: (v: number) => void;
 }) {
+	const i = Math.max(
+		0,
+		steps.findIndex(([v]) => v === value),
+	);
 	return (
-		<Popover modal={false}>
-			<PopoverTrigger render={<FilterTrigger label={label} active={selected.size > 0} badgeCount={selected.size} />} />
-			<PopoverContent align="start" className="w-56 p-1">
-				{options.map(([value, text]) => {
-					const checked = selected.has(value);
-					return (
-						<button
-							key={value}
-							type="button"
-							onClick={() => onToggle(value)}
-							className={cn(
-								"flex w-full cursor-pointer items-center gap-2.5 rounded-sm px-2 py-1.5 text-left text-sm",
-								checked ? "bg-accent" : "hover:bg-muted",
-							)}
-						>
-							<Checkbox checked={checked} className="pointer-events-none" />
-							<span className="flex-1">{text}</span>
-						</button>
-					);
-				})}
-			</PopoverContent>
-		</Popover>
+		<StopScale
+			label={label}
+			stops={steps.map(([, l]) => ({ label: l }))}
+			lo={i}
+			hi={i}
+			onPick={(n) => onChange(steps[n]?.[0] ?? 0)}
+		/>
 	);
 }
 
@@ -216,13 +189,13 @@ function SummaryStrip({ results }: { results: InfluencerResult[] }) {
 			<div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
 				<StatTile label="Matches" value={String(s.matches)} hint={s.maybe > 0 ? `+ ${s.maybe} maybe` : undefined} />
 				<StatTile
-					label="Median engagement"
+					label="Median Engagement"
 					value={s.medianEngagementPct === null ? "—" : `${s.medianEngagementPct}%`}
 					hint="Across kept creators"
 				/>
-				<StatTile label="Median followers" value={formatCount(s.medianFollowers)} />
+				<StatTile label="Median Followers" value={formatCount(s.medianFollowers)} />
 				<StatTile
-					label="Do brand collabs"
+					label="Do Brand Collabs"
 					value={kept === 0 ? "—" : `${s.withCollabs} of ${kept}`}
 					hint="Sponsored posts spotted"
 				/>
@@ -363,7 +336,7 @@ function Row({ r, onOpen }: { r: InfluencerResult; onOpen: () => void }) {
 					{r.verdict === "exclude" && r.excludedBecause ? (
 						<span className="text-[10px] text-muted-foreground">{EXCLUDED_LABEL[r.excludedBecause]}</span>
 					) : conflict ? (
-						<span className="text-[10px] text-destructive">Competitor link</span>
+						<span className="text-[10px] text-destructive">Competitor Link</span>
 					) : null}
 				</div>
 			</TableCell>
@@ -447,15 +420,15 @@ export function InfluencerResults({
 				? r.verdict === "maybe"
 				: r.verdict === "exclude",
 	).length;
-	const filtersOn =
-		filters.platforms.size > 0 ||
-		filters.bands.size > 0 ||
-		filters.minFit > 0 ||
-		filters.minEngagement > 0 ||
-		filters.activeWithinDays > 0 ||
-		filters.minPostsPerWeek > 0 ||
-		filters.collab !== "any" ||
-		filters.search.trim() !== "";
+	const activeCount = [
+		filters.platforms.size > 0,
+		filters.bands.size > 0,
+		filters.minFit > 0,
+		filters.minEngagement > 0,
+		filters.activeWithinDays > 0,
+		filters.minPostsPerWeek > 0,
+		filters.collab !== "any",
+	].filter(Boolean).length;
 	const tabCount: Record<ResultTab, number> = {
 		matches: counts.matches,
 		maybe: counts.maybe,
@@ -466,6 +439,18 @@ export function InfluencerResults({
 	return (
 		<div className="space-y-4">
 			<SummaryStrip results={results} />
+
+			{stats.requested !== undefined && counts.matches + counts.maybe < stats.requested && (
+				<p className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm">
+					<IconAlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-500" />
+					<span>
+						Found {counts.matches + counts.maybe} of {stats.requested} creators.{" "}
+						{stats.stoppedAtBudget
+							? `The search stopped at the $${cost.capUsd.toFixed(2)} limit. Raise the limit and run it again; creators already checked cost nothing.`
+							: `No more fitting creators turned up after ${stats.searches} searches. Try a broader description or more follower sizes.`}
+					</span>
+				</p>
+			)}
 
 			<div className="flex flex-wrap items-center justify-between gap-3">
 				<div className="inline-flex rounded-lg bg-muted p-[3px]" role="tablist" aria-label="Result groups">
@@ -497,12 +482,12 @@ export function InfluencerResults({
 				/>
 			</div>
 
-			<div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card/70 p-2 shadow-xs backdrop-blur-sm">
-				<InputGroup className="h-8 w-full sm:w-56">
+			<div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card/70 p-2 shadow-xs backdrop-blur-sm sm:flex-nowrap">
+				<InputGroup className="h-8 min-w-0 flex-1 sm:max-w-sm">
 					<InputGroupInput
 						value={filters.search}
 						onChange={(e) => set("search", e.target.value)}
-						placeholder="Search name, bio, brand…"
+						placeholder="Search Name, Bio or Brand"
 						className="h-8 text-sm"
 					/>
 					<InputGroupAddon className="pl-2.5">
@@ -517,58 +502,87 @@ export function InfluencerResults({
 					)}
 				</InputGroup>
 
-				{platformsInResults.length > 1 && (
-					<CheckMenu
-						label="Platform"
-						options={platformsInResults.map((p) => [p, PLATFORM_LABEL[p]] as const)}
-						selected={filters.platforms}
-						onToggle={(p) => toggleIn("platforms", p)}
-					/>
-				)}
 				<Popover modal={false}>
 					<PopoverTrigger
 						render={
 							<FilterTrigger
-								label={
-									filters.bands.size > 0 ? rangeCaption([...filters.bands]).replace(" followers", "") : "Followers"
-								}
-								active={filters.bands.size > 0}
+								label="Filters"
+								icon={<IconAdjustmentsHorizontal className="size-3.5" />}
+								active={activeCount > 0}
+								badgeCount={activeCount}
 							/>
 						}
 					/>
-					<PopoverContent align="start" className="w-[26rem] max-w-[90vw] p-3">
-						<SizeRange bands={[...filters.bands]} onChange={(v) => set("bands", new Set(v))} />
+					<PopoverContent
+						align="start"
+						className="max-h-[70vh] w-[28rem] max-w-[92vw] divide-y divide-border/50 overflow-y-auto p-4"
+					>
+						<div className="flex items-center justify-between pb-3">
+							<span className="font-semibold text-sm">Filters</span>
+							<button
+								type="button"
+								disabled={activeCount === 0}
+								onClick={() => setFilters((f) => ({ ...defaultFilters(), tab: f.tab, search: f.search }))}
+								className="text-muted-foreground text-xs transition-colors hover:text-foreground disabled:opacity-40"
+							>
+								Clear All
+							</button>
+						</div>
+						{platformsInResults.length > 1 && (
+							<PanelRow label="Platform">
+								<ToggleGroup
+									label="Platform"
+									selected={[...filters.platforms]}
+									onToggle={(p) => toggleIn("platforms", p)}
+									options={platformsInResults.map((p) => ({ id: p, label: PLATFORM_LABEL[p] }))}
+								/>
+							</PanelRow>
+						)}
+						<PanelRow label="Followers">
+							<SizeRange bands={[...filters.bands]} onChange={(v) => set("bands", new Set(v))} />
+						</PanelRow>
+						<PanelRow label="Fit Score">
+							<StepScale
+								label="Fit Score"
+								steps={FIT_STEPS}
+								value={filters.minFit}
+								onChange={(v) => set("minFit", v)}
+							/>
+						</PanelRow>
+						<PanelRow label="Engagement">
+							<StepScale
+								label="Engagement"
+								steps={ENGAGEMENT_STEPS}
+								value={filters.minEngagement}
+								onChange={(v) => set("minEngagement", v)}
+							/>
+						</PanelRow>
+						<PanelRow label="Last Posted">
+							<StepScale
+								label="Last Posted Within"
+								steps={ACTIVE_STEPS}
+								value={filters.activeWithinDays}
+								onChange={(v) => set("activeWithinDays", v)}
+							/>
+						</PanelRow>
+						<PanelRow label="Posting Rate">
+							<StepScale
+								label="Posting Rate"
+								steps={POSTING_STEPS}
+								value={filters.minPostsPerWeek}
+								onChange={(v) => set("minPostsPerWeek", v)}
+							/>
+						</PanelRow>
+						<PanelRow label="Brand Collabs">
+							<StepScale
+								label="Brand Collabs"
+								steps={COLLAB_STEPS.map(([, l], i) => [i, l] as const)}
+								value={COLLAB_STEPS.findIndex(([k]) => k === filters.collab)}
+								onChange={(i) => set("collab", COLLAB_STEPS[i]?.[0] ?? "any")}
+							/>
+						</PanelRow>
 					</PopoverContent>
 				</Popover>
-				<StepMenu value={filters.minFit} steps={FIT_STEPS} onChange={(v) => set("minFit", v)} />
-				<StepMenu value={filters.minEngagement} steps={ENGAGEMENT_STEPS} onChange={(v) => set("minEngagement", v)} />
-				<StepMenu value={filters.activeWithinDays} steps={ACTIVE_STEPS} onChange={(v) => set("activeWithinDays", v)} />
-				<StepMenu value={filters.minPostsPerWeek} steps={POSTING_STEPS} onChange={(v) => set("minPostsPerWeek", v)} />
-				<DropdownMenu>
-					<DropdownMenuTrigger
-						render={<FilterTrigger label={COLLAB_LABEL[filters.collab]} active={filters.collab !== "any"} />}
-					/>
-					<DropdownMenuContent align="start">
-						<DropdownMenuRadioGroup value={filters.collab} onValueChange={(v) => set("collab", v as CollabFilter)}>
-							{(Object.keys(COLLAB_LABEL) as CollabFilter[]).map((k) => (
-								<DropdownMenuRadioItem key={k} value={k}>
-									{COLLAB_LABEL[k]}
-								</DropdownMenuRadioItem>
-							))}
-						</DropdownMenuRadioGroup>
-					</DropdownMenuContent>
-				</DropdownMenu>
-
-				{filtersOn && (
-					<Button
-						variant="ghost"
-						size="sm"
-						className="h-8 text-muted-foreground"
-						onClick={() => setFilters((f) => ({ ...defaultFilters(), tab: f.tab }))}
-					>
-						Clear filters
-					</Button>
-				)}
 
 				<div className="ml-auto flex items-center gap-2">
 					<DropdownMenu>
@@ -635,13 +649,13 @@ export function InfluencerResults({
 			{results.length === 0 ? (
 				<EmptyState
 					icon={IconSearch}
-					title="No creators passed the checks"
+					title="No Creators Passed the Checks"
 					description="The list is never padded with weak fits. Try a broader direction or more follower sizes."
 				/>
 			) : rows.length === 0 ? (
 				<EmptyState
 					icon={IconSearch}
-					title="Nothing matches these filters"
+					title="Nothing Matches These Filters"
 					description="Loosen the filters above, or switch tabs. The creators are still here."
 				/>
 			) : view === "table" ? (
@@ -654,7 +668,7 @@ export function InfluencerResults({
 								<TableHead className="text-right">Followers</TableHead>
 								<TableHead className="text-right">Engagement</TableHead>
 								<TableHead className="text-right">Posting</TableHead>
-								<TableHead>Brand collabs</TableHead>
+								<TableHead>Brand Collabs</TableHead>
 								<TableHead className="w-28">Status</TableHead>
 							</TableRow>
 						</TableHeader>

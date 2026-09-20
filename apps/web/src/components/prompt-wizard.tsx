@@ -285,7 +285,7 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 							</>
 						) : (
 							<>
-								<Play className="h-4 w-4" /> Analyze brand
+								<Play className="h-4 w-4" /> Analyze Brand
 							</>
 						)}
 					</Button>
@@ -302,13 +302,13 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 	return (
 		<div className="max-w-2xl mx-auto space-y-6">
 			<div className="space-y-2">
-				<h2 className="text-2xl font-bold">Brand details</h2>
+				<h2 className="text-2xl font-bold">Brand Details</h2>
 				<p className="text-muted-foreground">
 					Confirm the brand identity, additional domains, and aliases used for tracking.
 				</p>
 				<div className="space-y-3">
 					<div>
-						<p className="text-xs text-muted-foreground">Brand name</p>
+						<p className="text-xs text-muted-foreground">Brand Name</p>
 						<Input value={data.brandName} onChange={(e) => updateBrandName(e.target.value)} placeholder="Brand name" />
 					</div>
 					<div>
@@ -321,7 +321,7 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 						/>
 					</div>
 					<div>
-						<p className="text-xs text-muted-foreground">Additional domains</p>
+						<p className="text-xs text-muted-foreground">Additional Domains</p>
 						<EditableTagsInput
 							items={data.additionalDomains}
 							onValueChange={updateAdditionalDomains}

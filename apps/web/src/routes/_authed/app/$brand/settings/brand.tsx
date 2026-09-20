@@ -103,7 +103,7 @@ function BrandSettingsPage() {
 		return (
 			<div className="max-w-2xl space-y-6">
 				<h1 className="text-2xl font-semibold">Brand</h1>
-				<p className="text-destructive">Brand not found</p>
+				<p className="text-destructive">Brand Not Found</p>
 			</div>
 		);
 	}
@@ -250,7 +250,7 @@ function BrandSettingsPage() {
 			<div className="rounded-xl border border-destructive/30 bg-destructive/[0.03] p-4">
 				<div className="flex flex-wrap items-center justify-between gap-3">
 					<div className="min-w-0">
-						<p className="text-sm font-semibold text-destructive">Delete brand</p>
+						<p className="text-sm font-semibold text-destructive">Delete Brand</p>
 						<p className="text-xs text-muted-foreground">
 							Permanently removes {brand.name} and all of its prompts, runs, citations, competitors and reports. This
 							action cannot be undone.
@@ -266,7 +266,7 @@ function BrandSettingsPage() {
 									className="pointer-events-none border-destructive/30 text-destructive opacity-50"
 								>
 									<IconTrash className="size-4" />
-									Delete brand
+									Delete Brand
 								</Button>
 							</TooltipTrigger>
 							<TooltipContent className="text-xs font-normal">Contact an admin to delete this brand</TooltipContent>
@@ -283,7 +283,7 @@ function BrandSettingsPage() {
 								}
 							>
 								<IconTrash className="size-4" />
-								Delete brand
+								Delete Brand
 							</DialogTrigger>
 							<DialogContent>
 								<DialogHeader>

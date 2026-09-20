@@ -82,11 +82,11 @@ function AnalyzeBrandDialog() {
 		<Dialog open={open} onOpenChange={(o) => (o ? setOpen(true) : handleClose())}>
 			<DialogTrigger render={<Button variant="outline" className="cursor-pointer w-full" />}>
 				<Sparkles className="h-4 w-4 mr-2" />
-				Analyze brand
+				Analyze Brand
 			</DialogTrigger>
 			<DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
 				<DialogHeader>
-					<DialogTitle>Analyze brand</DialogTitle>
+					<DialogTitle>Analyze Brand</DialogTitle>
 					<DialogDescription>Run the onboarding analysis for any website.</DialogDescription>
 				</DialogHeader>
 
@@ -139,7 +139,7 @@ function AnalyzeBrandDialog() {
 											</>
 										) : (
 											<>
-												<Copy className="h-4 w-4 mr-1" /> Copy prompts
+												<Copy className="h-4 w-4 mr-1" /> Copy Prompts
 											</>
 										)}
 									</Button>
@@ -155,7 +155,7 @@ function AnalyzeBrandDialog() {
 							</div>
 
 							{result.additionalDomains.length > 0 && (
-								<TagSection title="Additional domains" items={result.additionalDomains} />
+								<TagSection title="Additional Domains" items={result.additionalDomains} />
 							)}
 							{result.aliases.length > 0 && <TagSection title="Aliases" items={result.aliases} />}
 
@@ -251,7 +251,7 @@ function ToolsPage() {
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2">
 							<Sparkles className="h-5 w-5" />
-							Brand analysis
+							Brand Analysis
 						</CardTitle>
 						<CardDescription>
 							Analyze a website to discover its competitors, additional brand domains, aliases, and suggested AI

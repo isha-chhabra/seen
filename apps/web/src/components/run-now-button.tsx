@@ -138,12 +138,12 @@ export function RunNowButton({
 	const busy = state.kind === "starting";
 	const disabled = busy || state.kind === "cooldown" || state.kind === "tracking" || isViewer;
 
-	let label = "Run all prompts now";
+	let label = "Run All Prompts Now";
 	if (state.kind === "starting") label = "Queueing…";
 	else if (state.kind === "tracking" || state.kind === "delayed") {
 		const mins = Math.max(1, Math.floor((now - state.startedAt) / 60000));
 		label = `Running… ${mins} min`;
-	} else if (state.kind === "done") label = "Run complete";
+	} else if (state.kind === "done") label = "Run Complete";
 	else if (state.kind === "stopped") label = "Run stopped — start again";
 	else if (state.kind === "cooldown") {
 		const mins = Math.max(1, Math.ceil((state.until - now) / 60000));
@@ -206,7 +206,7 @@ export function RunNowButton({
 								})
 							}
 						>
-							Continue waiting
+							Continue Waiting
 						</Button>
 						<Button type="button" onClick={() => start({ bypassCooldown: true })}>
 							Retry

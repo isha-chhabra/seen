@@ -14,7 +14,7 @@ import { googleSerp } from "@workspace/lib/article-finder/search";
 import { db } from "@workspace/lib/db/db";
 import { brandInfluencerSearches, brands, competitors, influencerProfiles } from "@workspace/lib/db/schema";
 import { scrapeDataset } from "@workspace/lib/influencer-finder/datasets";
-import { draftBrief, judgeCreators, screenHits } from "@workspace/lib/influencer-finder/llm";
+import { draftBrief, expandQueries, judgeCreators, screenHits } from "@workspace/lib/influencer-finder/llm";
 import { type CachedProfile, runInfluencerSearch } from "@workspace/lib/influencer-finder/pipeline";
 import type { InfluencerBrief, InfluencerSearchPayload, Platform } from "@workspace/lib/influencer-finder/types";
 import { and, desc, eq, lt, sql } from "drizzle-orm";
@@ -228,13 +228,14 @@ export const findInfluencersFn = createServerFn({ method: "POST" })
 						capUsd: data.maxSpendUsd,
 					},
 					{
-						serp: async (query) =>
-							(await googleSerp(query, 0, { timeoutMs: 75_000, attempts: 2 })).map((r) => ({
+						serp: async (query, page) =>
+							(await googleSerp(query, page, { timeoutMs: 75_000, attempts: 2 })).map((r) => ({
 								url: r.url,
 								title: r.title,
 								snippet: r.snippet,
 							})),
 						scrape: (dataset, urls) => scrapeDataset(dataset, urls),
+						expand: async (args) => (await expandQueries(args)).map(cleanQuery).filter(Boolean),
 						screen: (args) => screenHits(args),
 						judge: (args) => judgeCreators(args),
 						cache: profileCache,

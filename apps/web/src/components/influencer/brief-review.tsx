@@ -3,7 +3,7 @@
  * search only starts from here, and it can never spend past the limit chosen.
  */
 import { IconLoader2 } from "@tabler/icons-react";
-import { estimateSearchCost } from "@workspace/lib/influencer-finder/cost";
+import { estimateCreatorsForLimit, estimateSearchCost } from "@workspace/lib/influencer-finder/cost";
 import type { InfluencerBrief, Platform } from "@workspace/lib/influencer-finder/types";
 import { Button } from "@workspace/ui/components/button";
 import { FormRow, FormRows, StopScale } from "@/components/finder-form";
@@ -11,7 +11,7 @@ import { TagInput } from "@/components/tag-input";
 import { PLATFORM_LABEL } from "./parts";
 
 export const CAP_OPTIONS = [0.1, 0.2, 0.35, 0.5] as const;
-export const TARGET_OPTIONS = [20, 30, 50] as const;
+export const TARGET_OPTIONS = [10, 20, 30, 50] as const;
 
 export function BriefReview({
 	brief,
@@ -45,6 +45,8 @@ export function BriefReview({
 	running: boolean;
 }) {
 	const est = estimateSearchCost(target);
+	const reach = estimateCreatorsForLimit(capUsd);
+	const fitting = CAP_OPTIONS.find((c) => estimateCreatorsForLimit(c) >= target);
 	const setQueries = (p: Platform, list: string[]) => onBrief({ ...brief, queries: { ...brief.queries, [p]: list } });
 	const targetIdx = TARGET_OPTIONS.indexOf(target as (typeof TARGET_OPTIONS)[number]);
 	const capIdx = CAP_OPTIONS.indexOf(capUsd as (typeof CAP_OPTIONS)[number]);
@@ -57,7 +59,7 @@ export function BriefReview({
 		<div>
 			<div className="mb-4 flex items-end justify-between gap-4">
 				<div>
-					<h2 className="font-semibold text-lg tracking-tight">Check the plan</h2>
+					<h2 className="font-semibold text-lg tracking-tight">Check the Plan</h2>
 					<p className="text-muted-foreground text-sm">These searches run when you continue. Edit anything.</p>
 				</div>
 				<div className="flex shrink-0 gap-4 text-muted-foreground text-xs">
@@ -67,7 +69,7 @@ export function BriefReview({
 						disabled={locked}
 						className="transition-colors hover:text-foreground"
 					>
-						Redo plan
+						Redo Plan
 					</button>
 					<button type="button" onClick={onBack} disabled={locked} className="transition-colors hover:text-foreground">
 						{hasResults ? "Back to results" : "Back"}
@@ -98,7 +100,7 @@ export function BriefReview({
 						placeholder="Add a brand or handle"
 					/>
 				</FormRow>
-				<FormRow label="Good signs" hint="Clues in bios and posts">
+				<FormRow label="Good Signs" hint="Clues in bios and posts">
 					<TagInput
 						plain
 						values={brief.fitSignals}
@@ -121,9 +123,9 @@ export function BriefReview({
 						</FormRow>
 					) : null,
 				)}
-				<FormRow label="Creators to find">
+				<FormRow label="Creators to Find">
 					<StopScale
-						label="Creators to find"
+						label="Creators to Find"
 						stops={TARGET_OPTIONS.map((n) => ({ label: String(n) }))}
 						lo={targetIdx}
 						hi={targetIdx}
@@ -131,10 +133,10 @@ export function BriefReview({
 						disabled={locked}
 					/>
 				</FormRow>
-				<FormRow label="Spending limit" hint="A hard stop">
+				<FormRow label="Spending Limit" hint="A hard stop">
 					<div className="space-y-2">
 						<StopScale
-							label="Spending limit"
+							label="Spending Limit"
 							stops={CAP_OPTIONS.map((n) => ({ label: `$${n.toFixed(2)}` }))}
 							lo={capIdx}
 							hi={capIdx}
@@ -142,13 +144,31 @@ export function BriefReview({
 							disabled={locked}
 						/>
 						<p className="text-muted-foreground text-xs leading-relaxed">
-							Usually{" "}
+							{target} creators usually cost{" "}
 							<span className="text-foreground tabular-nums">
-								${est.low.toFixed(2)}–${Math.min(est.high, capUsd).toFixed(2)}
+								${est.low.toFixed(2)}–${est.high.toFixed(2)}
 							</span>
-							. The search stops at the limit and keeps what it has checked. Creators looked up in the last 30 days cost
-							nothing.
+							. The search stops at the limit. Creators checked in the last 30 days cost nothing.
 						</p>
+						{reach < target && (
+							<p className="text-amber-500 text-xs leading-relaxed">
+								At ${capUsd.toFixed(2)} expect about {reach} creators, not {target}.
+								{fitting && (
+									<>
+										{" "}
+										<button
+											type="button"
+											onClick={() => onCap(fitting)}
+											disabled={locked}
+											className="underline underline-offset-2 hover:text-foreground"
+										>
+											Use ${fitting.toFixed(2)}
+										</button>{" "}
+										to reach {target}.
+									</>
+								)}
+							</p>
+						)}
 					</div>
 				</FormRow>
 			</FormRows>

@@ -180,7 +180,7 @@ function TeamSettingsPage() {
 			)}
 
 			<div className="space-y-2">
-				<h2 className="text-lg font-semibold">Invite a teammate</h2>
+				<h2 className="text-lg font-semibold">Invite a Teammate</h2>
 				{!isAdmin && <p className="text-sm text-muted-foreground">Contact an admin to invite more members.</p>}
 				<form
 					onSubmit={handleInvite}
@@ -218,7 +218,7 @@ function TeamSettingsPage() {
 						</Select>
 					</div>
 					<div className="flex flex-col gap-2">
-						<Label htmlFor="invite-expiry">Link expires</Label>
+						<Label htmlFor="invite-expiry">Link Expires</Label>
 						<Select
 							items={{ "7": "7 days", "30": "30 days", never: "Never" }}
 							value={inviteExpiry}
@@ -229,8 +229,8 @@ function TeamSettingsPage() {
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="7">7 days</SelectItem>
-								<SelectItem value="30">30 days</SelectItem>
+								<SelectItem value="7">7 Days</SelectItem>
+								<SelectItem value="30">30 Days</SelectItem>
 								<SelectItem value="never">Never</SelectItem>
 							</SelectContent>
 						</Select>
@@ -306,7 +306,7 @@ function TeamSettingsPage() {
 
 			{invitations.length > 0 && (
 				<div className="space-y-3">
-					<h2 className="text-lg font-semibold">Pending invitations</h2>
+					<h2 className="text-lg font-semibold">Pending Invitations</h2>
 					<div className="divide-y rounded-md border">
 						{invitations.map((inv) => (
 							<div key={inv.id} className="flex items-center justify-between gap-3 p-3">

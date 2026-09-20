@@ -110,7 +110,7 @@ export function TrackDomainPopover({
 
 					<div className="space-y-1">
 						<div className="flex items-center gap-1">
-							<p className="text-[11px] text-muted-foreground">Add as brand domain</p>
+							<p className="text-[11px] text-muted-foreground">Add as Brand Domain</p>
 							<Tooltip>
 								<TooltipTrigger render={<IconInfoCircle className="h-3 w-3 text-muted-foreground cursor-help" />} />
 								<TooltipContent className="max-w-xs text-xs font-normal">
@@ -133,7 +133,7 @@ export function TrackDomainPopover({
 					{competitors.length > 0 && (
 						<div className="space-y-1">
 							<div className="flex items-center gap-1">
-								<p className="text-[11px] text-muted-foreground">Add to existing competitor</p>
+								<p className="text-[11px] text-muted-foreground">Add to Existing Competitor</p>
 								<Tooltip>
 									<TooltipTrigger render={<IconInfoCircle className="h-3 w-3 text-muted-foreground cursor-help" />} />
 									<TooltipContent className="max-w-xs text-xs font-normal">

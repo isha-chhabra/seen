@@ -113,7 +113,7 @@ function ScoreBadge({ score }: { score: number }) {
 function AffiliateBadge({ status }: { status: ArticleResult["affiliateStatus"] }) {
 	if (status === "yes") return <Badge variant="success">Affiliate</Badge>;
 	if (status === "unsure") return <Badge variant="quiet">Unsure</Badge>;
-	return <Badge variant="outline">Not affiliate</Badge>;
+	return <Badge variant="outline">Not Affiliate</Badge>;
 }
 
 /** Same trigger look as the shared FilterBar's FilterTriggerButton (see
@@ -182,12 +182,12 @@ function ResultRow({ r, brandName }: { r: ArticleResult; brandName?: string }) {
 			<TableCell className="py-3 align-top">
 				<div className="flex flex-wrap gap-1.5">
 					<Badge variant={r.tier === "high_authority" ? "secondary" : "outline"}>
-						{r.tier === "high_authority" ? "High authority" : "Niche & blog"}
+						{r.tier === "high_authority" ? "High Authority" : "Niche & Blog"}
 					</Badge>
 					<AffiliateBadge status={r.affiliateStatus} />
-					{r.linksCompetitor && <Badge variant="accent">Links a competitor</Badge>}
+					{r.linksCompetitor && <Badge variant="accent">Links a Competitor</Badge>}
 					{r.brandAlreadyMentioned && <Badge variant="quiet">Mentions {brandName ?? "brand"}</Badge>}
-					{r.viaCrawl && <Badge variant="quiet">Via crawl</Badge>}
+					{r.viaCrawl && <Badge variant="quiet">Via Crawl</Badge>}
 				</div>
 			</TableCell>
 			<TableCell className="w-16 py-3 text-right align-top">
@@ -213,7 +213,7 @@ function ResultRow({ r, brandName }: { r: ArticleResult; brandName?: string }) {
 						href={r.url}
 						target="_blank"
 						rel="noreferrer"
-						title="Open article"
+						title="Open Article"
 						className="text-muted-foreground/60 transition-colors hover:text-primary"
 					>
 						<IconArrowUpRight className="size-4" />
@@ -444,19 +444,19 @@ function ArticleFinderPage() {
 	// button text and the menu items it opens can never drift out of sync
 	// (sentence case throughout: first word capitalized, proper nouns aside).
 	const tierLabels: Record<typeof tierFilter, string> = {
-		all: "All tiers",
-		high_authority: "High authority",
-		niche_blog: "Niche & blog",
+		all: "All Tiers",
+		high_authority: "High Authority",
+		niche_blog: "Niche & Blog",
 	};
 	const mentionLabels: Record<typeof mentionFilter, string> = {
-		all: "Any mentions",
+		all: "Any Mentions",
 		mentioned: `Mentions ${brand?.name ?? "brand"}`,
-		unmentioned: `Doesn't mention ${brand?.name ?? "brand"}`,
+		unmentioned: `Doesn't Mention ${brand?.name ?? "brand"}`,
 	};
 	const sortLabels: Record<typeof sortBy, string> = {
-		score_desc: "Score, high to low",
-		score_asc: "Score, low to high",
-		date_desc: "Newest published",
+		score_desc: "Score, High to Low",
+		score_asc: "Score, Low to High",
+		date_desc: "Newest Published",
 		domain_asc: "Domain, A to Z",
 	};
 
@@ -488,7 +488,7 @@ function ArticleFinderPage() {
 					<>
 						{queries.length > 0 && (
 							<Button variant="ghost" size="sm" onClick={() => setPhase("queries")}>
-								Edit queries
+								Edit Queries
 							</Button>
 						)}
 						<ExportMenu
@@ -499,7 +499,7 @@ function ArticleFinderPage() {
 							disabled={totalResults === 0 || isViewer}
 						/>
 						<Button variant="outline" size="sm" onClick={newSearch}>
-							New search
+							New Search
 						</Button>
 					</>
 				) : undefined
@@ -526,7 +526,7 @@ function ArticleFinderPage() {
 							</FormRow>
 							<FormRow label="Depth">
 								<StopScale
-									label="Search depth"
+									label="Search Depth"
 									stops={DEPTH_STOPS}
 									lo={pages - 1}
 									hi={pages - 1}
@@ -557,7 +557,7 @@ function ArticleFinderPage() {
 					<div>
 						<div className="mb-4 flex items-end justify-between gap-4">
 							<div>
-								<h2 className="text-lg font-semibold tracking-tight">Check the searches</h2>
+								<h2 className="text-lg font-semibold tracking-tight">Check the Searches</h2>
 								<p className="text-sm text-muted-foreground">These run when you continue. Edit anything.</p>
 							</div>
 							<div className="flex shrink-0 gap-4 text-xs text-muted-foreground">
@@ -567,7 +567,7 @@ function ArticleFinderPage() {
 									disabled={locked || isViewer}
 									className="transition-colors hover:text-foreground"
 								>
-									Redo plan
+									Redo Plan
 								</button>
 								<button
 									type="button"
@@ -689,7 +689,7 @@ function ArticleFinderPage() {
 										[
 											["yes", "Confirmed"],
 											["unsure", "Unsure"],
-											["no", "Not affiliate"],
+											["no", "Not Affiliate"],
 										] as const
 									).map(([value, label]) => {
 										const checked = affiliateFilter.has(value);
@@ -748,13 +748,13 @@ function ArticleFinderPage() {
 						{totalResults === 0 ? (
 							<EmptyState
 								icon={IconSearch}
-								title="No articles found"
+								title="No Articles Found"
 								description="Try a broader direction, a wider date range, or more depth."
 							/>
 						) : filteredCount === 0 ? (
 							<EmptyState
 								icon={IconSearch}
-								title="Nothing matches these filters"
+								title="Nothing Matches These Filters"
 								description="Loosen the filters above, the results are still there."
 							/>
 						) : (

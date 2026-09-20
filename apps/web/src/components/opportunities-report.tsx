@@ -78,8 +78,8 @@ function OpportunityCard({ o, brandId }: { o: Opportunity; brandId: string }) {
 	const [open, setOpen] = useState<Tab | null>(null);
 	const tabs: { key: Tab; label: string; count: number }[] = [
 		{ key: "prompts", label: "Prompts", count: o.relatedPrompts.length },
-		{ key: "your", label: "Your citations", count: o.yourCitations.length },
-		{ key: "comp", label: "Competitor citations", count: o.competitorCitations.length },
+		{ key: "your", label: "Your Citations", count: o.yourCitations.length },
+		{ key: "comp", label: "Competitor Citations", count: o.competitorCitations.length },
 	];
 	return (
 		<div className="rounded-xl border border-border p-4">

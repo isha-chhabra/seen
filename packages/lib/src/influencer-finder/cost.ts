@@ -71,16 +71,24 @@ export class CostLedger {
 }
 
 /**
- * Rough cost of a search before it runs, for the estimate on the form. Shape:
- * a fixed handful of searches, plus one paid record per creator analysed and a
- * few extra posts each for engagement, then the AI reading.
+ * Rough cost of a search before it runs, for the estimate on the form. Measured on a real run:
+ * about half the creators looked up are kept, each analysed creator costs two records (the post that
+ * found them and their profile), each kept creator three more posts for engagement, plus the searches
+ * (more of them when more creators are wanted) and the AI reading.
  */
-export function estimateSearchCost(maxCreators: number): { low: number; high: number } {
-	const searches = 9 * PRICE.searchRequest;
-	const perCreator = PRICE.record * 2.5; // profile + share of resolve/engagement lookups
-	const ai = 0.03;
-	const base = searches + ai;
-	return { low: round(base + maxCreators * PRICE.record), high: round(base + maxCreators * perCreator * 1.6) };
+const PER_KEPT = { low: 0.0105, high: 0.016 };
+const FIXED = { low: 0.06, high: 0.09 };
+
+export function estimateSearchCost(creators: number): { low: number; high: number } {
+	return {
+		low: round(FIXED.low + creators * PER_KEPT.low),
+		high: round(FIXED.high + creators * PER_KEPT.high),
+	};
+}
+
+/** About how many creators a spending limit reaches. */
+export function estimateCreatorsForLimit(capUsd: number): number {
+	return Math.max(0, Math.floor((capUsd - FIXED.low) / ((PER_KEPT.low + PER_KEPT.high) / 2)));
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;

@@ -47,7 +47,7 @@ function AcceptInvitationPage() {
 
 	if (loadError || !invitation) {
 		return (
-			<FullPageCard title="Invitation unavailable">
+			<FullPageCard title="Invitation Unavailable">
 				<div className="space-y-4 w-full">
 					<Alert variant="destructive">
 						<AlertDescription>{loadError ?? "This invitation could not be loaded"}</AlertDescription>
@@ -56,7 +56,7 @@ function AcceptInvitationPage() {
 						Make sure you're signed in with the email address that received this invitation.
 					</p>
 					<Link to="/auth/logout" className={buttonVariants({ variant: "outline", className: "w-full" })}>
-						Switch account
+						Switch Account
 					</Link>
 				</div>
 			</FullPageCard>

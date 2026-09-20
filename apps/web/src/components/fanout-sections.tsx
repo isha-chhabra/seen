@@ -186,7 +186,7 @@ export function QueryWordsSection({ terms, wordChanges }: { terms: TermStat[]; w
 							<div className="flex items-center gap-2">
 								<Switch id="qf-hide-stop" checked={hideStop} onCheckedChange={setHideStop} />
 								<label htmlFor="qf-hide-stop" className="text-muted-foreground cursor-pointer text-sm">
-									Hide stop words
+									Hide Stop Words
 								</label>
 							</div>
 							<Tabs value={tab} onValueChange={(v) => setTab(v as WordTab)}>

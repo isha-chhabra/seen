@@ -72,7 +72,7 @@ function CompetitorsSettingsPage() {
 			<div className="space-y-6">
 				<div>
 					<h1 className="text-3xl font-bold">Competitors</h1>
-					<p className="text-destructive">Brand not found</p>
+					<p className="text-destructive">Brand Not Found</p>
 				</div>
 			</div>
 		);

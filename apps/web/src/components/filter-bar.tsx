@@ -55,12 +55,12 @@ export function labelForModel(model: string): string {
 }
 
 const LOOKBACK_OPTIONS: { value: LookbackPeriod; label: string }[] = [
-	{ value: "1w", label: "Last 7 days" },
-	{ value: "1m", label: "Last 30 days" },
-	{ value: "3m", label: "Last 3 months" },
-	{ value: "6m", label: "Last 6 months" },
-	{ value: "1y", label: "Last 12 months" },
-	{ value: "all", label: "All time" },
+	{ value: "1w", label: "Last 7 Days" },
+	{ value: "1m", label: "Last 30 Days" },
+	{ value: "3m", label: "Last 3 Months" },
+	{ value: "6m", label: "Last 6 Months" },
+	{ value: "1y", label: "Last 12 Months" },
+	{ value: "all", label: "All Time" },
 ];
 
 function getLookbackLabel(lookback: LookbackPeriod): string {

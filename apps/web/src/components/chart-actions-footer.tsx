@@ -77,7 +77,7 @@ export function ChartActionsFooter({
 							size="sm"
 							variant="secondary"
 							className="text-xs cursor-pointer h-6 flex items-center px-2"
-							title="Download chart as PNG"
+							title="Download Chart as PNG"
 						>
 							<Download className="size-3 mr-0.5" />
 							<span className="text-xs font-normal">{isDownloading ? "Exporting..." : "Export (PNG)"}</span>

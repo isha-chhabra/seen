@@ -191,7 +191,7 @@ function PromptHeader({
 						params={{ brand: brandId }}
 						className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2 decoration-muted-foreground/40 hover:decoration-foreground/40"
 					>
-						Edit prompts
+						Edit Prompts
 					</Link>
 				</div>
 			)}

@@ -62,7 +62,7 @@ export function SizeRange({
 	return (
 		<div className="space-y-2">
 			<StopScale
-				label="Audience size"
+				label="Audience Size"
 				stops={STOPS}
 				lo={lo}
 				hi={hi}
@@ -111,7 +111,7 @@ export function BriefForm({
 	return (
 		<div>
 			<FormRows>
-				<FormRow label="Who to find">
+				<FormRow label="Who to Find">
 					<TagInput
 						plain
 						icon={<IconSearch className="size-4" />}
@@ -142,7 +142,7 @@ export function BriefForm({
 						]}
 					/>
 				</FormRow>
-				<FormRow label="Audience size">
+				<FormRow label="Audience Size">
 					<SizeRange bands={bands} onChange={onBands} disabled={busy} />
 				</FormRow>
 			</FormRows>
@@ -151,7 +151,7 @@ export function BriefForm({
 				Optional · sharper results
 			</p>
 			<FormRows>
-				<FormRow label="Creators you like" hint="Used as a style guide">
+				<FormRow label="Creators You Like" hint="Used as a style guide">
 					<TagInput
 						plain
 						values={extras.similarTo}
@@ -161,7 +161,7 @@ export function BriefForm({
 						max={5}
 					/>
 				</FormRow>
-				<FormRow label="Steer clear of" hint="Accounts to rule out">
+				<FormRow label="Steer Clear of" hint="Accounts to rule out">
 					<TagInput
 						plain
 						values={extras.avoid}
@@ -171,7 +171,7 @@ export function BriefForm({
 						max={8}
 					/>
 				</FormRow>
-				<FormRow label="Audience location">
+				<FormRow label="Audience Location">
 					<TagInput
 						plain
 						values={extras.basedIn}

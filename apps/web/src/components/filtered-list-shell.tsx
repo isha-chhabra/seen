@@ -82,7 +82,7 @@ export function FilteredListShell({
 					<p className="mb-2">{noMatchesTitle ?? "No results match your filters."}</p>
 					<p className="text-sm mb-4">{noMatchesDescription ?? "Try adjusting your search or filters."}</p>
 					<Button variant="outline" size="sm" onClick={filters.clearFilters} className="cursor-pointer">
-						Clear filters
+						Clear Filters
 					</Button>
 				</div>
 			</div>

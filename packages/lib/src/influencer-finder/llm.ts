@@ -5,7 +5,9 @@
  *                     suggestions and the phrases that count as evidence of fit
  *   2. screenHits   , a cheap first read of search hits (handle + caption snippet)
  *                     to decide which few deserve a paid lookup
- *   3. judgeCreators, reads each analysed creator's bio and recent posts against the
+ *   3. expandQueries, once the first pass has found some fitting creators, new phrases that
+ *                     should surface more like them
+ *   4. judgeCreators, reads each analysed creator's bio and recent posts against the
  *                     brief. Counting (cadence, engagement, sponsorships) is done in
  *                     code and passed in; the model only reads and rates.
  */
@@ -19,6 +21,32 @@ async function ask<T>(prompt: string, schema: z.ZodType<T>, onCost?: OnCost): Pr
 	const { object } = await runStructuredCompletionPrompt(prompt, schema);
 	onCost?.(prompt.length, JSON.stringify(object).length);
 	return object;
+}
+
+// ── expand ──────────────────────────────────────────────────────────
+
+const expandSchema = z.object({ queries: z.array(z.string()).min(1).max(8) });
+
+export async function expandQueries(
+	args: {
+		brief: InfluencerBrief;
+		brandName: string;
+		kept: { handle: string; bio: string }[];
+		used: string[];
+	},
+	onCost?: OnCost,
+): Promise<string[]> {
+	const prompt = [
+		`Brand: ${args.brandName}. The team wants creators matching: "${args.brief.direction}".`,
+		...guidanceLines(args.brief),
+		args.kept.length
+			? `Creators already found that fit (handle: bio):\n${args.kept.map((k) => `@${k.handle}: ${k.bio}`).join("\n")}`
+			: "No fitting creators found yet; the phrases used so far may be too narrow or too generic.",
+		`Phrases already searched: ${args.used.join("; ")}.`,
+		`Return 6 new natural phrases, different from those above, that would surface OTHER creators like these. Vary the angle: sub-niches, occasions, products, communities, how such creators describe themselves. No quotes, no operators like site:, no brand names, no years, no country names.`,
+	].join("\n");
+	const r = await ask(prompt, expandSchema, onCost);
+	return r.queries;
 }
 
 // ── 1. brief ────────────────────────────────────────────────────────

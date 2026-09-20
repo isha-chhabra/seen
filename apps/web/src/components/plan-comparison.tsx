@@ -85,11 +85,11 @@ export function PlanComparison({
 				<div className={GRID}>
 					<SectionHeading>Limits</SectionHeading>
 					<Row label="Brands" cell={(plan) => plan.maxBrands} />
-					<Row label="Tracked prompts" cell={(plan) => plan.maxPrompts} />
-					<Row label="Platforms per brand" cell={(plan) => plan.platformPicks} />
+					<Row label="Tracked Prompts" cell={(plan) => plan.maxPrompts} />
+					<Row label="Platforms per Brand" cell={(plan) => plan.platformPicks} />
 					<Row label="Sampling" cell={(plan) => `${plan.standardRunsPerDay}×/day`} />
 					<Row label="Seats" cell={() => "Unlimited"} />
-					<Row label="API access" cell={() => true} />
+					<Row label="API Access" cell={() => true} />
 
 					<PlatformSection tier="scraped" />
 					<PlatformSection tier="api" />
@@ -105,7 +105,7 @@ export function PlanComparison({
 						cell={(plan) => (plan.premiumIncluded > 0 ? premiumPairings(plan.premiumIncluded) : false)}
 					/>
 					<Row
-						label="Buy more"
+						label="Buy More"
 						cell={(plan) => (plan.premiumAddonAvailable ? `$${PREMIUM_ADDON_MONTHLY_USD}/mo each` : false)}
 					/>
 					{platformTierMembers("premium").map((member) => (

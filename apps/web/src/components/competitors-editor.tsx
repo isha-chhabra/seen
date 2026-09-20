@@ -72,7 +72,7 @@ export function CompetitorsEditor({ competitors, onChange, disabled }: Competito
 							{competitor.name ? (
 								<span className="text-sm font-medium">{competitor.name}</span>
 							) : (
-								<span className="text-sm text-muted-foreground italic">Unnamed competitor</span>
+								<span className="text-sm text-muted-foreground italic">Unnamed Competitor</span>
 							)}
 							{competitor.domains.some(Boolean) && (
 								<span className="text-xs text-muted-foreground ml-2">{competitor.domains.filter(Boolean)[0]}</span>

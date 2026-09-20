@@ -84,7 +84,7 @@ export function ExportMenu<T>({
 						{sheets === "copied" ? (
 							<>
 								<Button variant="outline" onClick={csv}>
-									Download CSV instead
+									Download CSV Instead
 								</Button>
 								<a
 									href="https://sheets.new"

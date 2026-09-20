@@ -16,7 +16,7 @@ import {
 	summarizeCollabs,
 	tagPost,
 } from "./analyze";
-import { CostLedger } from "./cost";
+import { CostLedger, PRICE } from "./cost";
 import { DATASETS, type DatasetRecord } from "./datasets";
 import type { JudgeDossier, Judgment, ScreenHit } from "./llm";
 import {
@@ -64,7 +64,14 @@ export interface CachedProfile {
 }
 
 export interface PipelineDeps {
-	serp(query: string): Promise<{ url: string; title: string; snippet: string }[]>;
+	serp(query: string, page: number): Promise<{ url: string; title: string; snippet: string }[]>;
+	/** New search phrases that should surface more creators like the ones already found. */
+	expand(args: {
+		brief: InfluencerBrief;
+		brandName: string;
+		kept: { handle: string; bio: string }[];
+		used: string[];
+	}): Promise<string[]>;
 	scrape(dataset: string, urls: string[]): Promise<DatasetRecord[]>;
 	screen(args: {
 		brief: InfluencerBrief;
@@ -88,7 +95,7 @@ export interface PipelineInput {
 	brief: InfluencerBrief;
 	brandName: string;
 	competitors: CompetitorInput[];
-	/** Stop widening once this many creators are "include". */
+	/** Keep searching until this many creators are kept (a match or a maybe), or the money or the leads run out. */
 	targetResults: number;
 	capUsd: number;
 }
@@ -114,6 +121,9 @@ const clip = (s: string, n: number) => s.replace(/\s+/g, " ").trim().slice(0, n)
 
 /** Google lookups in flight at once. */
 const SEARCH_CONCURRENCY = 4;
+/** Most passes over the web in one run, and the deepest Google page tried per phrase. */
+const MAX_ROUNDS = 8;
+const MAX_PAGE = 3;
 
 export async function runInfluencerSearch(
 	input: PipelineInput,
@@ -139,26 +149,33 @@ export async function runInfluencerSearch(
 		maybe: 0,
 		excluded: 0,
 		stoppedAtBudget: false,
+		requested: input.targetResults,
 	};
-	const stageDone = async (label: string, pct: number) => onProgress(label, pct);
-	const stop = () => {
-		stats.stoppedAtBudget = true;
+	// Progress follows how close the run is to its target, and never goes backwards across rounds.
+	let lastPct = 5;
+	const stageDone = async (label: string, pct: number) => {
+		const shown =
+			pct >= 85 ? pct : Math.min(84, 10 + Math.round(70 * Math.min(1, keptCount() / Math.max(1, input.targetResults))));
+		lastPct = Math.max(lastPct, shown);
+		return onProgress(label, lastPct);
 	};
+	/** Phrases whose Google page gave something new, and how deep each has been searched. */
+	const pageDepth = new Map<string, number>();
+	const productive = new Set<string>();
+	const allPhrases = new Map<string, Platform>();
 
-	async function searchAll(byPlatform: Partial<Record<Platform, string[]>>, reserve: number) {
+	interface SearchJob {
+		platform: Platform;
+		phrase: string;
+		page: number;
+	}
+	const jobKey = (j: SearchJob) => `${j.platform}|${j.phrase}`;
+
+	async function searchAll(jobs: SearchJob[], reserve: number) {
 		const igHits: { code: string; url: string; text: string }[] = [];
 		const ttHits: { handle: string; text: string }[] = [];
 		// Google lookups are slow (tens of seconds each), so they run a few at a time. Each is paid for
 		// before it starts, so the spending limit holds however many are in flight.
-		const jobs: { platform: Platform; query: string }[] = [];
-		for (const platform of brief.platforms) {
-			for (const q of byPlatform[platform] ?? []) {
-				const query = `site:${platform === "instagram" ? "instagram.com" : "tiktok.com"} ${q}`;
-				if (usedQueries.has(query)) continue;
-				usedQueries.add(query);
-				jobs.push({ platform, query });
-			}
-		}
 		const outcomes: Awaited<ReturnType<PipelineDeps["serp"]>>[] = jobs.map(() => []);
 		let next = 0;
 		let outOfBudget = false;
@@ -169,22 +186,22 @@ export async function runInfluencerSearch(
 					outOfBudget = true;
 					return;
 				}
+				const job = jobs[i] as SearchJob;
 				ledger.chargeSearch();
 				stats.searches += 1;
-				outcomes[i] = await deps.serp((jobs[i] as (typeof jobs)[number]).query).catch(() => []);
+				const site = job.platform === "instagram" ? "instagram.com" : "tiktok.com";
+				outcomes[i] = await deps.serp(`site:${site} ${job.phrase}`, job.page).catch(() => []);
 			}
 		}
 		await Promise.all(Array.from({ length: Math.min(SEARCH_CONCURRENCY, jobs.length) }, worker));
-		if (outOfBudget) {
-			stop();
-			return null;
-		}
 		for (const [i, job] of jobs.entries()) {
+			pageDepth.set(jobKey(job), job.page);
 			for (const r of outcomes[i] ?? []) {
 				if (job.platform === "instagram") {
 					const m = /instagram\.com\/(p|reel)\/([\w-]+)/.exec(r.url);
 					if (m?.[2] && !seenIgPosts.has(m[2])) {
 						seenIgPosts.add(m[2]);
+						productive.add(jobKey(job));
 						igHits.push({
 							code: m[2],
 							url: `https://www.instagram.com/${m[1]}/${m[2]}/`,
@@ -196,6 +213,7 @@ export async function runInfluencerSearch(
 					const h = m?.[1]?.toLowerCase();
 					if (h && !seenTtHandles.has(h)) {
 						seenTtHandles.add(h);
+						productive.add(jobKey(job));
 						ttHits.push({
 							handle: m?.[1] ?? h,
 							text: `@${m?.[1]} | ${clip(r.title, 110)} | ${clip(r.snippet, 200)}`,
@@ -208,31 +226,25 @@ export async function runInfluencerSearch(
 		return { igHits, ttHits };
 	}
 
-	/** One full pass over a set of queries. Returns how many new creators were analysed. */
-	async function round(queries: Partial<Record<Platform, string[]>>, share: number): Promise<number> {
-		// Money this pass may spend, after keeping some back for a possible next pass.
-		const roundBudget = Math.max(0, ledger.remaining() * share);
+	/** One pass: search, screen, look up and judge. Returns how many new creators were analysed. */
+	async function round(jobs: SearchJob[], roundBudget: number, label: string): Promise<number> {
 		const spendFloor = ledger.spent();
 		const spendLimit = () => ledger.spent() - spendFloor >= roundBudget;
 
-		await stageDone("Searching the web", 10);
-		const found = await searchAll(queries, ledger.remaining() - roundBudget * 0.5);
-		if (!found) return 0;
+		await stageDone(label, 10);
+		const found = await searchAll(jobs, ledger.remaining() - roundBudget * 0.65);
 		const { igHits, ttHits } = found;
 		if (igHits.length + ttHits.length === 0) return 0;
 
-		// How many creators this pass can afford to look up, at rough all-in costs.
+		// How many creators this pass can afford to look up, at rough all-in costs (the engagement top-up is reserved separately).
 		const perIg = 0.0064;
 		const perTt = 0.0028;
-		const budgetForCreators = Math.max(0, roundBudget - ledger.spent() + spendFloor - 0.01);
-		const igKeepMax = Math.min(igHits.length, 30, Math.floor((budgetForCreators * 0.65) / perIg));
+		const budgetForCreators = Math.max(0, roundBudget - ledger.spent() + spendFloor - 0.005);
+		const igKeepMax = Math.min(igHits.length, 30, Math.floor((budgetForCreators * 0.75) / perIg));
 		const ttKeepMax = brief.platforms.includes("tiktok")
 			? Math.min(ttHits.length, 14, Math.floor((budgetForCreators * 0.25) / perTt))
 			: 0;
-		if (igKeepMax + ttKeepMax === 0) {
-			stop();
-			return 0;
-		}
+		if (igKeepMax + ttKeepMax === 0) return 0;
 
 		await stageDone("Picking who to look at", 30);
 		const hits: ScreenHit[] = [
@@ -259,10 +271,7 @@ export async function runInfluencerSearch(
 		const fresh: Working[] = [];
 		for (let i = 0; i < postUrls.length; i += BATCH) {
 			const n = Math.min(BATCH, ledger.affordableRecords(0.02), postUrls.length - i);
-			if (n <= 0 || spendLimit()) {
-				stop();
-				break;
-			}
+			if (n <= 0 || spendLimit()) break;
 			const chunk = postUrls.slice(i, i + n);
 			const recs = (await deps.scrape(DATASETS.instagramPost, chunk).catch(() => []))
 				.map(readIgPost)
@@ -332,10 +341,7 @@ export async function runInfluencerSearch(
 		) {
 			for (let i = 0; i < urls.length; i += BATCH) {
 				const n = Math.min(BATCH, ledger.affordableRecords(0.015), urls.length - i);
-				if (n <= 0 || spendLimit()) {
-					stop();
-					return;
-				}
+				if (n <= 0 || spendLimit()) return;
 				const chunk = urls.slice(i, i + n);
 				const recs = await deps.scrape(dataset, chunk).catch(() => []);
 				ledger.chargeRecords(chunk.length);
@@ -361,10 +367,7 @@ export async function runInfluencerSearch(
 		await stageDone("Judging fit", 70);
 		const toJudge = analysed.filter((w) => !w.preExcluded && passesSize(w));
 		for (let i = 0; i < toJudge.length; i += JUDGE_BATCH) {
-			if (!ledger.canAffordLlm()) {
-				stop();
-				break;
-			}
+			if (!ledger.canAffordLlm()) break;
 			const batch = toJudge.slice(i, i + JUDGE_BATCH);
 			const out = await deps
 				.judge({ brief, brandName, competitors: competitorNames, batch: batch.map(dossierOf) })
@@ -466,33 +469,90 @@ export async function runInfluencerSearch(
 		};
 	}
 
+	/** Whether a creator would end up on the list (a match or a maybe), competitor checks included. */
+	function keptOf(w: Working): boolean {
+		return !!(w.ig || w.tt) && !w.preExcluded && !!w.judged && toResult(w).verdict !== "exclude";
+	}
+	function keptCount(): number {
+		let n = 0;
+		for (const w of creators.values()) if (keptOf(w)) n += 1;
+		return n;
+	}
+
 	// ── run ─────────────────────────────────────────────────────────
 
-	await round(brief.queries, 0.7);
+	// Search in passes until enough creators are kept: first the brief's own phrases, then the same
+	// phrases one Google page deeper, new phrases dreamed up from who has been found, and the
+	// hashtags the best creators use. A pass that turns up nobody new twice in a row ends the run.
+	for (const platform of brief.platforms) for (const q of brief.queries[platform]) allPhrases.set(`${platform}|${q}`, platform);
+	const topUpReserve = Math.min(input.targetResults * EXTRA_POSTS_FOR_ENGAGEMENT * PRICE.record, input.capUsd * 0.4);
+	let dry = 0;
+	for (let n = 0; n < MAX_ROUNDS && keptCount() < input.targetResults && dry < 2; n++) {
+		if (ledger.remaining() - topUpReserve < 0.03) break;
+		const jobs = n === 0 ? firstJobs() : await widenJobs();
+		if (jobs.length === 0) break;
+		const roundBudget = Math.min(ledger.remaining() - topUpReserve, Math.max(0.06, input.capUsd * 0.3));
+		const analysed = await round(jobs, roundBudget, n === 0 ? "Searching the web" : "Widening the search");
+		dry = analysed === 0 ? dry + 1 : 0;
+	}
 
-	// Widen the search from the best creators' own hashtags if there aren't enough keepers yet.
-	const keepers = () => [...creators.values()].filter((w) => w.judged?.verdict === "include" && !w.preExcluded).length;
-	if (keepers() < input.targetResults && ledger.remaining() > 0.05 && !stats.stoppedAtBudget) {
+	function firstJobs(): SearchJob[] {
+		return brief.platforms.flatMap((platform) => brief.queries[platform].map((phrase) => ({ platform, phrase, page: 0 })));
+	}
+
+	async function widenJobs(): Promise<SearchJob[]> {
+		const jobs: SearchJob[] = [];
+		// 1. One page deeper for phrases that were still turning up new posts.
+		for (const [k, platform] of allPhrases) {
+			const depth = pageDepth.get(k);
+			if (depth !== undefined && depth < MAX_PAGE && productive.has(k) && jobs.length < 6) {
+				jobs.push({ platform, phrase: k.slice(platform.length + 1), page: depth + 1 });
+			}
+		}
+		// 2. New phrases, aimed at creators like the ones already kept.
+		const kept = [...creators.values()].filter((w) => keptOf(w));
+		if (ledger.canAffordLlm()) {
+			const phrases = await deps
+				.expand({
+					brief,
+					brandName,
+					kept: kept.slice(0, 8).map((w) => ({ handle: w.handle, bio: clip(w.ig?.bio ?? w.tt?.bio ?? "", 140) })),
+					used: [...allPhrases.keys()].map((k) => k.slice(k.indexOf("|") + 1)),
+				})
+				.catch(() => [] as string[]);
+			ledger.chargeLlm(1800, 400);
+			for (const phrase of phrases.slice(0, 5)) {
+				for (const platform of brief.platforms) {
+					const k = `${platform}|${phrase}`;
+					if (allPhrases.has(k)) continue;
+					allPhrases.set(k, platform);
+					jobs.push({ platform, phrase, page: 0 });
+				}
+			}
+		}
+		// 3. Hashtags the kept creators use most.
 		const tags = new Map<string, number>();
-		for (const w of creators.values()) {
-			if (w.judged?.verdict !== "include") continue;
+		for (const w of kept) {
 			for (const p of w.posts.slice(0, 12))
 				for (const t of p.caption.match(/#[A-Za-z0-9_]{4,}/g) ?? [])
 					tags.set(t.toLowerCase(), (tags.get(t.toLowerCase()) ?? 0) + 1);
 		}
-		const widened = [...tags.entries()]
-			.filter(([t]) => !GENERIC_TAGS.has(t))
-			.sort((a, b) => b[1] - a[1])
-			.slice(0, 4)
-			.map(([t]) => t);
-		if (widened.length > 0) await round({ instagram: widened }, 0.9);
+		for (const [tag] of [...tags.entries()].filter(([t]) => !GENERIC_TAGS.has(t)).sort((a, b) => b[1] - a[1]).slice(0, 8)) {
+			const k = `instagram|${tag}`;
+			if (!brief.platforms.includes("instagram") || allPhrases.has(k)) continue;
+			allPhrases.set(k, "instagram");
+			jobs.push({ platform: "instagram", phrase: tag, page: 0 });
+			if (jobs.length >= 14) break;
+		}
+		return jobs;
 	}
 
 	// Engagement top-up: a few more posts for the creators worth keeping, so the average means something.
 	await stageDone("Checking engagement", 85);
-	const worthy = [...creators.values()].filter(
-		(w) => w.platform === "instagram" && w.ig && !w.preExcluded && w.judged && w.judged.verdict !== "exclude",
-	);
+	const worthy = [...creators.values()]
+		.filter((w) => w.platform === "instagram" && w.ig && keptOf(w))
+		.sort((a, b) => (b.judged?.fitScore ?? 0) - (a.judged?.fitScore ?? 0))
+		.slice(0, input.targetResults);
 	const topUp: { w: Working; url: string }[] = [];
 	for (const w of worthy) {
 		const urls = (w.ig?.posts ?? []).map((p) => p.url).filter((u): u is string => !!u && !w.samples.has(u));
@@ -501,10 +561,7 @@ export async function runInfluencerSearch(
 	}
 	for (let i = 0; i < topUp.length; i += BATCH) {
 		const n = Math.min(BATCH, ledger.affordableRecords(0), topUp.length - i);
-		if (n <= 0) {
-			stop();
-			break;
-		}
+		if (n <= 0) break;
 		const chunk = topUp.slice(i, i + n);
 		const recs = (
 			await deps
@@ -523,6 +580,7 @@ export async function runInfluencerSearch(
 
 	await stageDone("Finishing up", 95);
 	const results = [...creators.values()].filter((w) => w.ig || w.tt).map((w) => toResult(w));
+	stats.stoppedAtBudget = keptCount() < input.targetResults && ledger.remaining() - topUpReserve < 0.03;
 	for (const r of results) {
 		if (r.verdict === "include") stats.included += 1;
 		else if (r.verdict === "maybe") stats.maybe += 1;

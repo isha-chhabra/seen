@@ -14,7 +14,7 @@ export default function MissingEnvPage({ mode, missing }: MissingEnvPageProps) {
 		mode === "local" ? "Set these via the CLI." : "Set these in the deployment environment, then redeploy or restart.";
 
 	return (
-		<FullPageCard title="Missing environment configuration" subtitle={`Deployment mode: ${mode}`} className="max-w-2xl">
+		<FullPageCard title="Missing Environment Configuration" subtitle={`Deployment mode: ${mode}`} className="max-w-2xl">
 			<div className="space-y-4 text-sm">
 				<p>{localHint}</p>
 				<ul className="space-y-3 rounded-md border bg-background p-4">

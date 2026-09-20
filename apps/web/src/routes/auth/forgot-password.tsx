@@ -67,7 +67,7 @@ export function ForgotPasswordForm({ isCloud, submitted: initiallySubmitted = fa
 	if (submitted) {
 		return (
 			<AuthSplitLayout
-				title="Check your email"
+				title="Check Your Email"
 				subtitle={
 					email ? `If an account exists for ${email}, a reset link is on its way.` : "A reset link is on its way."
 				}
@@ -81,7 +81,7 @@ export function ForgotPasswordForm({ isCloud, submitted: initiallySubmitted = fa
 
 	return (
 		<AuthSplitLayout
-			title="Reset your password"
+			title="Reset Your Password"
 			subtitle="Enter your email and we'll send you a reset link."
 			pitch={panel}
 			footer={<SalesFooterLinks source={source} />}
@@ -121,7 +121,7 @@ export function BackToSignIn() {
 	return (
 		<p className="text-sm text-muted-foreground">
 			<Link to="/auth/login" className="text-primary hover:underline font-medium">
-				Back to sign in
+				Back to Sign In
 			</Link>
 		</p>
 	);

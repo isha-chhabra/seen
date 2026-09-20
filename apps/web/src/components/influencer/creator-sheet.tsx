@@ -20,14 +20,14 @@ const TAG_STYLE: Record<Exclude<SponsorTag, "organic">, { label: string; classNa
 		className: "bg-[color-mix(in_oklch,var(--chart-2)_18%,transparent)] text-[var(--chart-2)]",
 	},
 	code: {
-		label: "Discount code",
+		label: "Discount Code",
 		className: "bg-[color-mix(in_oklch,var(--chart-5)_18%,transparent)] text-[var(--chart-5)]",
 	},
 	partner: {
 		label: "Partner",
 		className: "bg-[color-mix(in_oklch,var(--chart-3)_18%,transparent)] text-[var(--chart-3)]",
 	},
-	own_brand: { label: "Own brand", className: "bg-muted text-muted-foreground" },
+	own_brand: { label: "Own Brand", className: "bg-muted text-muted-foreground" },
 };
 
 function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
@@ -79,7 +79,7 @@ function PostRow({ post }: { post: CreatorPost }) {
 				)}
 			</div>
 			<p className="text-sm leading-snug">
-				{post.caption || <span className="text-muted-foreground">No caption</span>}
+				{post.caption || <span className="text-muted-foreground">No Caption</span>}
 			</p>
 		</li>
 	);
@@ -116,7 +116,7 @@ export function CreatorSheet({ creator, onClose }: { creator: InfluencerResult |
 						</SheetHeader>
 
 						<div className="flex-1 space-y-6 overflow-y-auto p-6">
-							<Section title="Why they fit">
+							<Section title="Why They Fit">
 								<div className="flex items-center gap-3">
 									<FitBar score={c.fitScore} className="[&>div]:w-40" />
 									<span className="text-muted-foreground text-xs">{Math.round(c.confidence * 100)}% confident</span>
@@ -163,7 +163,7 @@ export function CreatorSheet({ creator, onClose }: { creator: InfluencerResult |
 										value={c.postsPerWeek === null ? "—" : `${c.postsPerWeek}/wk`}
 										hint={c.platform === "tiktok" ? "Not measurable on TikTok yet" : undefined}
 									/>
-									<Stat label="Last post" value={formatDaysAgo(c.lastPostDaysAgo)} />
+									<Stat label="Last Post" value={formatDaysAgo(c.lastPostDaysAgo)} />
 									<Stat
 										label="Sponsored"
 										value={`${c.collab.sponsoredPosts} of ${c.collab.postsChecked}`}
@@ -176,7 +176,7 @@ export function CreatorSheet({ creator, onClose }: { creator: InfluencerResult |
 								</dl>
 							</Section>
 
-							<Section title="Brand collaborations">
+							<Section title="Brand Collaborations">
 								{c.collab.brands.length === 0 ? (
 									<p className="text-muted-foreground text-sm">No brand partners spotted in their recent posts.</p>
 								) : (
@@ -190,7 +190,7 @@ export function CreatorSheet({ creator, onClose }: { creator: InfluencerResult |
 								)}
 							</Section>
 
-							<Section title="Competitor check">
+							<Section title="Competitor Check">
 								{c.competitor.isCompetitor || c.competitor.promotesCompetitor ? (
 									<p className="flex gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
 										<IconShieldX className="mt-0.5 size-4 shrink-0 text-destructive" />

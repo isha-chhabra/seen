@@ -174,14 +174,14 @@ function ProfilePage() {
 
 						<dl className="grid gap-4 border-t pt-5 sm:grid-cols-2">
 							{profile.organization && <Fact label="Organization">{profile.organization}</Fact>}
-							<Fact label="Member since">
+							<Fact label="Member Since">
 								{new Date(profile.memberSince).toLocaleDateString(undefined, {
 									year: "numeric",
 									month: "short",
 									day: "numeric",
 								})}
 							</Fact>
-							<Fact label="Sign up method">{profile.signInMethods.join(", ") || "Email"}</Fact>
+							<Fact label="Sign Up Method">{profile.signInMethods.join(", ") || "Email"}</Fact>
 						</dl>
 					</CardContent>
 				</Card>
@@ -190,7 +190,7 @@ function ProfilePage() {
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2">
 							<IconHistory className="size-4 text-primary" />
-							Recent activity
+							Recent Activity
 						</CardTitle>
 						<CardDescription>The latest prompt runs and Article Finder searches in Seen.</CardDescription>
 					</CardHeader>
@@ -264,7 +264,7 @@ function DeleteAccountCard() {
 			<Card className="scroll-reveal border-destructive/30">
 				<CardContent className="flex flex-wrap items-center justify-between gap-4">
 					<div className="min-w-0">
-						<p className="font-medium">Delete account</p>
+						<p className="font-medium">Delete Account</p>
 						<p className="text-sm text-muted-foreground">
 							Permanently removes your account and your access to Seen. This can't be undone.
 						</p>
@@ -276,7 +276,7 @@ function DeleteAccountCard() {
 						onClick={() => setOpen(true)}
 					>
 						<IconTrash className="size-4" />
-						Delete account
+						Delete Account
 					</Button>
 				</CardContent>
 			</Card>
