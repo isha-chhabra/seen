@@ -158,7 +158,6 @@ export async function runInfluencerSearch(
 	const creators = new Map<string, Working>();
 	const seenIgPosts = new Set<string>();
 	const seenTtHandles = new Set<string>();
-	const usedQueries = new Set<string>();
 	const stats: InfluencerSearchStats = {
 		searches: 0,
 		postsFound: 0,
