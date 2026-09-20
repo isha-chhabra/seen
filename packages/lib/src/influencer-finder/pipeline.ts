@@ -112,6 +112,9 @@ interface Working {
 const key = (platform: Platform, handle: string) => `${platform}:${handle.toLowerCase()}`;
 const clip = (s: string, n: number) => s.replace(/\s+/g, " ").trim().slice(0, n);
 
+/** Google lookups in flight at once. */
+const SEARCH_CONCURRENCY = 4;
+
 export async function runInfluencerSearch(
 	input: PipelineInput,
 	deps: PipelineDeps,
@@ -145,42 +148,58 @@ export async function runInfluencerSearch(
 	async function searchAll(byPlatform: Partial<Record<Platform, string[]>>, reserve: number) {
 		const igHits: { code: string; url: string; text: string }[] = [];
 		const ttHits: { handle: string; text: string }[] = [];
+		// Google lookups are slow (tens of seconds each), so they run a few at a time. Each is paid for
+		// before it starts, so the spending limit holds however many are in flight.
+		const jobs: { platform: Platform; query: string }[] = [];
 		for (const platform of brief.platforms) {
 			for (const q of byPlatform[platform] ?? []) {
 				const query = `site:${platform === "instagram" ? "instagram.com" : "tiktok.com"} ${q}`;
 				if (usedQueries.has(query)) continue;
 				usedQueries.add(query);
-				let results: Awaited<ReturnType<PipelineDeps["serp"]>> = [];
-				for (let attempt = 0; attempt < 2 && results.length === 0; attempt++) {
-					if (!ledger.canSearch(reserve)) {
-						stop();
-						return null;
-					}
-					ledger.chargeSearch();
-					stats.searches += 1;
-					results = await deps.serp(query).catch(() => []);
+				jobs.push({ platform, query });
+			}
+		}
+		const outcomes: Awaited<ReturnType<PipelineDeps["serp"]>>[] = jobs.map(() => []);
+		let next = 0;
+		let outOfBudget = false;
+		async function worker() {
+			while (!outOfBudget && next < jobs.length) {
+				const i = next++;
+				if (!ledger.canSearch(reserve)) {
+					outOfBudget = true;
+					return;
 				}
-				for (const r of results) {
-					if (platform === "instagram") {
-						const m = /instagram\.com\/(p|reel)\/([\w-]+)/.exec(r.url);
-						if (m?.[2] && !seenIgPosts.has(m[2])) {
-							seenIgPosts.add(m[2]);
-							igHits.push({
-								code: m[2],
-								url: `https://www.instagram.com/${m[1]}/${m[2]}/`,
-								text: `${clip(r.title, 110)} | ${clip(r.snippet, 200)}`,
-							});
-						}
-					} else {
-						const m = /tiktok\.com\/@([\w.]+)\/video\//.exec(r.url);
-						const h = m?.[1]?.toLowerCase();
-						if (h && !seenTtHandles.has(h)) {
-							seenTtHandles.add(h);
-							ttHits.push({
-								handle: m?.[1] ?? h,
-								text: `@${m?.[1]} | ${clip(r.title, 110)} | ${clip(r.snippet, 200)}`,
-							});
-						}
+				ledger.chargeSearch();
+				stats.searches += 1;
+				outcomes[i] = await deps.serp((jobs[i] as (typeof jobs)[number]).query).catch(() => []);
+			}
+		}
+		await Promise.all(Array.from({ length: Math.min(SEARCH_CONCURRENCY, jobs.length) }, worker));
+		if (outOfBudget) {
+			stop();
+			return null;
+		}
+		for (const [i, job] of jobs.entries()) {
+			for (const r of outcomes[i] ?? []) {
+				if (job.platform === "instagram") {
+					const m = /instagram\.com\/(p|reel)\/([\w-]+)/.exec(r.url);
+					if (m?.[2] && !seenIgPosts.has(m[2])) {
+						seenIgPosts.add(m[2]);
+						igHits.push({
+							code: m[2],
+							url: `https://www.instagram.com/${m[1]}/${m[2]}/`,
+							text: `${clip(r.title, 110)} | ${clip(r.snippet, 200)}`,
+						});
+					}
+				} else {
+					const m = /tiktok\.com\/@([\w.]+)\/video\//.exec(r.url);
+					const h = m?.[1]?.toLowerCase();
+					if (h && !seenTtHandles.has(h)) {
+						seenTtHandles.add(h);
+						ttHits.push({
+							handle: m?.[1] ?? h,
+							text: `@${m?.[1]} | ${clip(r.title, 110)} | ${clip(r.snippet, 200)}`,
+						});
 					}
 				}
 			}
@@ -222,12 +241,10 @@ export async function runInfluencerSearch(
 		];
 		let keep: Record<Platform, number[]>;
 		if (ledger.canAffordLlm()) {
-			keep = await deps
-				.screen({ brief, hits, keep: { instagram: igKeepMax, tiktok: ttKeepMax } })
-				.catch(() => ({
-					instagram: igHits.map((_, i) => i).slice(0, igKeepMax),
-					tiktok: ttHits.map((_, i) => i).slice(0, ttKeepMax),
-				}));
+			keep = await deps.screen({ brief, hits, keep: { instagram: igKeepMax, tiktok: ttKeepMax } }).catch(() => ({
+				instagram: igHits.map((_, i) => i).slice(0, igKeepMax),
+				tiktok: ttHits.map((_, i) => i).slice(0, ttKeepMax),
+			}));
 			ledger.chargeLlm(hits.length * 90, 200);
 		} else {
 			keep = {
@@ -412,16 +429,14 @@ export async function runInfluencerSearch(
 			if (matcher.identity([w.handle, w.ig.name, ...w.ig.links]).length > 0) w.preExcluded = "competitor";
 		} else if (w.tt) {
 			w.engagement = { pct: w.tt.engagementPct, sample: w.tt.topVideos.length };
-			w.posts = w.tt.topVideos
-				.slice(0, 6)
-				.map((v) => ({
-					date: v.date,
-					kind: "video",
-					caption: clip(v.description, 220),
-					url: null,
-					tag: "organic" as const,
-					brand: null,
-				}));
+			w.posts = w.tt.topVideos.slice(0, 6).map((v) => ({
+				date: v.date,
+				kind: "video",
+				caption: clip(v.description, 220),
+				url: null,
+				tag: "organic" as const,
+				brand: null,
+			}));
 			if (matcher.identity([w.handle, w.tt.name]).length > 0) w.preExcluded = "competitor";
 		}
 	}

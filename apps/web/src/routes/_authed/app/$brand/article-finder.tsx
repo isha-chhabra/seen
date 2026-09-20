@@ -7,13 +7,11 @@
 
 import {
 	IconArrowUpRight,
-	IconChecks,
 	IconChevronDown,
 	IconLink,
 	IconLoader2,
 	IconMail,
 	IconSearch,
-	IconSortDescending,
 	IconX,
 } from "@tabler/icons-react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -39,7 +37,7 @@ import { ArticleSearchLoader } from "@/components/article-search-loader";
 import { DateRangePicker } from "@/components/date-range-picker";
 import { EmptyState } from "@/components/empty-state";
 import { ExportMenu } from "@/components/export-menu";
-import { FinderSteps, FormRow, FormRows, type Step, StopScale, TrustList } from "@/components/finder-form";
+import { FinderSteps, FormRow, FormRows, type Step, StopScale } from "@/components/finder-form";
 import { PageHeader } from "@/components/page-header";
 import { TagInput } from "@/components/tag-input";
 import { useBrand, useBrandRole } from "@/hooks/use-brands";
@@ -95,11 +93,6 @@ const ARTICLE_STEPS: readonly Step[] = [
 	["Check the searches", "See the searches before they run. Add, remove or reword any of them."],
 	["Review articles", "Each article is checked for fit and affiliate links, then sorted by publisher authority."],
 ];
-const ARTICLE_TRUST = [
-	{ icon: IconChecks, text: "Every article is checked for fit" },
-	{ icon: IconLink, text: "Affiliate links detected" },
-	{ icon: IconSortDescending, text: "Sorted by publisher authority" },
-] as const;
 const DEPTH_STOPS = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({
 	label: String(n),
 	sub: n === 1 ? "Quick" : n === 8 ? "Thorough" : undefined,
@@ -521,6 +514,7 @@ function ArticleFinderPage() {
 							<FormRow label="Articles">
 								<TagInput
 									plain
+									icon={<IconSearch className="size-4" />}
 									values={directionTags}
 									onChange={setDirectionTags}
 									placeholder="e.g. gift guides for premium steaks"
@@ -555,10 +549,7 @@ function ArticleFinderPage() {
 								{busy && <IconLoader2 className="size-4 animate-spin" />}
 								{busy ? "Creating plan…" : "Create search plan"}
 							</Button>
-							<span className="text-xs text-muted-foreground">Nothing runs until you continue</span>
 						</div>
-
-						<TrustList items={ARTICLE_TRUST} />
 					</div>
 				)}
 

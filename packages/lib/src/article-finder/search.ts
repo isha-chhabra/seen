@@ -137,7 +137,7 @@ function parseOrganic(body: string | null, page: number): SerpOrganicResult[] {
 export async function googleSerp(
 	query: string,
 	page: number,
-	opts: { from?: string; to?: string },
+	opts: { from?: string; to?: string; timeoutMs?: number; attempts?: number },
 ): Promise<SerpOrganicResult[]> {
 	const url = googleSearchUrl(query, page, opts.from, opts.to);
 	// An empty first page for a normal query is nearly always a blocked or
@@ -147,7 +147,7 @@ export async function googleSerp(
 	const attempts = page === 0 && !/\bsite:/.test(query) ? 3 : 1;
 	let mapped: SerpOrganicResult[] = [];
 	for (let i = 0; i < attempts && mapped.length === 0; i++) {
-		const body = await brightdataRaw(SERP_ZONE, url, 30_000, 3);
+		const body = await brightdataRaw(SERP_ZONE, url, opts.timeoutMs ?? 30_000, opts.attempts ?? 3);
 		mapped = parseOrganic(body, page);
 		if (mapped.length === 0) {
 			console.warn(

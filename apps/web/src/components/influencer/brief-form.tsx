@@ -2,10 +2,10 @@
  * Step 1 of Influencer Finder: who to look for. Three answers are required
  * (who, platforms, size); three optional ones sharpen the results.
  */
-import { IconChartBar, IconChecks, IconLoader2, IconShieldCheck } from "@tabler/icons-react";
+import { IconLoader2, IconSearch } from "@tabler/icons-react";
 import { FOLLOWER_BANDS, type FollowerBand, type Platform } from "@workspace/lib/influencer-finder/types";
 import { Button } from "@workspace/ui/components/button";
-import { FormRow, FormRows, nextRange, type Step, StopScale, ToggleGroup, TrustList } from "@/components/finder-form";
+import { FormRow, FormRows, nextRange, type Step, StopScale, ToggleGroup } from "@/components/finder-form";
 import { TagInput } from "@/components/tag-input";
 import { formatCount } from "@/lib/influencer-results";
 import { PLATFORM_LABEL, PlatformIcon } from "./parts";
@@ -77,12 +77,6 @@ export function SizeRange({
 	);
 }
 
-const TRUST = [
-	{ icon: IconChecks, text: "Judged on recent posts, not just bios" },
-	{ icon: IconShieldCheck, text: "Competitors and their partners screened out" },
-	{ icon: IconChartBar, text: "Engagement and past brand deals included" },
-] as const;
-
 export function BriefForm({
 	direction,
 	onDirection,
@@ -120,6 +114,7 @@ export function BriefForm({
 				<FormRow label="Who to find">
 					<TagInput
 						plain
+						icon={<IconSearch className="size-4" />}
 						values={direction}
 						onChange={onDirection}
 						placeholder="e.g. barbecue cooks, or style creators for big and tall men"
@@ -195,10 +190,7 @@ export function BriefForm({
 					{busy && <IconLoader2 className="size-4 animate-spin" />}
 					{busy ? "Creating plan…" : "Create search plan"}
 				</Button>
-				<span className="text-muted-foreground text-xs">Nothing runs until you continue</span>
 			</div>
-
-			<TrustList items={TRUST} />
 		</div>
 	);
 }

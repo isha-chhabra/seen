@@ -23,6 +23,8 @@ import { requireAuthSession, requireBrandAccess, requireBrandWriteAccess } from 
 
 const DEBOUNCE_MS = 45_000;
 const MAX_SPEND_USD = 0.5;
+/** A running search that has reported nothing for this long is treated as dead. */
+const STALE_RUN_MS = 15 * 60_000;
 const lastRunByBrand = new Map<string, number>();
 
 const platformSchema = z.enum(["instagram", "tiktok"]);
@@ -227,7 +229,11 @@ export const findInfluencersFn = createServerFn({ method: "POST" })
 					},
 					{
 						serp: async (query) =>
-							(await googleSerp(query, 0, {})).map((r) => ({ url: r.url, title: r.title, snippet: r.snippet })),
+							(await googleSerp(query, 0, { timeoutMs: 75_000, attempts: 2 })).map((r) => ({
+								url: r.url,
+								title: r.title,
+								snippet: r.snippet,
+							})),
 						scrape: (dataset, urls) => scrapeDataset(dataset, urls),
 						screen: (args) => screenHits(args),
 						judge: (args) => judgeCreators(args),
@@ -302,6 +308,23 @@ export const getInfluencerSearchStatusFn = createServerFn({ method: "POST" })
 			.orderBy(desc(brandInfluencerSearches.createdAt))
 			.limit(1);
 		if (!row) return null;
+		// A run whose server went away mid-search (a restart) never finishes; stop showing it as running.
+		if (row.status === "running" && Date.now() - row.updatedAt.getTime() > STALE_RUN_MS) {
+			const error = "The search was interrupted. Start it again; creators already checked are reused for free.";
+			await db
+				.update(brandInfluencerSearches)
+				.set({ status: "error", stage: null, error, updatedAt: new Date() })
+				.where(eq(brandInfluencerSearches.id, row.id));
+			return {
+				id: row.id,
+				status: "error" as const,
+				stage: null,
+				progressPct: row.progressPct,
+				error,
+				startedAt: String(row.createdAt),
+				updatedAt: String(new Date()),
+			};
+		}
 		return {
 			id: row.id,
 			status: row.status as "running" | "done" | "error",

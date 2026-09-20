@@ -8,7 +8,7 @@
  *   a scale  -> a ruler with stops (StopScale), for sizes, depth, budgets
  *   yes / no -> a switch
  *
- * Plus the 1-2-3 step marker (details on hover) and a short list of reasons to trust it.
+ * Plus the 1-2-3 step marker (details on hover).
  */
 import { IconCheck } from "@tabler/icons-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip";
@@ -17,7 +17,7 @@ import type { ComponentType, ReactNode } from "react";
 
 /** The rows share one grid so every label and control lines up down the page. */
 export function FormRows({ children }: { children: ReactNode }) {
-	return <div className="divide-y divide-border/60 border-y border-border/60">{children}</div>;
+	return <div className="divide-y divide-border/40 border-y border-border/40">{children}</div>;
 }
 
 export function FormRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -237,23 +237,4 @@ export function nextRange(lo: number, hi: number, i: number): [number, number] {
 	if (i === lo) return [i + 1, hi];
 	if (i === hi) return [lo, i - 1];
 	return [i, i];
-}
-
-// ── reassurance ─────────────────────────────────────────────────────
-
-export function TrustList({
-	items,
-}: {
-	items: readonly { icon: ComponentType<{ className?: string }>; text: string }[];
-}) {
-	return (
-		<ul className="mt-8 grid gap-2.5 text-muted-foreground text-sm sm:grid-cols-3">
-			{items.map(({ icon: Icon, text }) => (
-				<li key={text} className="flex items-start gap-2.5 leading-snug">
-					<Icon className="mt-0.5 size-4 shrink-0 text-primary" />
-					{text}
-				</li>
-			))}
-		</ul>
-	);
 }

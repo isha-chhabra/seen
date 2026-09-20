@@ -16,6 +16,7 @@ export function TagInput({
 	max,
 	className,
 	plain,
+	icon,
 }: {
 	values: string[];
 	onChange: (values: string[]) => void;
@@ -25,6 +26,8 @@ export function TagInput({
 	className?: string;
 	/** Borderless, sits on a form row's hairline instead of drawing its own box. */
 	plain?: boolean;
+	/** Leading icon, e.g. a magnifier to mark the field you type into. */
+	icon?: React.ReactNode;
 }) {
 	const [draft, setDraft] = useState("");
 
@@ -50,11 +53,12 @@ export function TagInput({
 			className={cn(
 				"flex min-h-10 flex-wrap items-center gap-1.5 bg-transparent",
 				plain
-					? "transition-shadow focus-within:shadow-[0_1px_0_0_var(--primary)]"
+					? "border-b border-foreground/25 pb-2 transition-colors hover:border-foreground/45 focus-within:border-primary"
 					: "rounded-md border p-2 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30",
 				className,
 			)}
 		>
+			{icon && <span className="flex text-muted-foreground">{icon}</span>}
 			{values.map((v, i) => (
 				<Badge
 					key={v}

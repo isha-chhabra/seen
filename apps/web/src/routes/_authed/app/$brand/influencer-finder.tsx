@@ -179,6 +179,8 @@ function InfluencerFinderPage() {
 		}
 	}
 
+	// A plan is only on screen if there is one to show; otherwise fall back to the first step.
+	const shown: Phase = phase === "review" && !brief ? "idle" : phase;
 	const wide = phase === "results";
 
 	return (
@@ -202,8 +204,8 @@ function InfluencerFinderPage() {
 			}
 		>
 			<div className={wide ? "max-w-[1400px]" : "max-w-3xl"}>
-				{phase !== "results" && <FinderSteps steps={INFLUENCER_STEPS} current={phase === "idle" ? 1 : 2} />}
-				{phase === "idle" && (
+				{phase !== "results" && <FinderSteps steps={INFLUENCER_STEPS} current={shown === "idle" ? 1 : 2} />}
+				{shown === "idle" && (
 					<BriefForm
 						direction={direction}
 						onDirection={setDirection}
@@ -220,24 +222,26 @@ function InfluencerFinderPage() {
 					/>
 				)}
 
-				{(phase === "review" || phase === "searching") && brief && (
-					<div className="space-y-4">
-						<BriefReview
-							brief={brief}
-							onBrief={setBrief}
-							capUsd={capUsd}
-							onCap={setCapUsd}
-							target={target}
-							onTarget={setTarget}
-							locked={locked || isViewer}
-							canRun={!locked && !isViewer}
-							hasResults={hasResults}
-							error={error}
-							onRegenerate={buildPlan}
-							onBack={() => setPhase(hasResults ? "results" : "idle")}
-							onRun={run}
-							running={phase === "searching"}
-						/>
+				{(shown === "review" || shown === "searching") && (
+					<div className="space-y-6">
+						{brief && (
+							<BriefReview
+								brief={brief}
+								onBrief={setBrief}
+								capUsd={capUsd}
+								onCap={setCapUsd}
+								target={target}
+								onTarget={setTarget}
+								locked={locked || isViewer}
+								canRun={!locked && !isViewer}
+								hasResults={hasResults}
+								error={error}
+								onRegenerate={buildPlan}
+								onBack={() => setPhase(hasResults ? "results" : "idle")}
+								onRun={run}
+								running={phase === "searching"}
+							/>
+						)}
 						{phase === "searching" && (
 							<ArticleSearchLoader title="Finding creators" stage={liveStage} progressPct={liveProgress} />
 						)}
