@@ -81,6 +81,7 @@ function makeDeps(overrides: Partial<PipelineDeps> = {}) {
 	const judged: string[][] = [];
 	const scrapeCalls: { dataset: string; urls: string[] }[] = [];
 	const store = new Map<string, CachedProfile>();
+	const memoStore = new Map<string, { value: unknown; at: number }>();
 	const deps: PipelineDeps = {
 		serp: vi.fn(async (query: string) =>
 			query.includes("instagram.com")
@@ -117,6 +118,10 @@ function makeDeps(overrides: Partial<PipelineDeps> = {}) {
 				competitor: { isCompetitor: false, promotesCompetitor: false, names: [], evidence: "" },
 			}));
 		}),
+		memo: {
+			get: async (k, key) => memoStore.get(`${k}:${key}`) ?? null,
+			put: async (k, key, value) => void memoStore.set(`${k}:${key}`, { value, at: NOW }),
+		},
 		cache: {
 			get: async (p, h) => store.get(`${p}:${h.toLowerCase()}`) ?? null,
 			put: async (p, h, d) => void store.set(`${p}:${h.toLowerCase()}`, d),
@@ -124,7 +129,7 @@ function makeDeps(overrides: Partial<PipelineDeps> = {}) {
 		now: () => NOW,
 		...overrides,
 	};
-	return { deps, judged, scrapeCalls, store };
+	return { deps, judged, scrapeCalls, store, memoStore };
 }
 
 describe("runInfluencerSearch", () => {
@@ -207,7 +212,11 @@ describe("runInfluencerSearch", () => {
 	});
 
 	it("keeps searching (deeper pages, new phrases) until the requested number of creators is kept", async () => {
-		const igOnly = { ...brief, platforms: ["instagram" as const], queries: { instagram: ["big and tall style"], tiktok: [] } };
+		const igOnly = {
+			...brief,
+			platforms: ["instagram" as const],
+			queries: { instagram: ["big and tall style"], tiktok: [] },
+		};
 		const codesFor = (query: string, page: number) =>
 			[1, 2, 3].map((n) => ({
 				url: `https://www.instagram.com/reel/${query.replace(/\W/g, "").slice(-6)}P${page}N${n}/`,
@@ -228,10 +237,18 @@ describe("runInfluencerSearch", () => {
 	});
 
 	it("says so when it runs out of money before reaching the requested number", async () => {
-		const igOnly = { ...brief, platforms: ["instagram" as const], queries: { instagram: ["big and tall style"], tiktok: [] } };
+		const igOnly = {
+			...brief,
+			platforms: ["instagram" as const],
+			queries: { instagram: ["big and tall style"], tiktok: [] },
+		};
 		const { deps } = makeDeps({
 			serp: vi.fn(async (query: string, page: number) =>
-				[1, 2, 3].map((n) => ({ url: `https://www.instagram.com/reel/${query.replace(/\W/g, "").slice(-6)}P${page}N${n}/`, title: "t", snippet: "s" })),
+				[1, 2, 3].map((n) => ({
+					url: `https://www.instagram.com/reel/${query.replace(/\W/g, "").slice(-6)}P${page}N${n}/`,
+					title: "t",
+					snippet: "s",
+				})),
 			),
 			expand: vi.fn(async () => ["another angle", "one more angle"]),
 		});
@@ -239,5 +256,44 @@ describe("runInfluencerSearch", () => {
 		expect(out.cost.usd).toBeLessThanOrEqual(0.1);
 		expect(out.results.filter((r) => r.verdict !== "exclude").length).toBeLessThan(50);
 		expect(out.stats.stoppedAtBudget).toBe(true);
+	});
+
+	it("a repeat search reuses Google pages, post owners, profiles and engagement samples", async () => {
+		const first = makeDeps();
+		const a = await runInfluencerSearch(input(), first.deps);
+		const second = makeDeps({ cache: first.deps.cache, memo: first.deps.memo });
+		const b = await runInfluencerSearch(input(), second.deps);
+		expect(second.deps.serp).not.toHaveBeenCalled();
+		expect(second.scrapeCalls.filter((c) => c.dataset === DATASETS.instagramPost)).toEqual([]);
+		expect(b.cost.usd).toBeLessThan(a.cost.usd * 0.5);
+		expect(b.results.map((r) => r.handle).sort()).toEqual(a.results.map((r) => r.handle).sort());
+	});
+
+	it("re-buys only the profile, not the engagement posts, for a creator stored a few weeks ago", async () => {
+		const first = makeDeps();
+		await runInfluencerSearch(input(), first.deps);
+		for (const entry of first.store.values()) {
+			entry.fetchedAt = NOW - 20 * 86_400_000;
+			entry.samplesAt = NOW - 20 * 86_400_000;
+		}
+		const second = makeDeps({ cache: first.deps.cache, memo: first.deps.memo });
+		const out = await runInfluencerSearch(input(), second.deps);
+		expect(second.scrapeCalls.some((c) => c.dataset === DATASETS.instagramProfile)).toBe(true);
+		expect(second.scrapeCalls.filter((c) => c.dataset === DATASETS.instagramPost)).toEqual([]);
+		expect(out.results.find((r) => r.handle === "goodguy")?.engagementAgeDays).toBe(20);
+	});
+
+	it("buys a creator again once the stored copy is over three months old", async () => {
+		const first = makeDeps();
+		await runInfluencerSearch(input(), first.deps);
+		for (const entry of first.store.values()) {
+			entry.fetchedAt = NOW - 100 * 86_400_000;
+			entry.samplesAt = NOW - 100 * 86_400_000;
+		}
+		const second = makeDeps({ cache: first.deps.cache, memo: first.deps.memo });
+		const out = await runInfluencerSearch(input(), second.deps);
+		expect(second.scrapeCalls.some((c) => c.dataset === DATASETS.instagramProfile)).toBe(true);
+		expect(second.scrapeCalls.some((c) => c.dataset === DATASETS.instagramPost)).toBe(true);
+		expect(out.results.find((r) => r.handle === "goodguy")?.engagementAgeDays).toBe(0);
 	});
 });

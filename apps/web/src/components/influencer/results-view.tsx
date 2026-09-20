@@ -640,7 +640,7 @@ export function InfluencerResults({
 				{(filters.minEngagement > 0 || filters.activeWithinDays > 0 || filters.minPostsPerWeek > 0) &&
 					" Creators with no value for a filtered number (hidden likes, unmeasured TikTok activity) are left out while it's on."}
 				<span className="ml-auto">
-					{stats.creatorsAnalyzed} analyzed · {stats.fromCache} reused from the last 30 days · spent $
+					{stats.creatorsAnalyzed} analyzed · {stats.fromCache} reused from earlier searches · spent $
 					{cost.usd.toFixed(2)} of ${cost.capUsd.toFixed(2)}
 					{stats.stoppedAtBudget && " · stopped at the spending limit"}
 				</span>

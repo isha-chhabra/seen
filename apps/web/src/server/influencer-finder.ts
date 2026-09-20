@@ -15,7 +15,7 @@ import { db } from "@workspace/lib/db/db";
 import { brandInfluencerSearches, brands, competitors, influencerProfiles } from "@workspace/lib/db/schema";
 import { scrapeDataset } from "@workspace/lib/influencer-finder/datasets";
 import { draftBrief, expandQueries, judgeCreators, screenHits } from "@workspace/lib/influencer-finder/llm";
-import { type CachedProfile, runInfluencerSearch } from "@workspace/lib/influencer-finder/pipeline";
+import { type CachedProfile, type Memo, runInfluencerSearch } from "@workspace/lib/influencer-finder/pipeline";
 import type { InfluencerBrief, InfluencerSearchPayload, Platform } from "@workspace/lib/influencer-finder/types";
 import { and, desc, eq, lt, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -127,6 +127,8 @@ function trimForCache(data: CachedProfile) {
 			? { ...data.ig, posts: data.ig.posts.slice(0, 12).map((p) => ({ ...p, caption: p.caption.slice(0, 300) })) }
 			: undefined,
 		tt: data.tt,
+		samples: data.samples?.slice(0, 12).map((p) => ({ ...p, caption: p.caption.slice(0, 200) })),
+		samplesAt: data.samplesAt,
 	};
 }
 
@@ -145,6 +147,28 @@ const profileCache = {
 		await db
 			.insert(influencerProfiles)
 			.values({ platform, handle: handle.toLowerCase(), ...values })
+			.onConflictDoUpdate({ target: [influencerProfiles.platform, influencerProfiles.handle], set: values });
+	},
+};
+
+/**
+ * Small lookups kept for every brand in the same table as the profiles, told apart by `platform`:
+ * "ig_post" (post code -> creator) and "serp" (one Google results page).
+ */
+const memo: Memo = {
+	async get(kind, key) {
+		const [row] = await db
+			.select()
+			.from(influencerProfiles)
+			.where(and(eq(influencerProfiles.platform, kind), eq(influencerProfiles.handle, key)))
+			.limit(1);
+		return row ? { value: (row.data as { value: unknown }).value, at: row.fetchedAt.getTime() } : null;
+	},
+	async put(kind, key, value) {
+		const values = { data: { value }, fetchedAt: new Date() };
+		await db
+			.insert(influencerProfiles)
+			.values({ platform: kind, handle: key, ...values })
 			.onConflictDoUpdate({ target: [influencerProfiles.platform, influencerProfiles.handle], set: values });
 	},
 };
@@ -214,10 +238,20 @@ export const findInfluencersFn = createServerFn({ method: "POST" })
 		// Its outcome is written to the row, never thrown from here.
 		void (async () => {
 			try {
-				// Creators not looked up for a couple of months are dropped, so the cache doesn't quietly become a database of people.
+				// Profiles unused for over three months are dropped, so the cache doesn't quietly become a database of people.
+				// Google pages go sooner: search results date quickly.
 				await db
 					.delete(influencerProfiles)
-					.where(lt(influencerProfiles.fetchedAt, sql`now() - interval '60 days'`))
+					.where(lt(influencerProfiles.fetchedAt, sql`now() - interval '100 days'`))
+					.catch(() => {});
+				await db
+					.delete(influencerProfiles)
+					.where(
+						and(
+							eq(influencerProfiles.platform, "serp"),
+							lt(influencerProfiles.fetchedAt, sql`now() - interval '10 days'`),
+						),
+					)
 					.catch(() => {});
 				const payload: InfluencerSearchPayload = await runInfluencerSearch(
 					{
@@ -239,6 +273,7 @@ export const findInfluencersFn = createServerFn({ method: "POST" })
 						screen: (args) => screenHits(args),
 						judge: (args) => judgeCreators(args),
 						cache: profileCache,
+						memo,
 					},
 					setStage,
 				);

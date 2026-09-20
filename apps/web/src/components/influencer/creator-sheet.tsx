@@ -155,7 +155,7 @@ export function CreatorSheet({ creator, onClose }: { creator: InfluencerResult |
 										hint={
 											c.engagementPct === null
 												? "Likes are hidden or unavailable"
-												: `Average of ${c.engagementSample} post${c.engagementSample === 1 ? "" : "s"}`
+												: `Average of ${c.engagementSample} post${c.engagementSample === 1 ? "" : "s"}${(c.engagementAgeDays ?? 0) > 14 ? `, measured ${c.engagementAgeDays} days ago` : ""}`
 										}
 									/>
 									<Stat

@@ -37,7 +37,12 @@ import type {
 	Verdict,
 } from "./types";
 
-const PROFILE_TTL_MS = 30 * 24 * 3_600_000;
+/** A creator's stored profile and engagement are reused for this long, across every brand. */
+const PROFILE_TTL_MS = 90 * 24 * 3_600_000;
+/** Past this age a stored profile is bought again (one cheap record) so activity is current; the engagement sample is kept. */
+const ACTIVITY_REFRESH_MS = 14 * 24 * 3_600_000;
+/** Google results for an identical phrase and page. */
+const SERP_TTL_MS = 7 * 24 * 3_600_000;
 const BATCH = 20;
 const JUDGE_BATCH = 5;
 const EXTRA_POSTS_FOR_ENGAGEMENT = 3;
@@ -58,9 +63,19 @@ const GENERIC_TAGS = new Set([
 ]);
 
 export interface CachedProfile {
+	/** When the profile record was last bought. */
 	fetchedAt: number;
 	ig?: IgProfileRec;
 	tt?: TtProfileRec;
+	/** The posts engagement was measured on, and when they were fetched. Reused until they are this old. */
+	samples?: IgPostRec[];
+	samplesAt?: number;
+}
+
+/** Small lookups worth keeping for every brand: which creator a post belongs to, and a Google results page. */
+export interface Memo {
+	get(kind: "serp" | "ig_post", key: string): Promise<{ value: unknown; at: number } | null>;
+	put(kind: "serp" | "ig_post", key: string, value: unknown): Promise<void>;
 }
 
 export interface PipelineDeps {
@@ -88,6 +103,7 @@ export interface PipelineDeps {
 		get(platform: Platform, handle: string): Promise<CachedProfile | null>;
 		put(platform: Platform, handle: string, data: CachedProfile): Promise<void>;
 	};
+	memo: Memo;
 	now?: () => number;
 }
 
@@ -114,9 +130,13 @@ interface Working {
 	judged?: Judgment;
 	engagement: { pct: number | null; sample: number };
 	preExcluded?: "competitor";
+	/** When the profile record was bought, and when the engagement posts were fetched. */
+	profileAt?: number;
+	samplesAt?: number;
 }
 
 const key = (platform: Platform, handle: string) => `${platform}:${handle.toLowerCase()}`;
+const postCode = (url: string): string | undefined => /\/(?:p|reel)\/([\w-]+)/.exec(url)?.[1];
 const clip = (s: string, n: number) => s.replace(/\s+/g, " ").trim().slice(0, n);
 
 /** Google lookups in flight at once. */
@@ -182,15 +202,23 @@ export async function runInfluencerSearch(
 		async function worker() {
 			while (!outOfBudget && next < jobs.length) {
 				const i = next++;
+				const job = jobs[i] as SearchJob;
+				const site = job.platform === "instagram" ? "instagram.com" : "tiktok.com";
+				const query = `site:${site} ${job.phrase}`;
+				const memoKey = `${query}|${job.page}`;
+				const hit = await deps.memo.get("serp", memoKey).catch(() => null);
+				if (hit && Array.isArray(hit.value) && now() - hit.at < SERP_TTL_MS) {
+					outcomes[i] = hit.value as Awaited<ReturnType<PipelineDeps["serp"]>>;
+					continue;
+				}
 				if (!ledger.canSearch(reserve)) {
 					outOfBudget = true;
 					return;
 				}
-				const job = jobs[i] as SearchJob;
 				ledger.chargeSearch();
 				stats.searches += 1;
-				const site = job.platform === "instagram" ? "instagram.com" : "tiktok.com";
-				outcomes[i] = await deps.serp(`site:${site} ${job.phrase}`, job.page).catch(() => []);
+				outcomes[i] = await deps.serp(query, job.page).catch(() => []);
+				if (outcomes[i]?.length) await deps.memo.put("serp", memoKey, outcomes[i]).catch(() => {});
 			}
 		}
 		await Promise.all(Array.from({ length: Math.min(SEARCH_CONCURRENCY, jobs.length) }, worker));
@@ -269,30 +297,46 @@ export async function runInfluencerSearch(
 		await stageDone("Looking up creators", 42);
 		const postUrls = keep.instagram.map((i) => igHits[i]?.url).filter((u): u is string => !!u);
 		const fresh: Working[] = [];
-		for (let i = 0; i < postUrls.length; i += BATCH) {
-			const n = Math.min(BATCH, ledger.affordableRecords(0.02), postUrls.length - i);
+		const workingFor = (handle: string): Working => {
+			const k = key("instagram", handle);
+			let w = creators.get(k);
+			if (!w) {
+				w = {
+					platform: "instagram",
+					handle,
+					fromCache: false,
+					samples: new Map(),
+					posts: [],
+					engagement: { pct: null, sample: 0 },
+				};
+				creators.set(k, w);
+				fresh.push(w);
+			}
+			return w;
+		};
+		// A post whose owner is already known needs no paid lookup.
+		const unknownPosts: string[] = [];
+		for (const url of postUrls) {
+			const code = postCode(url);
+			const owner = code ? await deps.memo.get("ig_post", code).catch(() => null) : null;
+			const handle = (owner?.value as { handle?: string } | undefined)?.handle;
+			if (handle) workingFor(handle);
+			else unknownPosts.push(url);
+		}
+		for (let i = 0; i < unknownPosts.length; i += BATCH) {
+			const n = Math.min(BATCH, ledger.affordableRecords(0.02), unknownPosts.length - i);
 			if (n <= 0 || spendLimit()) break;
-			const chunk = postUrls.slice(i, i + n);
+			const chunk = unknownPosts.slice(i, i + n);
 			const recs = (await deps.scrape(DATASETS.instagramPost, chunk).catch(() => []))
 				.map(readIgPost)
 				.filter((r): r is IgPostRec => !!r);
 			ledger.chargeRecords(chunk.length);
 			for (const rec of recs) {
-				const k = key("instagram", rec.handle);
-				let w = creators.get(k);
-				if (!w) {
-					w = {
-						platform: "instagram",
-						handle: rec.handle,
-						fromCache: false,
-						samples: new Map(),
-						posts: [],
-						engagement: { pct: null, sample: 0 },
-					};
-					creators.set(k, w);
-					fresh.push(w);
-				}
+				const w = workingFor(rec.handle);
 				w.samples.set(rec.url, rec);
+				w.samplesAt ??= now();
+				const code = postCode(rec.url);
+				if (code) await deps.memo.put("ig_post", code, { handle: rec.handle }).catch(() => {});
 			}
 		}
 		for (const i of keep.tiktok) {
@@ -313,27 +357,39 @@ export async function runInfluencerSearch(
 		}
 		stats.creatorsFound += fresh.length;
 
-		// Profiles: reuse anyone we already paid for within the freshness window.
+		// Profiles: reuse anyone already paid for, whichever brand it was for. Instagram profiles a couple of
+		// weeks old are bought again (one record) so posting activity is current; the engagement sample is kept.
 		await stageDone("Reading bios and posts", 55);
-		const need: { igUrls: string[]; ttUrls: string[]; byUrl: Map<string, Working> } = {
-			igUrls: [],
-			ttUrls: [],
-			byUrl: new Map(),
-		};
+		const need: { igUrls: string[]; ttUrls: string[] } = { igUrls: [], ttUrls: [] };
 		for (const w of fresh) {
 			const cached = await deps.cache.get(w.platform, w.handle).catch(() => null);
-			if (cached && now() - cached.fetchedAt < PROFILE_TTL_MS && (w.platform === "instagram" ? cached.ig : cached.tt)) {
+			const age = cached ? now() - cached.fetchedAt : Number.POSITIVE_INFINITY;
+			if (cached && age < PROFILE_TTL_MS && (w.platform === "instagram" ? cached.ig : cached.tt)) {
 				w.ig = cached.ig;
 				w.tt = cached.tt;
+				w.profileAt = cached.fetchedAt;
 				w.fromCache = true;
 				stats.fromCache += 1;
-				continue;
+				if (cached.samples && cached.samplesAt && now() - cached.samplesAt < PROFILE_TTL_MS) {
+					for (const smp of cached.samples) if (!w.samples.has(smp.url)) w.samples.set(smp.url, smp);
+					w.samplesAt ??= cached.samplesAt;
+				}
+				if (w.platform !== "instagram" || age <= ACTIVITY_REFRESH_MS) continue;
 			}
 			const url =
 				w.platform === "instagram" ? `https://www.instagram.com/${w.handle}/` : `https://www.tiktok.com/@${w.handle}`;
 			(w.platform === "instagram" ? need.igUrls : need.ttUrls).push(url);
-			need.byUrl.set(url, w);
 		}
+		const save = (w: Working) =>
+			deps.cache
+				.put(w.platform, w.handle, {
+					fetchedAt: w.profileAt ?? now(),
+					ig: w.ig,
+					tt: w.tt,
+					samples: [...w.samples.values()],
+					samplesAt: w.samplesAt,
+				})
+				.catch(() => {});
 		async function buy(
 			dataset: string,
 			urls: string[],
@@ -352,7 +408,8 @@ export async function runInfluencerSearch(
 					if (!w) continue;
 					if (dataset === DATASETS.tiktokProfile) w.tt = rec as TtProfileRec;
 					else w.ig = rec as IgProfileRec;
-					await deps.cache.put(w.platform, w.handle, { fetchedAt: now(), ig: w.ig, tt: w.tt }).catch(() => {});
+					w.profileAt = now();
+					await save(w);
 				}
 			}
 		}
@@ -484,7 +541,8 @@ export async function runInfluencerSearch(
 	// Search in passes until enough creators are kept: first the brief's own phrases, then the same
 	// phrases one Google page deeper, new phrases dreamed up from who has been found, and the
 	// hashtags the best creators use. A pass that turns up nobody new twice in a row ends the run.
-	for (const platform of brief.platforms) for (const q of brief.queries[platform]) allPhrases.set(`${platform}|${q}`, platform);
+	for (const platform of brief.platforms)
+		for (const q of brief.queries[platform]) allPhrases.set(`${platform}|${q}`, platform);
 	const topUpReserve = Math.min(input.targetResults * EXTRA_POSTS_FOR_ENGAGEMENT * PRICE.record, input.capUsd * 0.4);
 	let dry = 0;
 	for (let n = 0; n < MAX_ROUNDS && keptCount() < input.targetResults && dry < 2; n++) {
@@ -497,7 +555,9 @@ export async function runInfluencerSearch(
 	}
 
 	function firstJobs(): SearchJob[] {
-		return brief.platforms.flatMap((platform) => brief.queries[platform].map((phrase) => ({ platform, phrase, page: 0 })));
+		return brief.platforms.flatMap((platform) =>
+			brief.queries[platform].map((phrase) => ({ platform, phrase, page: 0 })),
+		);
 	}
 
 	async function widenJobs(): Promise<SearchJob[]> {
@@ -537,7 +597,10 @@ export async function runInfluencerSearch(
 				for (const t of p.caption.match(/#[A-Za-z0-9_]{4,}/g) ?? [])
 					tags.set(t.toLowerCase(), (tags.get(t.toLowerCase()) ?? 0) + 1);
 		}
-		for (const [tag] of [...tags.entries()].filter(([t]) => !GENERIC_TAGS.has(t)).sort((a, b) => b[1] - a[1]).slice(0, 8)) {
+		for (const [tag] of [...tags.entries()]
+			.filter(([t]) => !GENERIC_TAGS.has(t))
+			.sort((a, b) => b[1] - a[1])
+			.slice(0, 8)) {
 			const k = `instagram|${tag}`;
 			if (!brief.platforms.includes("instagram") || allPhrases.has(k)) continue;
 			allPhrases.set(k, "instagram");
@@ -574,9 +637,25 @@ export async function runInfluencerSearch(
 			.map(readIgPost)
 			.filter((r): r is IgPostRec => !!r);
 		ledger.chargeRecords(chunk.length);
-		for (const rec of recs) creators.get(key("instagram", rec.handle))?.samples.set(rec.url, rec);
+		for (const rec of recs) {
+			const w = creators.get(key("instagram", rec.handle));
+			if (!w) continue;
+			w.samples.set(rec.url, rec);
+			w.samplesAt ??= now();
+		}
 	}
-	for (const w of worthy) prepare(w);
+	for (const w of worthy) {
+		prepare(w);
+		await deps.cache
+			.put(w.platform, w.handle, {
+				fetchedAt: w.profileAt ?? now(),
+				ig: w.ig,
+				tt: w.tt,
+				samples: [...w.samples.values()],
+				samplesAt: w.samplesAt,
+			})
+			.catch(() => {});
+	}
 
 	await stageDone("Finishing up", 95);
 	const results = [...creators.values()].filter((w) => w.ig || w.tt).map((w) => toResult(w));
@@ -650,6 +729,7 @@ export async function runInfluencerSearch(
 			fitEvidence: j?.fitEvidence ?? [],
 			engagementPct: w.engagement.pct,
 			engagementSample: w.engagement.sample,
+			engagementAgeDays: w.samplesAt ? Math.max(0, Math.round((now() - w.samplesAt) / 86_400_000)) : null,
 			postsPerWeek: ig ? postsPerWeek(w.posts.map((p) => p.date).filter((d): d is string => !!d)) : null,
 			lastPostDaysAgo: ig ? daysSince(w.posts[0]?.date, now()) : null,
 			collab,

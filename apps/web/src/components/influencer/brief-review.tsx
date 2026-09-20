@@ -148,7 +148,8 @@ export function BriefReview({
 							<span className="text-foreground tabular-nums">
 								${est.low.toFixed(2)}–${est.high.toFixed(2)}
 							</span>
-							. The search stops at the limit. Creators checked in the last 30 days cost nothing.
+							. The search stops at the limit. Creators checked in the last 3 months cost little or nothing, whichever
+							brand they were for.
 						</p>
 						{reach < target && (
 							<p className="text-amber-500 text-xs leading-relaxed">

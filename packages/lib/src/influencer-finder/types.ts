@@ -105,6 +105,8 @@ export interface InfluencerResult {
 	engagementPct: number | null;
 	/** How many posts the average is based on. */
 	engagementSample: number;
+	/** How many days ago those posts were fetched; 0 or a few when measured in this run, more when reused from an earlier one. */
+	engagementAgeDays?: number | null;
 	/** Null when activity can't be measured (TikTok returns top videos, not recent ones). */
 	postsPerWeek: number | null;
 	lastPostDaysAgo: number | null;
