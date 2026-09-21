@@ -43,7 +43,7 @@ export async function expandQueries(
 			? `Creators already found that fit (handle: bio):\n${args.kept.map((k) => `@${k.handle}: ${k.bio}`).join("\n")}`
 			: "No fitting creators found yet; the phrases used so far may be too narrow or too generic.",
 		`Phrases already searched: ${args.used.join("; ")}.`,
-		`Return 6 new SHORT keyword phrases of 2 to 4 words (never full sentences), different from those above, that would surface OTHER creators like these. Vary the angle: sub-niches, occasions, products, communities, how such creators describe themselves. No quotes, no operators like site:, no brand names, no years, no country names.`,
+		`Return 6 new SHORT keyword phrases of 1 to 3 words (never full sentences), different from those above, that OTHER creators like these would put in their bio or captions. Vary the angle: sub-niches, occasions, products, communities, how such creators describe themselves. No quotes, no operators like site:, no brand names, no years, no country names.`,
 	].join("\n");
 	const r = await ask(prompt, expandSchema, onCost);
 	return r.queries;
@@ -56,6 +56,7 @@ const briefSchema = z.object({
 	tiktokQueries: z.array(z.string()).min(2).max(6),
 	extraCompetitors: z.array(z.string()).max(12),
 	fitSignals: z.array(z.string()).min(3).max(14),
+	bioKeywords: z.array(z.string()).min(3).max(12),
 });
 
 /** The optional guidance from the brief, as prompt lines. Empty when none was given. */
@@ -83,7 +84,7 @@ export async function draftBrief(
 		basedIn?: string[];
 	},
 	onCost?: OnCost,
-): Promise<Pick<InfluencerBrief, "queries" | "fitSignals"> & { extraCompetitors: string[] }> {
+): Promise<Pick<InfluencerBrief, "queries" | "fitSignals" | "bioKeywords"> & { extraCompetitors: string[] }> {
 	const prompt = [
 		`Brand: ${args.brandName} (${args.website}). Known competitors: ${args.competitors.join(", ") || "none listed"}.`,
 		`The team wants influencers to reach out to. In their words: "${args.direction}".`,
@@ -92,6 +93,7 @@ export async function draftBrief(
 		`- instagramQueries: 6 to 8 SHORT keyword phrases of 2 to 4 words, the kind people type into a search box or use as a topic (for example "big and tall style", "3XL menswear haul"). Never full sentences. Varied angles (style, fit, reviews, hauls, occasions, sub-audiences). No quotes, no operators like site:, no brand names, no years, no country names.`,
 		`- tiktokQueries: 3 to 5 short keyword phrases in the same spirit.`,
 		`- extraCompetitors: up to 10 brands or major retailers a creator here might also promote that compete with ${args.brandName} and are NOT already listed. Short names only.`,
+		`- bioKeywords: 6 to 10 short words or phrases (1 to 3 words) that creators like this put in their Instagram BIO to describe themselves or their niche (for example "big and tall", "plus size men", "3XL", "tall guy"). Plain text, no hashtags, no brand names. Profiles are searched for any of these in the bio, so favour the ones many such creators actually use.`,
 		`- fitSignals: 6 to 12 short phrases, hashtags or self-descriptions that a truly fitting creator would use about themselves or their content (for example a size, a niche, a community term). Evidence of fit must come from what people say about themselves.`,
 	].join("\n");
 	const r = await ask(prompt, briefSchema, onCost);
@@ -102,6 +104,7 @@ export async function draftBrief(
 		},
 		extraCompetitors: r.extraCompetitors,
 		fitSignals: r.fitSignals,
+		bioKeywords: r.bioKeywords,
 	};
 }
 

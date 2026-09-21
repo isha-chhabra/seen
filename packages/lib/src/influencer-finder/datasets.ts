@@ -68,3 +68,87 @@ export async function scrapeDataset(
 	// A record with an error field is a URL that could not be read; it isn't a creator.
 	return list.filter((r): r is DatasetRecord => !!r && typeof r === "object" && !("error" in r));
 }
+
+// ── searching Bright Data's ready-made Instagram profiles ───────────
+
+const MARKETPLACE = "https://api.brightdata.com/datasets";
+
+export interface ProfileSearch {
+	/** A profile qualifies when its bio contains any of these (case-insensitive). */
+	keywords: readonly string[];
+	minFollowers: number;
+	maxFollowers: number | null;
+	/** Handles already seen, left out so a second pass returns new creators. */
+	exclude: readonly string[];
+	/** The most records to return, and so the most that can be billed. */
+	limit: number;
+}
+
+/** Bright Data allows at most 4 rules in one group and 3 levels of groups, so bio keywords go in groups of 4. */
+const GROUP_MAX = 4;
+
+/** The filter the search sends: bio keywords, follower range, minus handles already seen. Private accounts are dropped after. */
+export function profileFilter(search: ProfileSearch): Record<string, unknown> {
+	const words = search.keywords
+		.slice(0, GROUP_MAX * GROUP_MAX)
+		.map((value) => ({ name: "biography", operator: "includes", value }));
+	const groups: Record<string, unknown>[] = [];
+	for (let i = 0; i < words.length; i += GROUP_MAX)
+		groups.push({ operator: "or", filters: words.slice(i, i + GROUP_MAX) });
+	const bio = groups.length === 1 ? groups[0] : { operator: "or", filters: groups };
+	const filters: Record<string, unknown>[] = [
+		bio as Record<string, unknown>,
+		{ name: "followers", operator: ">=", value: search.minFollowers },
+	];
+	if (search.maxFollowers !== null) filters.push({ name: "followers", operator: "<=", value: search.maxFollowers });
+	if (search.exclude.length > 0) filters.push({ name: "account", operator: "not_in", value: [...search.exclude] });
+	return { operator: "and", filters };
+}
+
+/**
+ * Asks Bright Data's Instagram profile database for creators whose bio matches, billed per record
+ * returned ($2.50 per 1,000; nothing when nothing matches). The job takes a couple of minutes to build,
+ * whatever its size, so it is polled until ready.
+ */
+export async function searchInstagramProfiles(
+	search: ProfileSearch,
+	{ fetchImpl = fetch, pollMs = 5_000, maxPolls = 84 }: ScrapeOptions = {},
+): Promise<DatasetRecord[]> {
+	if (search.keywords.length === 0 || search.limit <= 0) return [];
+	const token = getCredential("BRIGHTDATA_API_TOKEN");
+	if (!token) throw new Error("BRIGHTDATA_API_TOKEN is not set");
+	const auth = { Authorization: `Bearer ${token}` };
+
+	const res = await fetchImpl(`${MARKETPLACE}/filter`, {
+		method: "POST",
+		headers: { ...auth, "Content-Type": "application/json" },
+		body: JSON.stringify({
+			dataset_id: DATASETS.instagramProfile,
+			records_limit: search.limit,
+			filter: profileFilter(search),
+		}),
+		signal: AbortSignal.timeout(60_000),
+	});
+	if (!res.ok) throw new Error(`profile search responded ${res.status}`);
+	const { snapshot_id: snapshot } = (await res.json()) as { snapshot_id?: string };
+	if (!snapshot) throw new Error("profile search returned no snapshot");
+
+	for (let i = 0; i < maxPolls; i++) {
+		await new Promise((r) => setTimeout(r, pollMs));
+		const meta = await fetchImpl(`${MARKETPLACE}/snapshots/${snapshot}`, {
+			headers: auth,
+			signal: AbortSignal.timeout(30_000),
+		});
+		const info = (await meta.json()) as { status?: string; dataset_size?: number };
+		if (info.status === "failed") throw new Error("profile search failed");
+		if (info.status !== "ready") continue;
+		if (!info.dataset_size) return [];
+		const download = await fetchImpl(`${MARKETPLACE}/snapshots/${snapshot}/download?format=json`, {
+			headers: auth,
+			signal: AbortSignal.timeout(90_000),
+		});
+		const records = await download.json();
+		return (Array.isArray(records) ? records : []).filter((r): r is DatasetRecord => !!r && typeof r === "object");
+	}
+	throw new Error("profile search timed out");
+}

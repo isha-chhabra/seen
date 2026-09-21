@@ -20,6 +20,8 @@ export interface InfluencerBrief {
 	fitSignals: string[];
 	/** Follower bands to keep; empty means any size. */
 	followerBands: FollowerBand[];
+	/** Words creators of this kind put in their Instagram bio; the ready-made profile database is searched on these. */
+	bioKeywords?: string[];
 	/** Optional extras that sharpen the search; every one may be empty or absent. */
 	/** Handles of creators they already like, as a style reference. */
 	similarTo?: string[];
@@ -49,6 +51,16 @@ export function followerBandOf(followers: number | null | undefined): FollowerBa
 		if (followers >= min && (max === null || followers < max)) return band;
 	}
 	return null;
+}
+
+/** The follower range covered by the chosen bands: no lower than 1K, no upper limit when the top band is chosen. */
+export function followerRangeOf(bands: readonly FollowerBand[]): { min: number; max: number | null } {
+	if (bands.length === 0) return { min: 1_000, max: null };
+	const chosen = bands.map((b) => FOLLOWER_BANDS[b]);
+	return {
+		min: Math.min(...chosen.map((b) => b.min)),
+		max: chosen.some((b) => b.max === null) ? null : Math.max(...chosen.map((b) => b.max as number)),
+	};
 }
 
 export type SponsorTag = "ad" | "gifted" | "partner" | "code" | "own_brand" | "organic";

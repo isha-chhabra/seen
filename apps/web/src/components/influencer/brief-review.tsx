@@ -8,9 +8,8 @@ import type { InfluencerBrief, Platform } from "@workspace/lib/influencer-finder
 import { Button } from "@workspace/ui/components/button";
 import { FormRow, FormRows, StopScale } from "@/components/finder-form";
 import { TagInput } from "@/components/tag-input";
-import { PLATFORM_LABEL } from "./parts";
 
-export const CAP_OPTIONS = [0.1, 0.2, 0.35, 0.5] as const;
+export const CAP_OPTIONS = [0.1, 0.2, 0.25, 0.35, 0.5] as const;
 export const TARGET_OPTIONS = [10, 20, 30, 50] as const;
 
 export function BriefReview({
@@ -78,18 +77,30 @@ export function BriefReview({
 			</div>
 
 			<FormRows>
-				{brief.platforms.map((p) => (
-					<FormRow key={p} label={`${PLATFORM_LABEL[p]} searches`} hint="Phrases to look up">
+				{brief.platforms.includes("instagram") && (
+					<FormRow label="Bio Keywords" hint="Words creators put in their Instagram bio">
 						<TagInput
 							plain
-							values={brief.queries[p]}
-							onChange={(v) => setQueries(p, v)}
+							values={brief.bioKeywords ?? []}
+							onChange={(v) => onBrief({ ...brief, bioKeywords: v })}
+							disabled={locked}
+							max={16}
+							placeholder="e.g. big and tall, plus size men"
+						/>
+					</FormRow>
+				)}
+				{brief.platforms.includes("tiktok") && (
+					<FormRow label="TikTok Searches" hint="Phrases to look up">
+						<TagInput
+							plain
+							values={brief.queries.tiktok}
+							onChange={(v) => setQueries("tiktok", v)}
 							disabled={locked}
 							max={12}
 							placeholder="Add a phrase, press Enter"
 						/>
 					</FormRow>
-				))}
+				)}
 				<FormRow label="Competitors" hint="Excluded, with partners">
 					<TagInput
 						plain

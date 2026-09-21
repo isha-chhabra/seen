@@ -13,7 +13,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { googleSerp } from "@workspace/lib/article-finder/search";
 import { db } from "@workspace/lib/db/db";
 import { brandInfluencerSearches, brands, competitors, influencerProfiles } from "@workspace/lib/db/schema";
-import { scrapeDataset } from "@workspace/lib/influencer-finder/datasets";
+import { scrapeDataset, searchInstagramProfiles } from "@workspace/lib/influencer-finder/datasets";
 import { draftBrief, expandQueries, judgeCreators, screenHits } from "@workspace/lib/influencer-finder/llm";
 import { type CachedProfile, clip, type Memo, runInfluencerSearch } from "@workspace/lib/influencer-finder/pipeline";
 import type { InfluencerBrief, InfluencerSearchPayload, Platform } from "@workspace/lib/influencer-finder/types";
@@ -49,6 +49,7 @@ const briefSchema = z.object({
 	competitors: z.array(z.string().trim().min(1).max(80)).max(40),
 	fitSignals: z.array(z.string().trim().min(1).max(120)).max(20),
 	followerBands: z.array(bandSchema).max(5),
+	bioKeywords: z.array(z.string().trim().min(1).max(60)).max(16).optional(),
 	similarTo: z.array(z.string().trim().min(1).max(60)).max(5).optional(),
 	avoid: z.array(z.string().trim().min(1).max(80)).max(8).optional(),
 	basedIn: z.array(z.string().trim().min(1).max(60)).max(3).optional(),
@@ -111,6 +112,9 @@ export const generateInfluencerBriefFn = createServerFn({ method: "POST" })
 			queries: { instagram: pick("instagram"), tiktok: pick("tiktok") },
 			competitors: unique([...known, ...draft.extraCompetitors]),
 			fitSignals: unique(draft.fitSignals),
+			bioKeywords: unique(
+				(draft.bioKeywords ?? []).map((k) => k.replace(/["#]/g, "").trim().toLowerCase()).filter((k) => k.length >= 3),
+			),
 			followerBands: data.followerBands,
 			similarTo,
 			avoid: data.avoid,
@@ -199,7 +203,14 @@ export const findInfluencersFn = createServerFn({ method: "POST" })
 				tiktok: unique(data.brief.queries.tiktok.map(cleanQuery).filter(Boolean)),
 			},
 		};
-		if (brief.platforms.every((p) => brief.queries[p].length === 0)) throw new Error("Add at least one search phrase.");
+		const bioKeywords = unique(
+			(data.brief.bioKeywords ?? []).map((k) => k.replace(/["#]/g, "").trim().toLowerCase()).filter(Boolean),
+		);
+		brief.bioKeywords = bioKeywords;
+		const hasInstagramKeywords = brief.platforms.includes("instagram") && bioKeywords.length > 0;
+		if (!hasInstagramKeywords && brief.platforms.every((p) => brief.queries[p].length === 0)) {
+			throw new Error("Add at least one bio keyword or search phrase.");
+		}
 
 		const { brand, comps } = await loadBrand(data.brandId);
 		const [run] = await db
@@ -269,6 +280,7 @@ export const findInfluencersFn = createServerFn({ method: "POST" })
 								snippet: r.snippet,
 							})),
 						scrape: (dataset, urls) => scrapeDataset(dataset, urls),
+						profiles: (search) => searchInstagramProfiles(search),
 						expand: async (args) => (await expandQueries(args)).map(cleanQuery).filter(Boolean),
 						screen: (args) => screenHits(args),
 						judge: (args) => judgeCreators(args),

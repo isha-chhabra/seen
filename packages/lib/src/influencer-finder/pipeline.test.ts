@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DATASETS } from "./datasets";
+import { DATASETS, type ProfileSearch } from "./datasets";
 import type { JudgeDossier, Judgment, ScreenHit } from "./llm";
 import { type CachedProfile, type PipelineDeps, type PipelineInput, runInfluencerSearch } from "./pipeline";
 import type { InfluencerBrief } from "./types";
@@ -306,5 +306,68 @@ describe("runInfluencerSearch", () => {
 		expect(good?.topHashtags).toContain("#bigandtall");
 		// "menswear" is a short bio, but still over the threshold; a blank one would carry captions
 		expect(dossiers.every((d) => d.bio.length >= 25 || d.posts.length > 0)).toBe(true);
+	});
+
+	describe("Instagram creators from the profile database", () => {
+		const igOnly: InfluencerBrief = {
+			...brief,
+			platforms: ["instagram"],
+			queries: { instagram: ["big and tall style"], tiktok: [] },
+			bioKeywords: ["big and tall", "tall guy"],
+		};
+		const pool = Array.from(
+			{ length: 60 },
+			(_, i) => `tg${String.fromCharCode(97 + (i % 26))}${String.fromCharCode(97 + Math.floor(i / 26))}`,
+		);
+		const fakeProfiles = (firstBatch = Number.POSITIVE_INFINITY) =>
+			vi.fn(async (search: ProfileSearch) => {
+				const fresh = pool.filter((h) => !search.exclude.includes(h));
+				const cap = search.exclude.length === 0 ? Math.min(search.limit, firstBatch) : search.limit;
+				return fresh.slice(0, cap).map(igProfileRecord);
+			});
+
+		it("takes candidates from the database, not Google, and looks up one post per kept creator", async () => {
+			const profiles = fakeProfiles();
+			const { deps, scrapeCalls } = makeDeps({ profiles });
+			const out = await runInfluencerSearch(input({ brief: igOnly, targetResults: 10, capUsd: 0.5 }), deps);
+			const kept = out.results.filter((r) => r.verdict !== "exclude");
+			expect(deps.serp).not.toHaveBeenCalled();
+			expect(profiles.mock.calls[0]?.[0].keywords).toEqual(["big and tall", "tall guy"]);
+			expect(profiles.mock.calls[0]?.[0].limit).toBeLessThanOrEqual(14);
+			expect(kept.length).toBeGreaterThanOrEqual(10);
+			const postLookups = scrapeCalls.filter((c) => c.dataset === DATASETS.instagramPost).flatMap((c) => c.urls);
+			expect(postLookups.length).toBeLessThanOrEqual(kept.length);
+			expect(out.cost.usd).toBeLessThanOrEqual(0.5);
+		});
+
+		it("asks again with new keywords, leaving out creators already seen, when there are too few", async () => {
+			const profiles = fakeProfiles(6);
+			const { deps } = makeDeps({ profiles, expand: vi.fn(async () => ["plus size men", "3xl"]) });
+			const out = await runInfluencerSearch(input({ brief: igOnly, targetResults: 12, capUsd: 0.5 }), deps);
+			expect(profiles.mock.calls.length).toBeGreaterThanOrEqual(2);
+			const second = profiles.mock.calls[1]?.[0];
+			expect(second?.exclude.length).toBeGreaterThanOrEqual(6);
+			expect(second?.keywords).toEqual(["plus size men", "3xl"]);
+			expect(out.results.filter((r) => r.verdict !== "exclude").length).toBeGreaterThanOrEqual(12);
+		});
+
+		it("falls back to Google when the database search fails", async () => {
+			const profiles = vi.fn(async () => {
+				throw new Error("down");
+			});
+			const { deps } = makeDeps({ profiles });
+			const out = await runInfluencerSearch(input({ brief: igOnly, targetResults: 3, capUsd: 0.5 }), deps);
+			expect(deps.serp).toHaveBeenCalled();
+			expect(out.results.length).toBeGreaterThan(0);
+		});
+
+		it("asks for no more candidates than the spending limit can pay for", async () => {
+			const profiles = fakeProfiles();
+			const { deps } = makeDeps({ profiles });
+			const out = await runInfluencerSearch(input({ brief: igOnly, targetResults: 50, capUsd: 0.1 }), deps);
+			expect(out.cost.usd).toBeLessThanOrEqual(0.1);
+			expect(profiles.mock.calls[0]?.[0].limit).toBeLessThanOrEqual(Math.floor(0.1 / 0.003));
+			expect(out.stats.stoppedAtBudget).toBe(true);
+		});
 	});
 });

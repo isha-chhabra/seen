@@ -17,7 +17,7 @@ import {
 	tagPost,
 } from "./analyze";
 import { CostLedger, PRICE } from "./cost";
-import { DATASETS, type DatasetRecord } from "./datasets";
+import { DATASETS, type DatasetRecord, type ProfileSearch } from "./datasets";
 import type { JudgeDossier, Judgment, ScreenHit } from "./llm";
 import {
 	type IgPostRec,
@@ -27,14 +27,15 @@ import {
 	readTtProfile,
 	type TtProfileRec,
 } from "./records";
-import type {
-	CreatorPost,
-	InfluencerBrief,
-	InfluencerResult,
-	InfluencerSearchPayload,
-	InfluencerSearchStats,
-	Platform,
-	Verdict,
+import {
+	type CreatorPost,
+	followerRangeOf,
+	type InfluencerBrief,
+	type InfluencerResult,
+	type InfluencerSearchPayload,
+	type InfluencerSearchStats,
+	type Platform,
+	type Verdict,
 } from "./types";
 
 /** A creator's stored profile and engagement are reused for this long, across every brand. */
@@ -47,7 +48,8 @@ const BATCH = 20;
 const JUDGE_BATCH = 8;
 /** How many lookup or judging chunks run at once. */
 const CHUNK_PARALLEL = 3;
-const EXTRA_POSTS_FOR_ENGAGEMENT = 3;
+/** Recent posts looked up per kept creator to measure engagement (one, to keep the price down). */
+const EXTRA_POSTS_FOR_ENGAGEMENT = 1;
 const GENERIC_TAGS = new Set([
 	"#fashion",
 	"#style",
@@ -105,6 +107,11 @@ export interface PipelineDeps {
 		get(platform: Platform, handle: string): Promise<CachedProfile | null>;
 		put(platform: Platform, handle: string, data: CachedProfile): Promise<void>;
 	};
+	/**
+	 * Searches the ready-made Instagram profile database by bio. When absent, or when it fails, Instagram
+	 * creators are found through Google instead.
+	 */
+	profiles?(search: ProfileSearch): Promise<DatasetRecord[]>;
 	memo: Memo;
 	now?: () => number;
 }
@@ -417,16 +424,6 @@ export async function runInfluencerSearch(
 				w.platform === "instagram" ? `https://www.instagram.com/${w.handle}/` : `https://www.tiktok.com/@${w.handle}`;
 			(w.platform === "instagram" ? need.igUrls : need.ttUrls).push(url);
 		}
-		const save = (w: Working) =>
-			deps.cache
-				.put(w.platform, w.handle, {
-					fetchedAt: w.profileAt ?? now(),
-					ig: w.ig,
-					tt: w.tt,
-					samples: [...w.samples.values()],
-					samplesAt: w.samplesAt,
-				})
-				.catch(() => {});
 		async function buy(
 			dataset: string,
 			urls: string[],
@@ -451,7 +448,7 @@ export async function runInfluencerSearch(
 						if (dataset === DATASETS.tiktokProfile) w.tt = rec as TtProfileRec;
 						else w.ig = rec as IgProfileRec;
 						w.profileAt = now();
-						await save(w);
+						await saveCreator(w);
 					}
 				},
 			);
@@ -461,7 +458,11 @@ export async function runInfluencerSearch(
 			buy(DATASETS.tiktokProfile, need.ttUrls, readTtProfile),
 		]);
 
-		// Facts that don't need a model, then the model reads what's left.
+		return finishRound(fresh);
+	}
+
+	/** Facts that don't need a model, then the model reads the bios of whoever is left. */
+	async function finishRound(fresh: Working[]): Promise<number> {
 		const analysed = fresh.filter((w) => (w.platform === "instagram" ? w.ig : w.tt));
 		for (const w of analysed) prepare(w);
 		stats.creatorsAnalyzed += analysed.length;
@@ -588,6 +589,99 @@ export async function runInfluencerSearch(
 		};
 	}
 
+	/** Stores a creator's profile and engagement sample for every brand to reuse. */
+	function saveCreator(w: Working) {
+		return deps.cache
+			.put(w.platform, w.handle, {
+				fetchedAt: w.profileAt ?? now(),
+				ig: w.ig,
+				tt: w.tt,
+				samples: [...w.samples.values()],
+				samplesAt: w.samplesAt,
+			})
+			.catch(() => {});
+	}
+
+	// ── Instagram creators from the ready-made profile database ─────
+
+	const usedKeywords = new Set<string>();
+	let datasetBroken = !deps.profiles;
+
+	/** Bio keywords in the form the database search wants: lowercase plain text, none used before. */
+	function newKeywords(list: readonly string[]): string[] {
+		const out: string[] = [];
+		for (const raw of list) {
+			const k = raw.toLowerCase().replace(/["#]/g, "").trim();
+			if (k.length < 3 || k.length > 40 || usedKeywords.has(k)) continue;
+			usedKeywords.add(k);
+			out.push(k);
+		}
+		return out.slice(0, 10);
+	}
+
+	/** Asks the database for creators whose bio matches, as many as are still needed and affordable. */
+	async function datasetRound(keywords: string[], label: string): Promise<number> {
+		const need = Math.max(1, input.targetResults - keptCount());
+		const room = Math.floor((ledger.remaining() - topUpReserve - 0.02) / PRICE.datasetRecord);
+		const limit = Math.min(Math.ceil(need * 1.4), 250, room);
+		if (limit < 3) return 0;
+		await stageDone(label, 10);
+		const range = followerRangeOf(brief.followerBands);
+		const recs = await (deps.profiles as NonNullable<PipelineDeps["profiles"]>)({
+			keywords,
+			minFollowers: range.min,
+			maxFollowers: range.max,
+			exclude: [...creators.values()].filter((w) => w.platform === "instagram").map((w) => w.handle),
+			limit,
+		});
+		ledger.chargeDatasetRecords(recs.length);
+
+		const fresh: Working[] = [];
+		for (const raw of recs) {
+			const rec = readIgProfile(raw);
+			if (!rec || rec.isPrivate || creators.has(key("instagram", rec.handle))) continue;
+			const w: Working = {
+				platform: "instagram",
+				handle: rec.handle,
+				ig: rec,
+				profileAt: now(),
+				fromCache: false,
+				samples: new Map(),
+				posts: [],
+				engagement: { pct: null, sample: 0 },
+			};
+			// Engagement already measured for this creator (for any brand) is reused.
+			const cached = await deps.cache.get("instagram", rec.handle).catch(() => null);
+			if (cached?.samples && cached.samplesAt && now() - cached.samplesAt < PROFILE_TTL_MS) {
+				for (const smp of cached.samples) w.samples.set(smp.url, smp);
+				w.samplesAt = cached.samplesAt;
+				stats.fromCache += 1;
+			}
+			creators.set(key("instagram", rec.handle), w);
+			fresh.push(w);
+			await saveCreator(w);
+		}
+		stats.creatorsFound += fresh.length;
+		await stageDone("Reading bios", 55);
+		return finishRound(fresh);
+	}
+
+	/** New bio keywords aimed at creators like the ones already kept. */
+	async function widenKeywords(): Promise<string[]> {
+		if (!ledger.canAffordLlm()) return [];
+		const kept = [...creators.values()].filter((w) => keptOf(w));
+		const phrases = await deps
+			.expand({
+				brief,
+				brandName,
+				kept: kept.slice(0, 8).map((w) => ({ handle: w.handle, bio: clip(w.ig?.bio ?? "", 140) })),
+				used: [...usedKeywords],
+			})
+			.catch(() => [] as string[]);
+		ledger.chargeLlm(1800, 400);
+		return newKeywords(phrases);
+	}
+
 	/** Whether a creator would end up on the list (a match or a maybe), competitor checks included. */
 	function keptOf(w: Working): boolean {
 		return !!(w.ig || w.tt) && !w.preExcluded && !!w.judged && toResult(w).verdict !== "exclude";
@@ -606,26 +700,45 @@ export async function runInfluencerSearch(
 	for (const platform of brief.platforms)
 		for (const q of brief.queries[platform]) allPhrases.set(`${platform}|${q}`, platform);
 	const topUpReserve = Math.min(input.targetResults * EXTRA_POSTS_FOR_ENGAGEMENT * PRICE.record, input.capUsd * 0.4);
+	const viaGoogle = (p: Platform) => p === "tiktok" || datasetBroken;
 	let dry = 0;
 	for (let n = 0; n < MAX_ROUNDS && keptCount() < input.targetResults && dry < 2; n++) {
 		if (ledger.remaining() - topUpReserve < 0.03) break;
-		const jobs = n === 0 ? firstJobs() : await widenJobs();
-		if (jobs.length === 0) break;
-		const roundBudget = Math.min(ledger.remaining() - topUpReserve, Math.max(0.06, input.capUsd * 0.3));
-		const analysed = await round(jobs, roundBudget, n === 0 ? "Searching the web" : "Widening the search");
+		let analysed = 0;
+		let googleFirst = n === 0;
+		if (brief.platforms.includes("instagram") && !datasetBroken) {
+			const words =
+				n === 0 ? newKeywords(brief.bioKeywords?.length ? brief.bioKeywords : brief.fitSignals) : await widenKeywords();
+			if (words.length > 0) {
+				try {
+					analysed += await datasetRound(words, n === 0 ? "Searching creators" : "Widening the search");
+				} catch (e) {
+					// The database is down or slow: fall back to finding Instagram creators through Google.
+					console.warn("[influencer-finder] profile database search failed, using Google", e);
+					datasetBroken = true;
+					googleFirst = true;
+				}
+			}
+		}
+		const jobs = googleFirst ? firstJobs() : await widenJobs();
+		if (jobs.length > 0) {
+			const roundBudget = Math.min(ledger.remaining() - topUpReserve, Math.max(0.06, input.capUsd * 0.3));
+			analysed += await round(jobs, roundBudget, n === 0 ? "Searching the web" : "Widening the search");
+		}
 		dry = analysed === 0 ? dry + 1 : 0;
 	}
 
 	function firstJobs(): SearchJob[] {
-		return brief.platforms.flatMap((platform) =>
-			brief.queries[platform].map((phrase) => ({ platform, phrase, page: 0 })),
-		);
+		return brief.platforms
+			.filter(viaGoogle)
+			.flatMap((platform) => brief.queries[platform].map((phrase) => ({ platform, phrase, page: 0 })));
 	}
 
 	async function widenJobs(): Promise<SearchJob[]> {
 		const jobs: SearchJob[] = [];
 		// 1. One page deeper for phrases that were still turning up new posts.
 		for (const [k, platform] of allPhrases) {
+			if (!viaGoogle(platform)) continue;
 			const depth = pageDepth.get(k);
 			if (depth !== undefined && depth < MAX_PAGE && productive.has(k) && jobs.length < 6) {
 				jobs.push({ platform, phrase: k.slice(platform.length + 1), page: depth + 1 });
@@ -714,15 +827,7 @@ export async function runInfluencerSearch(
 	);
 	for (const w of worthy) {
 		prepare(w);
-		await deps.cache
-			.put(w.platform, w.handle, {
-				fetchedAt: w.profileAt ?? now(),
-				ig: w.ig,
-				tt: w.tt,
-				samples: [...w.samples.values()],
-				samplesAt: w.samplesAt,
-			})
-			.catch(() => {});
+		await saveCreator(w);
 	}
 
 	await stageDone("Finishing up", 95);
