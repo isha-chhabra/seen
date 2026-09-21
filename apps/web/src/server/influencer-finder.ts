@@ -64,6 +64,11 @@ const cleanHandle = (h: string) =>
 		.replace(/^@/, "")
 		.toLowerCase();
 
+/** Data from the profile database can hold half an emoji, which Postgres refuses to search inside; repair it before storing. */
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+const wellFormed = <T>(value: T): T =>
+	JSON.parse(JSON.stringify(value, (_k, v) => (typeof v === "string" ? v.replace(LONE_SURROGATE, "\uFFFD") : v)));
+
 const unique = (list: string[]) => [...new Map(list.map((s) => [s.toLowerCase(), s])).values()];
 
 async function loadBrand(brandId: string) {
@@ -147,7 +152,7 @@ const profileCache = {
 		return { ...(row.data as Omit<CachedProfile, "fetchedAt">), fetchedAt: row.fetchedAt.getTime() };
 	},
 	async put(platform: Platform, handle: string, data: CachedProfile): Promise<void> {
-		const values = { data: trimForCache(data), fetchedAt: new Date(data.fetchedAt) };
+		const values = { data: wellFormed(trimForCache(data)), fetchedAt: new Date(data.fetchedAt) };
 		await db
 			.insert(influencerProfiles)
 			.values({ platform, handle: handle.toLowerCase(), ...values })
@@ -169,7 +174,7 @@ const memo: Memo = {
 		return row ? { value: (row.data as { value: unknown }).value, at: row.fetchedAt.getTime() } : null;
 	},
 	async put(kind, key, value) {
-		const values = { data: { value }, fetchedAt: new Date() };
+		const values = { data: wellFormed({ value }), fetchedAt: new Date() };
 		await db
 			.insert(influencerProfiles)
 			.values({ platform: kind, handle: key, ...values })
@@ -291,7 +296,7 @@ export const findInfluencersFn = createServerFn({ method: "POST" })
 				);
 				await db
 					.update(brandInfluencerSearches)
-					.set({ status: "done", stage: null, progressPct: 100, payload, updatedAt: new Date() })
+					.set({ status: "done", stage: null, progressPct: 100, payload: wellFormed(payload), updatedAt: new Date() })
 					.where(eq(brandInfluencerSearches.id, runId));
 			} catch (e) {
 				await db

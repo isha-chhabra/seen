@@ -351,6 +351,21 @@ describe("runInfluencerSearch", () => {
 			expect(out.results.filter((r) => r.verdict !== "exclude").length).toBeGreaterThanOrEqual(12);
 		});
 
+		it("sends many keywords as a few searches at once, within the candidate limit", async () => {
+			const profiles = fakeProfiles();
+			const many = Array.from({ length: 10 }, (_, i) => `niche word ${i}`);
+			const { deps } = makeDeps({ profiles });
+			await runInfluencerSearch(
+				input({ brief: { ...igOnly, bioKeywords: many }, targetResults: 20, capUsd: 0.5 }),
+				deps,
+			);
+			const firstRound = profiles.mock.calls.slice(0, 3).map(([s]) => s);
+			expect(firstRound.length).toBe(3);
+			expect(firstRound.every((s) => s.keywords.length <= 4)).toBe(true);
+			expect(firstRound[0]?.keywords[0]).toBe("niche word 0");
+			expect(firstRound.reduce((sum, s) => sum + s.limit, 0)).toBeLessThanOrEqual(Math.ceil(20 * 1.4));
+		});
+
 		it("falls back to Google when the database search fails", async () => {
 			const profiles = vi.fn(async () => {
 				throw new Error("down");

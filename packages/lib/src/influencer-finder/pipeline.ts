@@ -627,13 +627,32 @@ export async function runInfluencerSearch(
 		if (limit < 3) return 0;
 		await stageDone(label, 10);
 		const range = followerRangeOf(brief.followerBands);
-		const recs = await (deps.profiles as NonNullable<PipelineDeps["profiles"]>)({
-			keywords,
-			minFollowers: range.min,
-			maxFollowers: range.max,
-			exclude: [...creators.values()].filter((w) => w.platform === "instagram").map((w) => w.handle),
-			limit,
-		});
+		const exclude = [...creators.values()].filter((w) => w.platform === "instagram").map((w) => w.handle);
+		// Bright Data builds a search faster with few keywords, and allows a group only 4 rules, so the keywords
+		// go out as up to three searches at once, the most specific group getting the biggest share.
+		const groups: string[][] = [];
+		for (let i = 0; i < keywords.length && groups.length < 3; i += 4) groups.push(keywords.slice(i, i + 4));
+		const usable = groups.slice(0, Math.max(1, Math.min(groups.length, Math.floor(limit / 3))));
+		const weights = [0.5, 0.3, 0.2].slice(0, usable.length);
+		const weightSum = weights.reduce((a, b) => a + b, 0);
+		const search = deps.profiles as NonNullable<PipelineDeps["profiles"]>;
+		let failure: unknown;
+		const found = await Promise.all(
+			usable.map((group, i) =>
+				search({
+					keywords: group,
+					minFollowers: range.min,
+					maxFollowers: range.max,
+					exclude,
+					limit: Math.max(1, Math.floor((limit * (weights[i] ?? 0)) / weightSum)),
+				}).catch((e) => {
+					failure = e;
+					return null;
+				}),
+			),
+		);
+		if (found.every((r) => r === null)) throw failure;
+		const recs = found.flatMap((r) => r ?? []);
 		ledger.chargeDatasetRecords(recs.length);
 
 		const fresh: Working[] = [];
