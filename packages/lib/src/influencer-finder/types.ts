@@ -22,6 +22,11 @@ export interface BrandUnderstanding {
 	greatFits: string[];
 	/** Obvious reasons a creator would say no, or working with them wouldn't help. */
 	dealBreakers: string[];
+	/**
+	 * Standing search words for this brand, written once with the rest and reused by every search: what such
+	 * creators put in an Instagram bio, and what to search for on TikTok and YouTube. Most specific first.
+	 */
+	keywords?: { instagram: string[]; tiktok: string[]; youtube: string[] };
 }
 
 export interface InfluencerBrief {

@@ -10,7 +10,7 @@
  * @workspace/lib/influencer-finder.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { extractReadableText, googleSerp, unlockerFetchHtml } from "@workspace/lib/article-finder/search";
+import { googleSerp } from "@workspace/lib/article-finder/search";
 import { db } from "@workspace/lib/db/db";
 import {
 	brandCreatorProfiles,
@@ -20,13 +20,7 @@ import {
 	influencerProfiles,
 } from "@workspace/lib/db/schema";
 import { scrapeDataset, searchInstagramProfiles } from "@workspace/lib/influencer-finder/datasets";
-import {
-	draftBrief,
-	expandQueries,
-	judgeCreators,
-	screenHits,
-	understandBrand,
-} from "@workspace/lib/influencer-finder/llm";
+import { draftBrief, expandQueries, judgeCreators, screenHits } from "@workspace/lib/influencer-finder/llm";
 import { type CachedProfile, clip, type Memo, runInfluencerSearch } from "@workspace/lib/influencer-finder/pipeline";
 import type {
 	BrandUnderstanding,
@@ -37,6 +31,12 @@ import type {
 import { and, desc, eq, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuthSession, requireBrandAccess, requireBrandWriteAccess } from "@/lib/auth/helpers";
+import {
+	cleanUnderstanding,
+	ensureKeywords,
+	saveUnderstanding,
+	writeUnderstanding,
+} from "@/lib/brand/creator-understanding";
 
 const DEBOUNCE_MS = 45_000;
 const MAX_SPEND_USD = 0.5;
@@ -62,6 +62,13 @@ const understandingSchema = z.object({
 	markets: z.array(z.string().trim().min(1).max(60)).min(1).max(8),
 	greatFits: z.array(z.string().trim().min(1).max(120)).max(12),
 	dealBreakers: z.array(z.string().trim().min(1).max(120)).max(12),
+	keywords: z
+		.object({
+			instagram: z.array(z.string().trim().min(1).max(60)).max(16),
+			tiktok: z.array(z.string().trim().min(1).max(80)).max(16),
+			youtube: z.array(z.string().trim().min(1).max(80)).max(16),
+		})
+		.optional(),
 });
 
 const briefSchema = z.object({
@@ -106,38 +113,6 @@ async function loadBrand(brandId: string) {
 
 // ── 0. the brand ────────────────────────────────────────────────────
 
-const cleanUnderstanding = (u: BrandUnderstanding): BrandUnderstanding => ({
-	summary: u.summary.trim(),
-	customer: u.customer.trim(),
-	markets: unique(u.markets),
-	greatFits: unique(u.greatFits),
-	dealBreakers: unique(u.dealBreakers),
-});
-
-async function saveUnderstanding(brandId: string, profile: BrandUnderstanding, source: "website" | "edited") {
-	await db
-		.insert(brandCreatorProfiles)
-		.values({ brandId, profile, source })
-		.onConflictDoUpdate({ target: brandCreatorProfiles.brandId, set: { profile, source, updatedAt: new Date() } });
-}
-
-/** Reads the brand's website and works out who buys, where, and who would say yes or no to a request. */
-async function writeUnderstanding(brandId: string): Promise<BrandUnderstanding> {
-	const { brand, comps } = await loadBrand(brandId);
-	const url = /^https?:/i.test(brand.website) ? brand.website : `https://${brand.website}`;
-	const html = await unlockerFetchHtml(url).catch(() => null);
-	const profile = cleanUnderstanding(
-		await understandBrand({
-			brandName: brand.name,
-			website: brand.website,
-			competitors: comps.map((c) => c.name),
-			pageText: html ? extractReadableText(html) : "",
-		}),
-	);
-	await saveUnderstanding(brandId, profile, "website");
-	return profile;
-}
-
 /** What is known about the brand for creator outreach: the saved copy, or one written now from its website. */
 export const getBrandUnderstandingFn = createServerFn({ method: "POST" })
 	.validator(z.object({ brandId: z.string().min(1), refresh: z.boolean().default(false) }))
@@ -151,7 +126,10 @@ export const getBrandUnderstandingFn = createServerFn({ method: "POST" })
 				.from(brandCreatorProfiles)
 				.where(eq(brandCreatorProfiles.brandId, data.brandId))
 				.limit(1);
-			if (row) return { profile: row.profile as BrandUnderstanding, source: row.source };
+			if (row) {
+				const profile = await ensureKeywords(data.brandId, row.profile as BrandUnderstanding, row.source);
+				return { profile, source: row.source };
+			}
 		}
 		// Reading a site and writing this up costs a fraction of a cent.
 		return { profile: await writeUnderstanding(data.brandId), source: "website" };
@@ -163,7 +141,7 @@ export const generateInfluencerBriefFn = createServerFn({ method: "POST" })
 	.validator(
 		z.object({
 			brandId: z.string().min(1),
-			direction: z.string().trim().min(3).max(500),
+			direction: z.string().trim().max(500).default(""),
 			platforms: z.array(platformSchema).min(1).max(2),
 			followerBands: z.array(bandSchema).max(5).default([]),
 			similarTo: z.array(z.string().trim().min(1).max(120)).max(5).default([]),
@@ -181,13 +159,15 @@ export const generateInfluencerBriefFn = createServerFn({ method: "POST" })
 		// What the person confirmed or corrected about the brand is kept for next time, and shapes everything below.
 		const understanding = cleanUnderstanding(data.understanding);
 		await saveUnderstanding(data.brandId, understanding, "edited");
+		// Nothing typed means: look for the kinds of creator the brand is already known to want.
+		const direction = data.direction || understanding.greatFits.join(", ") || understanding.summary;
 		const similarTo = unique(data.similarTo.map(cleanHandle).filter(Boolean));
 		const draft = await draftBrief({
 			brand: understanding,
 			brandName: brand.name,
 			website: brand.website,
 			competitors: known,
-			direction: data.direction,
+			direction,
 			platforms: data.platforms,
 			similarTo,
 			avoid: data.avoid,
@@ -197,13 +177,22 @@ export const generateInfluencerBriefFn = createServerFn({ method: "POST" })
 			data.platforms.includes(p) ? unique(draft.queries[p].map(cleanQuery).filter(Boolean)) : [];
 		return {
 			brand: understanding,
-			direction: data.direction,
+			direction,
 			platforms: data.platforms,
-			queries: { instagram: pick("instagram"), tiktok: pick("tiktok") },
+			// The brand's standing keywords come first, then whatever is specific to this search.
+			queries: {
+				instagram: pick("instagram"),
+				tiktok: unique([
+					...(data.platforms.includes("tiktok") ? (understanding.keywords?.tiktok ?? []) : []),
+					...pick("tiktok"),
+				]).slice(0, 12),
+			},
 			competitors: unique([...known, ...draft.extraCompetitors]),
 			fitSignals: unique(draft.fitSignals),
 			bioKeywords: unique(
-				(draft.bioKeywords ?? []).map((k) => k.replace(/["#]/g, "").trim().toLowerCase()).filter((k) => k.length >= 3),
+				[...(understanding.keywords?.instagram ?? []), ...(draft.bioKeywords ?? [])]
+					.map((k) => k.replace(/["#]/g, "").trim().toLowerCase())
+					.filter((k) => k.length >= 3),
 			),
 			followerBands: data.followerBands,
 			similarTo,

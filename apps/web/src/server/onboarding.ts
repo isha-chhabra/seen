@@ -20,6 +20,7 @@ import {
 	enqueueAnalyzeBrand,
 	getAnalyzeBrandStatus,
 } from "@/lib/brand/analyze-brand-job";
+import { prepareBrandForCreators } from "@/lib/brand/creator-understanding";
 import { saveWizardOnboarding, wizardOnboardingInputSchema } from "@/server/onboarding-core";
 
 /**
@@ -83,5 +84,8 @@ export const updateOnboardedBrandFn = createServerFn({ method: "POST" })
 	.handler(async ({ data }) => {
 		const session = await requireAuthSession();
 		await requireBrandAccess(session.user.id, data.brandId);
-		return saveWizardOnboarding(data);
+		const result = await saveWizardOnboarding(data);
+		// The brand is analyzed and confirmed: work out, once, who would make content for it.
+		prepareBrandForCreators(data.brandId);
+		return result;
 	});

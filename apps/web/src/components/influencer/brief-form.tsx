@@ -90,6 +90,7 @@ export function BriefForm({
 	canSubmit,
 	error,
 	onSubmit,
+	directionHint,
 }: {
 	direction: string[];
 	onDirection: (v: string[]) => void;
@@ -103,6 +104,8 @@ export function BriefForm({
 	canSubmit: boolean;
 	error: string | null;
 	onSubmit: () => void;
+	/** What is looked for when nothing is typed, e.g. the brand's known great fits. */
+	directionHint?: string;
 }) {
 	const togglePlatform = (p: Platform) =>
 		onPlatforms(
@@ -111,13 +114,17 @@ export function BriefForm({
 	return (
 		<div>
 			<FormRows>
-				<FormRow label="Who to Find">
+				<FormRow label="Who to Find" hint="Optional">
 					<TagInput
 						plain
 						icon={<IconSearch className="size-4" />}
 						values={direction}
 						onChange={onDirection}
-						placeholder="e.g. barbecue cooks, or style creators for big and tall men"
+						placeholder={
+							directionHint
+								? `Optional. Leave empty to look for: ${directionHint}`
+								: "e.g. barbecue cooks, or style creators for big and tall men"
+						}
 						disabled={busy}
 					/>
 				</FormRow>

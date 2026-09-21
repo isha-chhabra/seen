@@ -11,6 +11,7 @@ import { db } from "@workspace/lib/db/db";
 import { brands } from "@workspace/lib/db/schema";
 import { count, desc } from "drizzle-orm";
 import { ApiError, createApiHandler } from "@/lib/api/handler";
+import { prepareBrandForCreators } from "@/lib/brand/creator-understanding";
 import {
 	apiCreateInputToInternal,
 	BrandConflictError,
@@ -56,7 +57,9 @@ export const Route = createFileRoute("/api/v1/brands/")({
 				},
 				handle: async ({ body }) => {
 					const internal = apiCreateInputToInternal(body);
-					return await createBrand(internal);
+					const created = await createBrand(internal);
+					prepareBrandForCreators(created.id);
+					return created;
 				},
 			}),
 		},

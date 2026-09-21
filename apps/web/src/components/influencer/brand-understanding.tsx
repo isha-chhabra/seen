@@ -3,11 +3,12 @@
  * confirmed or corrected here, and kept for next time. Every creator is asked three things: would they
  * make content for this brand, is there an obvious reason they'd say no, and would the brand benefit.
  */
-import { IconRefresh } from "@tabler/icons-react";
+import { IconChevronDown, IconRefresh } from "@tabler/icons-react";
 import type { BrandUnderstanding } from "@workspace/lib/influencer-finder/types";
 import { Input } from "@workspace/ui/components/input";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Textarea } from "@workspace/ui/components/textarea";
+import { useState } from "react";
 import { FormRow, FormRows } from "@/components/finder-form";
 import { TagInput } from "@/components/tag-input";
 
@@ -36,6 +37,7 @@ export function BrandUnderstandingPanel({
 	error,
 	onRefresh,
 	disabled,
+	source,
 }: {
 	brandName: string;
 	value: BrandUnderstanding;
@@ -44,26 +46,52 @@ export function BrandUnderstandingPanel({
 	error: string | null;
 	onRefresh: () => void;
 	disabled?: boolean;
+	/** "website" when the AI wrote it and nobody has looked yet, "edited" once a person has. */
+	source?: string;
 }) {
+	const [open, setOpen] = useState(false);
+	const expanded = open || !understandingComplete(value) || !!error;
 	return (
 		<section className="mb-8">
-			<div className="mb-3 flex items-end justify-between gap-4">
-				<div>
+			<div className="mb-3 flex items-start justify-between gap-4">
+				<div className="min-w-0">
 					<h2 className="font-semibold text-lg tracking-tight">About {brandName}</h2>
-					<p className="text-muted-foreground text-sm">
-						Every creator is judged on three things: would they make content for this brand, is there an obvious reason
-						they'd say no, and would the brand benefit. Fix anything that's wrong.
-					</p>
+					{!loading && understandingComplete(value) && !expanded ? (
+						<p className="mt-1 text-muted-foreground text-sm">
+							Sells in {value.markets.join(", ")}. Looking for {value.greatFits.join(", ") || "creators who fit"}.
+						</p>
+					) : (
+						<p className="text-muted-foreground text-sm">
+							Every creator is judged on three things: would they make content for this brand, is there an obvious
+							reason they'd say no, and would the brand benefit.
+							{source === "website" && " Written from the website and Google. Fix anything that's off."}
+						</p>
+					)}
 				</div>
-				<button
-					type="button"
-					onClick={onRefresh}
-					disabled={loading || disabled}
-					className="flex shrink-0 items-center gap-1.5 text-muted-foreground text-xs transition-colors hover:text-foreground disabled:opacity-50"
-				>
-					<IconRefresh className={loading ? "size-3.5 animate-spin" : "size-3.5"} />
-					Read Website Again
-				</button>
+				<div className="flex shrink-0 items-center gap-4 text-muted-foreground text-xs">
+					{expanded && (
+						<button
+							type="button"
+							onClick={onRefresh}
+							disabled={loading || disabled}
+							className="flex items-center gap-1.5 transition-colors hover:text-foreground disabled:opacity-50"
+						>
+							<IconRefresh className={loading ? "size-3.5 animate-spin" : "size-3.5"} />
+							Read Website Again
+						</button>
+					)}
+					{!loading && understandingComplete(value) && (
+						<button
+							type="button"
+							onClick={() => setOpen((o) => !o)}
+							aria-expanded={expanded}
+							className="flex items-center gap-1 transition-colors hover:text-foreground"
+						>
+							{expanded ? "Done" : "Edit"}
+							<IconChevronDown className={expanded ? "size-3.5 rotate-180" : "size-3.5"} />
+						</button>
+					)}
+				</div>
 			</div>
 			{loading ? (
 				<div className="space-y-3 border-border/40 border-y py-5" role="status" aria-live="polite">
@@ -72,7 +100,7 @@ export function BrandUnderstandingPanel({
 					<Skeleton className="h-4 w-1/2" />
 					<Skeleton className="h-4 w-2/3" />
 				</div>
-			) : (
+			) : !expanded ? null : (
 				<>
 					{error && <p className="mb-2 text-amber-500 text-sm">{error}</p>}
 					<FormRows>

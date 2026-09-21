@@ -25,33 +25,83 @@ async function ask<T>(prompt: string, schema: z.ZodType<T>, onCost?: OnCost): Pr
 
 // ── the brand ───────────────────────────────────────────────────────
 
+const keywordsSchema = z.object({
+	instagram: z
+		.array(z.string())
+		.min(4)
+		.max(12)
+		.describe("Words creators put in their Instagram bio, most specific first."),
+	tiktok: z.array(z.string()).min(3).max(8).describe("Short phrases to search on TikTok, most specific first."),
+	youtube: z.array(z.string()).min(3).max(8).describe("Short phrases to search on YouTube, most specific first."),
+});
+
+const KEYWORD_RULES = [
+	`Keywords, for finding creators the brand could work with:`,
+	`- instagram: 6 to 10 short phrases (1 to 3 words) creators put in their Instagram BIO to describe themselves or their niche, ORDERED FROM MOST SPECIFIC TO LEAST. Profiles are searched for ANY of them in the bio, so each must signal the niche on its own.`,
+	`- tiktok and youtube: 4 to 6 short search phrases (2 to 4 words) each, the way people title videos in this niche.`,
+	`- NEVER include generic words that fit thousands of unrelated creators ("fashion", "style", "menswear", "model", "lifestyle", "creator", "body positive", or a size on its own like "3XL"). No hashtags, no brand names, no full sentences.`,
+].join("\n");
+
 const understandingSchema = z.object({
 	summary: z.string().describe("Two sentences: what the brand sells and to whom."),
 	customer: z.string().describe("Who buys from it, in one sentence."),
 	markets: z.array(z.string()).min(1).max(6).describe("Countries it sells and ships to, as plain names."),
 	greatFits: z.array(z.string()).min(2).max(8).describe("Kinds of creator who would gladly make content for it."),
 	dealBreakers: z.array(z.string()).min(2).max(8).describe("Obvious reasons a creator would say no or would not help."),
+	keywords: keywordsSchema,
 });
 
-/** Reads the brand's own website text and answers the questions an outreach lead would ask before writing to anyone. */
+/**
+ * Works out, once per brand, what an outreach lead would want to know before writing to anyone: from the
+ * brand's own site, a couple of Google searches about it, and what it says about working with creators.
+ */
 export async function understandBrand(
-	args: { brandName: string; website: string; competitors: string[]; pageText: string },
+	args: {
+		brandName: string;
+		website: string;
+		competitors: string[];
+		pageText: string;
+		webSnippets: string;
+		creatorSnippets: string;
+	},
 	onCost?: OnCost,
 ): Promise<BrandUnderstanding> {
 	const prompt = [
-		`You are the outreach lead for ${args.brandName} (${args.website}). Before anyone writes to a creator you work out, from the brand's own website and what you know of it:`,
-		`1. Who would happily make content for this brand if asked? Think about every audience the brand serves, including less obvious ones (for example a menswear brand for big and tall men also suits plus-size women's creators only if the site shows it sells to them).`,
+		`You are the outreach lead for ${args.brandName} (${args.website}). Before anyone writes to a creator you work out, from the sources below and what you know of the brand:`,
+		`1. Who would happily make content for this brand if asked? Think about every audience the brand serves, including less obvious ones, but only ones the sources support.`,
 		`2. What are the obvious reasons a creator would say no, or working with them would not help the brand? Think about: a creator who is really a business or a page, one who works exclusively with a competitor, one whose audience lives where the brand does not sell, one in a different niche or price tier, one with no history of brand work.`,
 		`3. Would the brand benefit? Which country or countries does it sell in, so that creators whose audience lives elsewhere are worthless to it?`,
 		args.competitors.length ? `Known competitors: ${args.competitors.join(", ")}.` : "",
 		args.pageText
-			? `Text from the website:\n${args.pageText.slice(0, 6000)}`
-			: "The website could not be read; answer from what you know of the brand and be cautious.",
+			? `Text from the brand's website:\n${args.pageText.slice(0, 7000)}`
+			: "The website could not be read; lean on the web results and what you know of the brand.",
+		args.webSnippets ? `What Google says about the brand:\n${args.webSnippets.slice(0, 2500)}` : "",
+		args.creatorSnippets
+			? `What Google says about the brand working with creators or ambassadors:\n${args.creatorSnippets.slice(0, 2000)}`
+			: "",
 		`Answer in plain words. markets are country names only. Deal-breakers are short (a few words each) and specific to this brand, and always include creators based outside the markets.`,
+		KEYWORD_RULES,
 	]
 		.filter(Boolean)
 		.join("\n");
 	return ask(prompt, understandingSchema, onCost);
+}
+
+/** Keywords for a brand whose profile was written before keywords existed, from the profile alone. */
+export async function keywordsForBrand(
+	args: { brandName: string; profile: Omit<BrandUnderstanding, "keywords"> },
+	onCost?: OnCost,
+): Promise<NonNullable<BrandUnderstanding["keywords"]>> {
+	const p = args.profile;
+	const prompt = [
+		`Brand: ${args.brandName}. ${p.summary} Customer: ${p.customer} Sells in: ${p.markets.join(", ")}.`,
+		p.greatFits.length ? `Creators who would gladly work with it: ${p.greatFits.join("; ")}.` : "",
+		p.dealBreakers.length ? `Obvious reasons a creator would say no: ${p.dealBreakers.join("; ")}.` : "",
+		KEYWORD_RULES,
+	]
+		.filter(Boolean)
+		.join("\n");
+	return ask(prompt, keywordsSchema, onCost);
 }
 
 /** The brand's understanding as prompt lines; empty when there is none. */
@@ -132,6 +182,11 @@ export async function draftBrief(
 		`Brand: ${args.brandName} (${args.website}). Known competitors: ${args.competitors.join(", ") || "none listed"}.`,
 		`The team wants influencers to reach out to. In their words: "${args.direction}".`,
 		...brandLines(args.brand),
+		...(args.brand?.keywords
+			? [
+					`The brand's standing keywords (already searched, most specific first): Instagram bio: ${args.brand.keywords.instagram.join("; ")}. TikTok: ${args.brand.keywords.tiktok.join("; ")}. Build on these; add only keywords specific to what is being looked for now, and never repeat them.`,
+				]
+			: []),
 		...guidanceLines(args),
 		`Return:`,
 		`- instagramQueries: 6 to 8 SHORT keyword phrases of 2 to 4 words, the kind people type into a search box or use as a topic (for example "big and tall style", "3XL menswear haul"). Never full sentences. Varied angles (style, fit, reviews, hauls, occasions, sub-audiences). No quotes, no operators like site:, no brand names, no years, no country names.`,

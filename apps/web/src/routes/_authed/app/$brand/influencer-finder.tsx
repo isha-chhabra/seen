@@ -65,6 +65,7 @@ function InfluencerFinderPage() {
 
 	const [understanding, setUnderstanding] = useState<BrandUnderstanding>(EMPTY_UNDERSTANDING);
 	const [understandingLoading, setUnderstandingLoading] = useState(true);
+	const [understandingSource, setUnderstandingSource] = useState<string | undefined>();
 	const [understandingError, setUnderstandingError] = useState<string | null>(null);
 
 	const [phase, setPhase] = useState<Phase>("idle");
@@ -154,6 +155,7 @@ function InfluencerFinderPage() {
 		try {
 			const r = await getBrandUnderstandingFn({ data: { brandId, refresh } });
 			setUnderstanding(r.profile);
+			setUnderstandingSource(r.source);
 		} catch (e) {
 			setUnderstandingError(e instanceof Error ? e.message : "Couldn't read the website. Fill this in by hand.");
 		} finally {
@@ -167,12 +169,7 @@ function InfluencerFinderPage() {
 
 	const locked = busy || phase === "searching";
 	const canBuild =
-		!isViewer &&
-		!busy &&
-		!understandingLoading &&
-		direction.length > 0 &&
-		platforms.length > 0 &&
-		understandingComplete(understanding);
+		!isViewer && !busy && !understandingLoading && platforms.length > 0 && understandingComplete(understanding);
 	const hasResults = (payload?.results.length ?? 0) > 0;
 
 	async function buildPlan() {
@@ -248,6 +245,7 @@ function InfluencerFinderPage() {
 						error={understandingError}
 						onRefresh={() => void loadUnderstanding(true)}
 						disabled={busy || isViewer}
+						source={understandingSource}
 					/>
 				)}
 				{shown === "idle" && (
@@ -264,6 +262,7 @@ function InfluencerFinderPage() {
 						canSubmit={canBuild}
 						error={error}
 						onSubmit={buildPlan}
+						directionHint={understanding.greatFits.join(", ")}
 					/>
 				)}
 
