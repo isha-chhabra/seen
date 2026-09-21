@@ -171,16 +171,6 @@ export function BriefForm({
 						max={8}
 					/>
 				</FormRow>
-				<FormRow label="Audience Location">
-					<TagInput
-						plain
-						values={extras.basedIn}
-						onChange={(v) => onExtras({ ...extras, basedIn: v })}
-						placeholder="e.g. United States"
-						disabled={busy}
-						max={3}
-					/>
-				</FormRow>
 			</FormRows>
 
 			{error && <p className="mt-5 text-destructive text-sm">{error}</p>}

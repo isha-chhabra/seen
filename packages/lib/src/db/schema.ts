@@ -330,6 +330,17 @@ export const influencerProfiles = pgTable(
 	}),
 ).enableRLS();
 
+/** What is known about a brand for creator outreach (see BrandUnderstanding), one row per brand. */
+export const brandCreatorProfiles = pgTable("brand_creator_profiles", {
+	brandId: text("brand_id")
+		.primaryKey()
+		.references(() => brands.id, { onDelete: "cascade" }),
+	profile: json("profile").notNull(),
+	/** "website" when written by the AI from the brand's site, "edited" once a person has changed it. */
+	source: text("source").notNull().default("website"),
+	updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}).enableRLS();
+
 export type InfluencerProfileRow = typeof influencerProfiles.$inferSelect;
 
 export type Brand = typeof brands.$inferSelect;

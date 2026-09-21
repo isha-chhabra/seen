@@ -6,6 +6,7 @@
 import { IconUserSearch } from "@tabler/icons-react";
 import { createFileRoute } from "@tanstack/react-router";
 import type {
+	BrandUnderstanding,
 	FollowerBand,
 	InfluencerBrief,
 	InfluencerSearchPayload,
@@ -15,6 +16,11 @@ import { Button } from "@workspace/ui/components/button";
 import { useCallback, useEffect, useState } from "react";
 import { ArticleSearchLoader } from "@/components/article-search-loader";
 import { FinderSteps } from "@/components/finder-form";
+import {
+	BrandUnderstandingPanel,
+	EMPTY_UNDERSTANDING,
+	understandingComplete,
+} from "@/components/influencer/brand-understanding";
 import { BriefForm, type Extras, INFLUENCER_STEPS } from "@/components/influencer/brief-form";
 import { BriefReview } from "@/components/influencer/brief-review";
 import { InfluencerResults } from "@/components/influencer/results-view";
@@ -24,6 +30,7 @@ import { buildTitle, getAppName, getBrandName } from "@/lib/route-head";
 import {
 	findInfluencersFn,
 	generateInfluencerBriefFn,
+	getBrandUnderstandingFn,
 	getInfluencerSearchStatusFn,
 	getLatestInfluencerSearchFn,
 } from "@/server/influencer-finder";
@@ -55,6 +62,10 @@ function InfluencerFinderPage() {
 	const [extras, setExtras] = useState<Extras>({ similarTo: [], avoid: [], basedIn: [] });
 	const [capUsd, setCapUsd] = useState(0.2);
 	const [target, setTarget] = useState(20);
+
+	const [understanding, setUnderstanding] = useState<BrandUnderstanding>(EMPTY_UNDERSTANDING);
+	const [understandingLoading, setUnderstandingLoading] = useState(true);
+	const [understandingError, setUnderstandingError] = useState<string | null>(null);
 
 	const [phase, setPhase] = useState<Phase>("idle");
 	const [busy, setBusy] = useState(false);
@@ -137,8 +148,31 @@ function InfluencerFinderPage() {
 		};
 	}, [brandId, adopt]);
 
+	async function loadUnderstanding(refresh: boolean) {
+		setUnderstandingLoading(true);
+		setUnderstandingError(null);
+		try {
+			const r = await getBrandUnderstandingFn({ data: { brandId, refresh } });
+			setUnderstanding(r.profile);
+		} catch (e) {
+			setUnderstandingError(e instanceof Error ? e.message : "Couldn't read the website. Fill this in by hand.");
+		} finally {
+			setUnderstandingLoading(false);
+		}
+	}
+	// biome-ignore lint/correctness/useExhaustiveDependencies: loadUnderstanding only reads brandId
+	useEffect(() => {
+		void loadUnderstanding(false);
+	}, [brandId]);
+
 	const locked = busy || phase === "searching";
-	const canBuild = !isViewer && !busy && direction.length > 0 && platforms.length > 0;
+	const canBuild =
+		!isViewer &&
+		!busy &&
+		!understandingLoading &&
+		direction.length > 0 &&
+		platforms.length > 0 &&
+		understandingComplete(understanding);
 	const hasResults = (payload?.results.length ?? 0) > 0;
 
 	async function buildPlan() {
@@ -148,7 +182,7 @@ function InfluencerFinderPage() {
 		try {
 			setBrief(
 				await generateInfluencerBriefFn({
-					data: { brandId, direction: direction.join(", "), platforms, followerBands: bands, ...extras },
+					data: { brandId, direction: direction.join(", "), platforms, followerBands: bands, ...extras, understanding },
 				}),
 			);
 			setPhase("review");
@@ -205,6 +239,17 @@ function InfluencerFinderPage() {
 		>
 			<div className={wide ? "max-w-[1400px]" : "max-w-3xl"}>
 				{phase !== "results" && <FinderSteps steps={INFLUENCER_STEPS} current={shown === "idle" ? 1 : 2} />}
+				{shown === "idle" && (
+					<BrandUnderstandingPanel
+						brandName={brand?.name ?? "This Brand"}
+						value={understanding}
+						onChange={setUnderstanding}
+						loading={understandingLoading}
+						error={understandingError}
+						onRefresh={() => void loadUnderstanding(true)}
+						disabled={busy || isViewer}
+					/>
+				)}
 				{shown === "idle" && (
 					<BriefForm
 						direction={direction}

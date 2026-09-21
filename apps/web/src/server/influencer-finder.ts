@@ -10,13 +10,30 @@
  * @workspace/lib/influencer-finder.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { googleSerp } from "@workspace/lib/article-finder/search";
+import { extractReadableText, googleSerp, unlockerFetchHtml } from "@workspace/lib/article-finder/search";
 import { db } from "@workspace/lib/db/db";
-import { brandInfluencerSearches, brands, competitors, influencerProfiles } from "@workspace/lib/db/schema";
+import {
+	brandCreatorProfiles,
+	brandInfluencerSearches,
+	brands,
+	competitors,
+	influencerProfiles,
+} from "@workspace/lib/db/schema";
 import { scrapeDataset, searchInstagramProfiles } from "@workspace/lib/influencer-finder/datasets";
-import { draftBrief, expandQueries, judgeCreators, screenHits } from "@workspace/lib/influencer-finder/llm";
+import {
+	draftBrief,
+	expandQueries,
+	judgeCreators,
+	screenHits,
+	understandBrand,
+} from "@workspace/lib/influencer-finder/llm";
 import { type CachedProfile, clip, type Memo, runInfluencerSearch } from "@workspace/lib/influencer-finder/pipeline";
-import type { InfluencerBrief, InfluencerSearchPayload, Platform } from "@workspace/lib/influencer-finder/types";
+import type {
+	BrandUnderstanding,
+	InfluencerBrief,
+	InfluencerSearchPayload,
+	Platform,
+} from "@workspace/lib/influencer-finder/types";
 import { and, desc, eq, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuthSession, requireBrandAccess, requireBrandWriteAccess } from "@/lib/auth/helpers";
@@ -39,7 +56,16 @@ const cleanQuery = (q: string) =>
 		.trim()
 		.slice(0, 120);
 
+const understandingSchema = z.object({
+	summary: z.string().trim().min(1).max(600),
+	customer: z.string().trim().min(1).max(300),
+	markets: z.array(z.string().trim().min(1).max(60)).min(1).max(8),
+	greatFits: z.array(z.string().trim().min(1).max(120)).max(12),
+	dealBreakers: z.array(z.string().trim().min(1).max(120)).max(12),
+});
+
 const briefSchema = z.object({
+	brand: understandingSchema.optional(),
 	direction: z.string().trim().min(3).max(500),
 	platforms: z.array(platformSchema).min(1).max(2),
 	queries: z.object({
@@ -78,6 +104,59 @@ async function loadBrand(brandId: string) {
 	return { brand, comps };
 }
 
+// ── 0. the brand ────────────────────────────────────────────────────
+
+const cleanUnderstanding = (u: BrandUnderstanding): BrandUnderstanding => ({
+	summary: u.summary.trim(),
+	customer: u.customer.trim(),
+	markets: unique(u.markets),
+	greatFits: unique(u.greatFits),
+	dealBreakers: unique(u.dealBreakers),
+});
+
+async function saveUnderstanding(brandId: string, profile: BrandUnderstanding, source: "website" | "edited") {
+	await db
+		.insert(brandCreatorProfiles)
+		.values({ brandId, profile, source })
+		.onConflictDoUpdate({ target: brandCreatorProfiles.brandId, set: { profile, source, updatedAt: new Date() } });
+}
+
+/** Reads the brand's website and works out who buys, where, and who would say yes or no to a request. */
+async function writeUnderstanding(brandId: string): Promise<BrandUnderstanding> {
+	const { brand, comps } = await loadBrand(brandId);
+	const url = /^https?:/i.test(brand.website) ? brand.website : `https://${brand.website}`;
+	const html = await unlockerFetchHtml(url).catch(() => null);
+	const profile = cleanUnderstanding(
+		await understandBrand({
+			brandName: brand.name,
+			website: brand.website,
+			competitors: comps.map((c) => c.name),
+			pageText: html ? extractReadableText(html) : "",
+		}),
+	);
+	await saveUnderstanding(brandId, profile, "website");
+	return profile;
+}
+
+/** What is known about the brand for creator outreach: the saved copy, or one written now from its website. */
+export const getBrandUnderstandingFn = createServerFn({ method: "POST" })
+	.validator(z.object({ brandId: z.string().min(1), refresh: z.boolean().default(false) }))
+	.handler(async ({ data }): Promise<{ profile: BrandUnderstanding; source: string }> => {
+		const session = await requireAuthSession();
+		if (data.refresh) await requireBrandWriteAccess(session.user.id, data.brandId);
+		else await requireBrandAccess(session.user.id, data.brandId);
+		if (!data.refresh) {
+			const [row] = await db
+				.select()
+				.from(brandCreatorProfiles)
+				.where(eq(brandCreatorProfiles.brandId, data.brandId))
+				.limit(1);
+			if (row) return { profile: row.profile as BrandUnderstanding, source: row.source };
+		}
+		// Reading a site and writing this up costs a fraction of a cent.
+		return { profile: await writeUnderstanding(data.brandId), source: "website" };
+	});
+
 // ── 1. brief ────────────────────────────────────────────────────────
 
 export const generateInfluencerBriefFn = createServerFn({ method: "POST" })
@@ -90,6 +169,7 @@ export const generateInfluencerBriefFn = createServerFn({ method: "POST" })
 			similarTo: z.array(z.string().trim().min(1).max(120)).max(5).default([]),
 			avoid: z.array(z.string().trim().min(1).max(80)).max(8).default([]),
 			basedIn: z.array(z.string().trim().min(1).max(60)).max(3).default([]),
+			understanding: understandingSchema,
 		}),
 	)
 	.handler(async ({ data }): Promise<InfluencerBrief> => {
@@ -98,8 +178,12 @@ export const generateInfluencerBriefFn = createServerFn({ method: "POST" })
 		const { brand, comps } = await loadBrand(data.brandId);
 		const known = comps.map((c) => c.name);
 
+		// What the person confirmed or corrected about the brand is kept for next time, and shapes everything below.
+		const understanding = cleanUnderstanding(data.understanding);
+		await saveUnderstanding(data.brandId, understanding, "edited");
 		const similarTo = unique(data.similarTo.map(cleanHandle).filter(Boolean));
 		const draft = await draftBrief({
+			brand: understanding,
 			brandName: brand.name,
 			website: brand.website,
 			competitors: known,
@@ -107,11 +191,12 @@ export const generateInfluencerBriefFn = createServerFn({ method: "POST" })
 			platforms: data.platforms,
 			similarTo,
 			avoid: data.avoid,
-			basedIn: data.basedIn,
+			basedIn: understanding.markets,
 		});
 		const pick = (p: Platform) =>
 			data.platforms.includes(p) ? unique(draft.queries[p].map(cleanQuery).filter(Boolean)) : [];
 		return {
+			brand: understanding,
 			direction: data.direction,
 			platforms: data.platforms,
 			queries: { instagram: pick("instagram"), tiktok: pick("tiktok") },
@@ -123,7 +208,7 @@ export const generateInfluencerBriefFn = createServerFn({ method: "POST" })
 			followerBands: data.followerBands,
 			similarTo,
 			avoid: data.avoid,
-			basedIn: data.basedIn,
+			basedIn: understanding.markets,
 		};
 	});
 

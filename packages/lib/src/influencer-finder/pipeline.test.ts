@@ -115,6 +115,7 @@ function makeDeps(overrides: Partial<PipelineDeps> = {}) {
 				fitReason: "fits",
 				fitEvidence: ["#bigandtall"],
 				concern: "",
+				locationOk: "yes" as const,
 				competitor: { isCompetitor: false, promotesCompetitor: false, names: [], evidence: "" },
 			}));
 		}),
@@ -384,5 +385,26 @@ describe("runInfluencerSearch", () => {
 			expect(profiles.mock.calls[0]?.[0].limit).toBeLessThanOrEqual(Math.floor(0.1 / 0.003));
 			expect(out.stats.stoppedAtBudget).toBe(true);
 		});
+	});
+
+	it("rules out a creator the AI places outside the brand's markets", async () => {
+		const { deps } = makeDeps();
+		const real = deps.judge;
+		deps.judge = vi.fn(async (args) =>
+			(await real(args)).map((j) => (j.handle === "goodguy" ? { ...j, locationOk: "no" as const } : j)),
+		);
+		const out = await runInfluencerSearch(
+			input({
+				brief: {
+					...brief,
+					brand: { summary: "s", customer: "c", markets: ["United States"], greatFits: ["a"], dealBreakers: ["b"] },
+				},
+			}),
+			deps,
+		);
+		const r = out.results.find((x) => x.handle === "goodguy");
+		expect(r?.verdict).toBe("exclude");
+		expect(r?.excludedBecause).toBe("outside_market");
+		expect(r?.fitScore).toBeLessThanOrEqual(40);
 	});
 });

@@ -162,6 +162,13 @@
       "when": 1791000000000,
       "tag": "0022_influencer_finder",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791100000000,
+      "tag": "0023_brand_creator_profiles",
+      "breakpoints": true
     }
   ]
 }

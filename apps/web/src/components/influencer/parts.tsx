@@ -48,6 +48,7 @@ export const EXCLUDED_LABEL: Record<NonNullable<InfluencerResult["excludedBecaus
 	competitor: "Competitor",
 	competitor_partner: "Promotes a competitor",
 	not_a_creator: "Not an individual creator",
+	outside_market: "Outside the brand's market",
 	low_fit: "Low fit",
 };
 

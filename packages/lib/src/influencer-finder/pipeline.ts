@@ -890,6 +890,9 @@ export async function runInfluencerSearch(
 		} else if (j?.kind === "brand_or_business") {
 			verdict = "exclude";
 			excludedBecause = "not_a_creator";
+		} else if (j?.locationOk === "no") {
+			verdict = "exclude";
+			excludedBecause = "outside_market";
 		} else if (!j) {
 			excludedBecause = "low_fit";
 		} else if (verdict === "exclude") {
@@ -909,7 +912,10 @@ export async function runInfluencerSearch(
 			postsCount: ig?.postsCount ?? tt?.videosCount ?? null,
 			bio: clip(ig?.bio ?? tt?.bio ?? "", 300),
 			links: ig?.links ?? [],
-			fitScore: isCompetitor || promotes ? Math.min(j?.fitScore ?? 0, 40) : (j?.fitScore ?? 0),
+			fitScore:
+				isCompetitor || promotes || excludedBecause === "outside_market"
+					? Math.min(j?.fitScore ?? 0, 40)
+					: (j?.fitScore ?? 0),
 			verdict,
 			confidence: j?.confidence ?? 0,
 			kind: j?.kind ?? "unclear",

@@ -8,7 +8,25 @@ export type Verdict = "include" | "maybe" | "exclude";
 export type CreatorKind = "individual_creator" | "brand_or_business" | "unclear";
 
 /** What the search was asked to find. Editable by the user before anything runs. */
+/**
+ * What the team knows about the brand, written once and reused: who buys, where, which creators would happily
+ * work with it and which obvious reasons would make a creator say no. Everything the search does is judged
+ * against this, so a creator is only kept if reaching out would plausibly work.
+ */
+export interface BrandUnderstanding {
+	summary: string;
+	customer: string;
+	/** Countries the brand sells in. Creators clearly based elsewhere are ruled out. */
+	markets: string[];
+	/** Kinds of creator who would gladly make content for the brand. */
+	greatFits: string[];
+	/** Obvious reasons a creator would say no, or working with them wouldn't help. */
+	dealBreakers: string[];
+}
+
 export interface InfluencerBrief {
+	/** What the brand is, who it sells to and where; the creator's fit is judged against it. */
+	brand?: BrandUnderstanding;
 	/** The user's own words, e.g. "big and tall men who post menswear fit content". */
 	direction: string;
 	platforms: Platform[];
@@ -127,7 +145,7 @@ export interface InfluencerResult {
 	concern: string;
 	recentPosts: CreatorPost[];
 	/** Why a creator was set aside, for the Excluded list. */
-	excludedBecause: "competitor" | "competitor_partner" | "not_a_creator" | "low_fit" | null;
+	excludedBecause: "competitor" | "competitor_partner" | "not_a_creator" | "outside_market" | "low_fit" | null;
 }
 
 export interface InfluencerSearchStats {
