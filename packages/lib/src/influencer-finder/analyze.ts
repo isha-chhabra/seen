@@ -33,8 +33,8 @@ export interface EngagementSample {
 }
 
 /**
- * Average (likes + comments) / followers, in percent, over the posts whose likes
- * are visible. Instagram lets people hide like counts (reported as null or -1);
+ * Typical (median) (likes + comments) / followers, in percent, over the posts whose likes
+ * are visible. The median, not the mean, so one viral post can't push a creator to 100%. Instagram lets people hide like counts (reported as null or -1);
  * those posts are left out rather than counted as zero.
  */
 export function engagementPct(
@@ -43,8 +43,12 @@ export function engagementPct(
 ): { pct: number | null; sample: number } {
 	const usable = samples.filter((s) => typeof s.likes === "number" && s.likes >= 0);
 	if (usable.length === 0 || !followers || followers <= 0) return { pct: null, sample: usable.length };
-	const total = usable.reduce((sum, s) => sum + (s.likes as number) + Math.max(0, s.comments ?? 0), 0);
-	return { pct: Math.round((total / usable.length / followers) * 10_000) / 100, sample: usable.length };
+	const rates = usable
+		.map((s) => ((s.likes as number) + Math.max(0, s.comments ?? 0)) / followers)
+		.sort((a, b) => a - b);
+	const mid = Math.floor(rates.length / 2);
+	const median = rates.length % 2 ? (rates[mid] as number) : ((rates[mid - 1] as number) + (rates[mid] as number)) / 2;
+	return { pct: Math.round(median * 10_000) / 100, sample: usable.length };
 }
 
 // ── sponsorship markers ─────────────────────────────────────────────

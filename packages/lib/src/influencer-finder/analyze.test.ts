@@ -33,6 +33,20 @@ describe("daysSince", () => {
 });
 
 describe("engagementPct", () => {
+	it("uses the median, so one viral post does not distort the rate", () => {
+		const r = engagementPct(
+			[
+				{ likes: 900, comments: 100 },
+				{ likes: 1000, comments: 0 },
+				{ likes: 1100, comments: 0 },
+				{ likes: 400_000, comments: 1000 },
+			],
+			100_000,
+		);
+		expect(r.pct).toBe(1.05);
+		expect(r.sample).toBe(4);
+	});
+
 	it("averages (likes + comments) over followers across the visible posts", () => {
 		const r = engagementPct(
 			[
