@@ -610,23 +610,16 @@ function ResponsesTab({
 }) {
 	const formatDate = (dateString: string) => new Date(dateString).toLocaleString(undefined, { timeZoneName: "short" });
 
-	const formatRawOutput = (rawOutput: any) =>
-		typeof rawOutput === "string" ? rawOutput : JSON.stringify(rawOutput, null, 2);
-
 	if (isLoading && runs.length === 0) {
 		return (
 			<div className="space-y-4">
 				{skeletonRows(3).map((row) => (
 					<Card key={row}>
 						<CardHeader className="pb-0 gap-y-0">
-							<div className="grid grid-cols-3 gap-x-4">
+							<div className="grid grid-cols-2 gap-x-4">
 								<div>
 									<Skeleton className="h-4 w-20 mb-1" />
 									<Skeleton className="h-4 w-16" />
-								</div>
-								<div>
-									<Skeleton className="h-4 w-16 mb-1" />
-									<Skeleton className="h-4 w-24" />
 								</div>
 								<div>
 									<Skeleton className="h-4 w-20 mb-1" />
@@ -657,14 +650,10 @@ function ResponsesTab({
 			{runs.map((run: any) => (
 				<Card key={run.id}>
 					<CardHeader className="pb-0 gap-y-0">
-						<div className="grid grid-cols-3 gap-x-4 text-sm">
+						<div className="grid grid-cols-2 gap-x-4 text-sm">
 							<div>
 								<span className="text-muted-foreground block text-xs mb-0.5">Model</span>
 								<span>{getModelDisplayName(run.model)}</span>
-							</div>
-							<div>
-								<span className="text-muted-foreground block text-xs mb-0.5">Version</span>
-								<span>{run.version}</span>
 							</div>
 							<div>
 								<span className="text-muted-foreground block text-xs mb-0.5">Evaluated</span>
@@ -715,14 +704,7 @@ function ResponsesTab({
 							</div>
 						</div>
 
-						<div>
-							<span className="text-xs text-muted-foreground block mb-1.5">Raw Output</span>
-							<div className="rounded-md border bg-muted/20 p-4 max-h-64 overflow-auto">
-								<pre className="text-xs font-mono leading-relaxed whitespace-pre-wrap">
-									{formatRawOutput(run.rawOutput)}
-								</pre>
-							</div>
-						</div>
+						<RawOutput rawOutput={run.rawOutput} />
 					</CardContent>
 				</Card>
 			))}
@@ -733,6 +715,29 @@ function ResponsesTab({
 				totalItems={pagination?.total ?? runs.length}
 				onPageChange={(p) => onPageChange(p + 1)}
 			/>
+		</div>
+	);
+}
+
+/** The provider's raw response, kept out of sight until someone asks for it. */
+function RawOutput({ rawOutput }: { rawOutput: unknown }) {
+	const [open, setOpen] = useState(false);
+	const formatRawOutput = (value: unknown) => (typeof value === "string" ? value : JSON.stringify(value, null, 2));
+	return (
+		<div>
+			<button
+				type="button"
+				onClick={() => setOpen((o) => !o)}
+				aria-expanded={open}
+				className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+			>
+				{open ? "Hide Raw Output" : "Show Raw Output"}
+			</button>
+			{open && (
+				<div className="mt-2 max-h-64 overflow-auto rounded-md border bg-muted/20 p-4">
+					<pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed">{formatRawOutput(rawOutput)}</pre>
+				</div>
+			)}
 		</div>
 	);
 }

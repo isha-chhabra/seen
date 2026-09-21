@@ -1,4 +1,4 @@
-import { IconBolt, IconLoader2 } from "@tabler/icons-react";
+import { IconLoader2 } from "@tabler/icons-react";
 import { Button } from "@workspace/ui/components/button";
 import {
 	Dialog,
@@ -163,11 +163,7 @@ export function RunNowButton({
 					className,
 				)}
 			>
-				{busy || state.kind === "tracking" ? (
-					<IconLoader2 className="size-5 animate-spin" />
-				) : (
-					<IconBolt className="size-5" />
-				)}
+				{(busy || state.kind === "tracking") && <IconLoader2 className="size-5 animate-spin" />}
 				{label}
 			</Button>
 
