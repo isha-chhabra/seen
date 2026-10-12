@@ -169,6 +169,8 @@ export const citations = pgTable(
 		),
 		promptCreatedIdx: index("citations_prompt_id_created_at_idx").on(table.promptId, table.createdAt),
 		domainIdx: index("citations_domain_idx").on(table.domain),
+		// Deleting prompt runs checks this foreign key for every run; without the index that is a full scan of citations per run.
+		promptRunIdx: index("citations_prompt_run_id_idx").on(table.promptRunId),
 	}),
 ).enableRLS();
 
